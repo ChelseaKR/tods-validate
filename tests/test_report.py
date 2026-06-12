@@ -35,3 +35,19 @@ def test_github_annotations_escape_newlines_and_percent() -> None:
     assert "%0A" in first  # newline escaped
     assert "100%25" in first  # percent escaped
     assert "\n" not in first
+
+
+def test_markdown_report_groups_and_links_nothing() -> None:
+    from tods_validate.report import render_markdown
+
+    out = render_markdown([FINDING], "feed/")
+    assert out.startswith("# TODS validation report")
+    assert "## Errors (1)" in out
+    assert "- **TODS-E999** (run_events.txt, row 7, field 'trip_id'):" in out
+    assert "  - Fix: Do the fix." in out
+
+
+def test_markdown_report_clean_feed() -> None:
+    from tods_validate.report import render_markdown
+
+    assert "No problems found." in render_markdown([], "feed/")

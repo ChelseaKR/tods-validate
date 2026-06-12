@@ -64,6 +64,39 @@ def render_json(findings: list[Finding], source: str) -> str:
     return json.dumps(payload, indent=2)
 
 
+def render_markdown(findings: list[Finding], source: str) -> str:
+    """A report suitable for pasting into an issue or working-group thread."""
+    counts = summarize(findings)
+    lines = [
+        "# TODS validation report",
+        "",
+        f"Source: `{source}`, validated against TODS v{SPEC_VERSION} by tods-validate.",
+        "",
+    ]
+    if not findings:
+        lines.append("No problems found.")
+        return "\n".join(lines)
+
+    lines.append(
+        f"**{counts[Severity.ERROR]} error(s), {counts[Severity.WARNING]} warning(s), "
+        f"{counts[Severity.INFO]} info.**"
+    )
+    for severity in (Severity.ERROR, Severity.WARNING, Severity.INFO):
+        group = [f for f in findings if f.severity == severity]
+        if not group:
+            continue
+        lines.append("")
+        lines.append(f"## {severity.name.title()}s ({len(group)})")
+        lines.append("")
+        for f in group:
+            location = f.location()
+            where = f" ({location})" if location else ""
+            lines.append(f"- **{f.rule_id}**{where}: {f.message}")
+            if f.suggestion:
+                lines.append(f"  - Fix: {f.suggestion}")
+    return "\n".join(lines)
+
+
 _GITHUB_COMMANDS = {
     Severity.ERROR: "error",
     Severity.WARNING: "warning",
@@ -103,5 +136,6 @@ def render_github(findings: list[Finding], source: str) -> str:
 RENDERERS = {
     "text": render_text,
     "json": render_json,
+    "markdown": render_markdown,
     "github": render_github,
 }

@@ -60,7 +60,20 @@ you pass `--fail-on warning`.
 Other output formats:
 
 - `--format json` prints a stable JSON document for tooling.
+- `--format markdown` prints a report suitable for pasting into an issue.
 - `--format github` prints GitHub Actions workflow annotations.
+
+To suppress findings your agency has decided to accept, pass
+`--ignore TODS-W206` (repeatable), or put the policy in a
+`tods-validate.toml` next to where you run the validator:
+
+```toml
+ignore = ["TODS-W206", "TODS-I108"]
+fail-on = "warning"
+```
+
+Command-line flags win over the file. A config file in another location can
+be passed with `--config path/to/file.toml`.
 
 References into GTFS are resolved after applying the supplement files, so a
 trip added by `trips_supplement.txt` is a valid target for
