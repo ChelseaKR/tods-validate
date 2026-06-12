@@ -79,6 +79,37 @@ References into GTFS are resolved after applying the supplement files, so a
 trip added by `trips_supplement.txt` is a valid target for
 `run_events.trip_id`, and a stop deleted by `stops_supplement.txt` is not.
 
+## Merging supplements into GTFS
+
+The spec says that GTFS plus the supplement files should form a valid GTFS
+dataset (the "TODS-Supplemented GTFS"). The `merge` subcommand materializes
+that dataset so you can test the claim, or hand the operational feed to a
+tool that only speaks GTFS:
+
+```sh
+tods-validate merge exports/tods/ --gtfs exports/gtfs.zip -o supplemented.zip
+```
+
+GTFS files without a supplement are copied through unchanged; supplemented
+files get their rows deleted, updated, and added per the spec's evaluation
+rules, and the command reports what changed per file. Validate the TODS
+package first so the merge rests on clean inputs.
+
+A CI job that checks the merged feed with MobilityData's gtfs-validator:
+
+```yaml
+- uses: ChelseaKR/tods-validate@v0
+  with:
+    path: feed/tods
+    gtfs: feed/gtfs
+- run: |
+    pipx install tods-validate
+    tods-validate merge feed/tods --gtfs feed/gtfs -o supplemented.zip
+- run: |
+    curl -sSL -o gtfs-validator.jar https://github.com/MobilityData/gtfs-validator/releases/latest/download/gtfs-validator-cli.jar
+    java -jar gtfs-validator.jar -i supplemented.zip -o validator-report
+```
+
 ## GitHub Action
 
 If your TODS export lives in a repository, this workflow validates it on

@@ -233,6 +233,14 @@ A supplement row sets TODS_delete=1 but no row with that primary key exists in t
 
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
+### TODS-E314: Supplement row references a GTFS entity that does not exist
+
+Severity: ERROR. Needs a companion GTFS feed.
+
+A supplement row names a route, service, trip, or stop that is not in the supplemented GTFS feed (for example, a trip added by trips_supplement.txt with a route_id that exists nowhere). The merged feed would not form valid GTFS.
+
+Spec reference: <https://tods-transit.org/spec/#supplement-files>
+
 ## Semantic checks (TODS-x4xx)
 
 ### TODS-E401: Event ends before it starts

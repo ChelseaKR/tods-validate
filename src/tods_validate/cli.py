@@ -17,6 +17,7 @@ from . import __version__
 from .config import Config, ConfigError, load_config
 from .findings import Severity
 from .loader import PackageNotFoundError
+from .merge import merge_feeds
 from .report import RENDERERS, summarize
 from .rules import all_rules
 from .runner import run
@@ -48,8 +49,31 @@ def _check_rule_ids(ignore: tuple[str, ...]) -> None:
         )
 
 
-@click.command(name="tods-validate")
+class _DefaultToValidate(click.Group):
+    """Route ``tods-validate path/`` to the validate command.
+
+    ``tods-validate feed/`` predates the subcommands and stays supported;
+    a path that is not a known subcommand is treated as ``validate``'s
+    argument. A feed directory literally named like a subcommand can always
+    be validated explicitly: ``tods-validate validate merge/``.
+    """
+
+    def resolve_command(
+        self, ctx: click.Context, args: list[str]
+    ) -> tuple[str | None, click.Command | None, list[str]]:
+        try:
+            return super().resolve_command(ctx, args)
+        except click.UsageError:
+            return "validate", self.get_command(ctx, "validate"), args
+
+
+@click.group(cls=_DefaultToValidate, name="tods-validate")
 @click.version_option(__version__, message=f"%(prog)s %(version)s (TODS v{SPEC_VERSION})")
+def main() -> None:
+    """Validate TODS (Transit Operational Data Standard) feeds."""
+
+
+@main.command()
 @click.argument("path", type=click.Path(exists=False))
 @click.option(
     "--gtfs",
@@ -93,7 +117,7 @@ def _check_rule_ids(ignore: tuple[str, ...]) -> None:
         "current directory is used if present."
     ),
 )
-def main(
+def validate(
     path: str,
     gtfs_path: str | None,
     output_format: str,
@@ -101,7 +125,7 @@ def main(
     ignore_ids: tuple[str, ...],
     config_path: str | None,
 ) -> None:
-    """Validate a TODS (Transit Operational Data Standard) feed at PATH.
+    """Validate the TODS feed at PATH.
 
     PATH is a directory or .zip file containing the TODS .txt files, with or
     without the GTFS feed alongside them.
@@ -126,6 +150,57 @@ def main(
         effective_fail_on == "warning" and counts[Severity.WARNING] > 0
     )
     sys.exit(1 if failed else 0)
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=False))
+@click.option(
+    "--gtfs",
+    "gtfs_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Companion GTFS feed (directory or .zip). Omit if the GTFS files sit "
+        "next to the TODS files."
+    ),
+)
+@click.option(
+    "-o",
+    "--output",
+    "output_path",
+    required=True,
+    type=click.Path(),
+    help="Where to write the merged feed: a directory, or a path ending in .zip.",
+)
+def merge(path: str, gtfs_path: str | None, output_path: str) -> None:
+    """Write the TODS-Supplemented GTFS feed.
+
+    Applies the supplement files in the TODS package at PATH to the companion
+    GTFS feed and writes the merged GTFS dataset. The spec says this dataset
+    should form valid GTFS; check it with MobilityData's gtfs-validator.
+    Validate the TODS package first so merge decisions rest on clean inputs.
+    """
+    try:
+        result = merge_feeds(
+            Path(path),
+            Path(gtfs_path) if gtfs_path else None,
+            Path(output_path),
+        )
+    except PackageNotFoundError as exc:
+        _fail(str(exc))
+
+    for name, stats in sorted(result.stats.items()):
+        details = []
+        if stats.updated:
+            details.append(f"{stats.updated} row(s) updated")
+        if stats.added:
+            details.append(f"{stats.added} added")
+        if stats.deleted:
+            details.append(f"{stats.deleted} deleted")
+        if stats.skipped:
+            details.append(f"{stats.skipped} skipped (blank primary key)")
+        click.echo(f"{name}: {', '.join(details) if details else 'no changes'}")
+    click.echo(f"Wrote {len(result.written)} file(s) to {output_path}.")
 
 
 if __name__ == "__main__":

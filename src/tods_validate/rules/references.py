@@ -61,6 +61,14 @@ def _calendar_available(context: ValidationContext) -> bool:
     )
 
 
+def _routes_available(context: ValidationContext) -> bool:
+    assert context.gtfs is not None
+    return (
+        "routes.txt" in context.gtfs.present
+        or context.package.get("routes_supplement.txt") is not None
+    )
+
+
 @rule(
     id="TODS-E301",
     severity=Severity.ERROR,
@@ -589,5 +597,78 @@ def delete_target_missing(context: ValidationContext) -> Iterator[Finding]:
                     suggestion=(
                         "Check the ID against the GTFS feed; the row may have already "
                         "been removed in a newer GTFS export."
+                    ),
+                )
+
+
+@rule(
+    id="TODS-E314",
+    severity=Severity.ERROR,
+    title="Supplement row references a GTFS entity that does not exist",
+    description=(
+        "A supplement row names a route, service, trip, or stop that is not in the "
+        "supplemented GTFS feed (for example, a trip added by trips_supplement.txt "
+        "with a route_id that exists nowhere). The merged feed would not form valid "
+        "GTFS."
+    ),
+    spec_section=_SUPPLEMENT_SECTION,
+    needs_gtfs=True,
+)
+def supplement_reference_missing(context: ValidationContext) -> Iterator[Finding]:
+    assert context.gtfs is not None
+    gtfs = context.gtfs
+    checks: list[tuple[str, str, bool, set[str], str]] = [
+        (
+            "trips_supplement.txt",
+            "route_id",
+            _routes_available(context),
+            gtfs.route_ids,
+            "routes.txt (after applying routes_supplement.txt)",
+        ),
+        (
+            "trips_supplement.txt",
+            "service_id",
+            _calendar_available(context),
+            gtfs.service_ids,
+            "calendar.txt or calendar_dates.txt (after applying supplements)",
+        ),
+        (
+            "stop_times_supplement.txt",
+            "trip_id",
+            _trips_available(context),
+            set(gtfs.trip_service),
+            "trips.txt (after applying trips_supplement.txt)",
+        ),
+        (
+            "stop_times_supplement.txt",
+            "stop_id",
+            _stops_available(context),
+            gtfs.stop_ids,
+            "stops.txt (after applying stops_supplement.txt)",
+        ),
+    ]
+    for filename, field_name, available, valid_ids, where in checks:
+        feed = context.package.get(filename)
+        if feed is None or not available or field_name not in feed.headers:
+            continue
+        for row in feed.rows:
+            if row.values.get("TODS_delete", "") == "1":
+                continue  # other values on a delete row are ignored
+            value = row.values.get(field_name, "")
+            if value and value not in valid_ids:
+                yield Finding(
+                    rule_id="TODS-E314",
+                    severity=Severity.ERROR,
+                    file=filename,
+                    row=row.line,
+                    field=field_name,
+                    message=(
+                        f"{filename} row {row.line}: {field_name} {value!r} does not "
+                        f"exist in {where}. The merged feed would reference a missing "
+                        "record."
+                    ),
+                    suggestion=(
+                        f"Correct the {field_name}, or add the missing record via the "
+                        "matching supplement file."
                     ),
                 )
