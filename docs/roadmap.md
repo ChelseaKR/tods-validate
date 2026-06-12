@@ -4,17 +4,18 @@ Planned direction for tods-validate. Dates are intentions, not promises;
 items move earlier when users ask for them. Feedback and feature requests
 are welcome as GitHub issues.
 
-## v0.2.0 — Suppression and reporting
+## v0.2.0 — Suppression and reporting (shipped 2026-06-12)
 
 - `--ignore TODS-Wxxx` (repeatable) and a `tods-validate.toml` config file so
   agencies can encode local policy and run the validator in CI without
   fighting warnings they have decided to accept.
 - `--format markdown`: a report suitable for pasting into an issue or a
   working-group thread.
-- Fixes from validating real-world feeds. If you produce or consume TODS and
-  can share a feed (privately is fine), please open an issue.
+- Still open: fixes from validating real-world feeds. If you produce or
+  consume TODS and can share a feed (privately is fine), please open an
+  issue.
 
-## v0.3.0 — The merge pipeline
+## v0.3.0 — The merge pipeline (shipped 2026-06-12)
 
 - `tods-validate merge feed/ -o supplemented.zip`: materialize the
   "TODS-Supplemented GTFS" the spec describes, so the result can be checked
@@ -24,10 +25,10 @@ are welcome as GitHub issues.
   `stop_times_supplement.txt:trip_id` resolving against supplemented trips).
 - A documented CI recipe chaining merge and gtfs-validator.
 
-## v0.4.0 — Distribution surfaces
+## v0.4.0 — Distribution surfaces (in progress)
 
 - Docker image on GHCR for CI environments without Python.
-- `--list-rules --format json` and a published JSON Schema for the report
+- `tods-validate rules` (text and JSON) and a published JSON Schema for the report
   format, so dashboards can consume findings without scraping text.
 - A pre-commit hook definition.
 - Performance benchmarks on large feeds.

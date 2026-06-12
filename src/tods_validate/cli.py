@@ -7,6 +7,7 @@ configuration could not be read at all.
 
 from __future__ import annotations
 
+import json
 import sys
 from pathlib import Path
 from typing import NoReturn
@@ -201,6 +202,37 @@ def merge(path: str, gtfs_path: str | None, output_path: str) -> None:
             details.append(f"{stats.skipped} skipped (blank primary key)")
         click.echo(f"{name}: {', '.join(details) if details else 'no changes'}")
     click.echo(f"Wrote {len(result.written)} file(s) to {output_path}.")
+
+
+@main.command(name="rules")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json"]),
+    default="text",
+    show_default=True,
+    help="Plain listing, or JSON for tooling.",
+)
+def rules_command(output_format: str) -> None:
+    """List every rule with its severity and description."""
+    rules = sorted(all_rules(), key=lambda r: r.id.split("-")[1][1:])
+    if output_format == "json":
+        payload = [
+            {
+                "id": r.id,
+                "severity": r.severity.name,
+                "title": r.title,
+                "description": r.description,
+                "specSection": r.spec_section,
+                "needsGtfs": r.needs_gtfs,
+            }
+            for r in rules
+        ]
+        click.echo(json.dumps(payload, indent=2))
+        return
+    for r in rules:
+        needs = " (needs companion GTFS)" if r.needs_gtfs else ""
+        click.echo(f"{r.id}  {r.severity.name:7}  {r.title}{needs}")
 
 
 if __name__ == "__main__":

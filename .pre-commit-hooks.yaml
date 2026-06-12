@@ -1,0 +1,14 @@
+# Use from another repository's .pre-commit-config.yaml:
+#
+#   - repo: https://github.com/ChelseaKR/tods-validate
+#     rev: v0.3.0
+#     hooks:
+#       - id: tods-validate
+#         args: [feed/tods, --gtfs, feed/gtfs]
+- id: tods-validate
+  name: tods-validate
+  description: Validate a TODS (Transit Operational Data Standard) feed
+  entry: tods-validate
+  language: python
+  pass_filenames: false
+  always_run: true

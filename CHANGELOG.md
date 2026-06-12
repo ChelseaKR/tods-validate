@@ -3,6 +3,15 @@
 Notable changes to tods-validate. Rule IDs are never renumbered or reused;
 new checks may be added in minor releases.
 
+## Unreleased
+
+- `tods-validate rules` lists the rule catalog from the tool itself
+  (`--format json` for tooling).
+- Published JSON Schema for the `--format json` report
+  (docs/report.schema.json), enforced by tests.
+- Dockerfile and a workflow publishing images to GHCR on each release.
+- pre-commit hook definition (.pre-commit-hooks.yaml).
+
 ## v0.3.0 - 2026-06-12
 
 - New `merge` subcommand writes the "TODS-Supplemented GTFS" dataset (the

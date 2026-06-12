@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ChelseaKR/tods-validate/main/docs/report.schema.json",
+  "title": "tods-validate JSON report",
+  "description": "Output of `tods-validate validate --format json`. Stable: fields are only added, never removed or renamed, within a major version.",
+  "type": "object",
+  "required": ["validator", "specVersion", "source", "summary", "findings"],
+  "properties": {
+    "validator": { "const": "tods-validate" },
+    "specVersion": {
+      "type": "string",
+      "description": "TODS specification version the rules implement."
+    },
+    "source": {
+      "type": "string",
+      "description": "The path that was validated, as given on the command line."
+    },
+    "summary": {
+      "type": "object",
+      "required": ["errors", "warnings", "infos"],
+      "properties": {
+        "errors": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 },
+        "infos": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "severity", "file", "row", "field", "message", "suggestion"],
+        "properties": {
+          "rule_id": { "type": "string", "pattern": "^TODS-[EWI][0-9]{3}$" },
+          "severity": { "enum": ["ERROR", "WARNING", "INFO"] },
+          "file": { "type": ["string", "null"] },
+          "row": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "description": "1-based line number; the header row is line 1."
+          },
+          "field": { "type": ["string", "null"] },
+          "message": { "type": "string" },
+          "suggestion": { "type": ["string", "null"] }
+        },
+        "additionalProperties": false
+      }
+    }
+  },
+  "additionalProperties": false
+}

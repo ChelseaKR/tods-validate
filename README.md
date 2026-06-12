@@ -22,7 +22,15 @@ Requires Python 3.11 or newer.
 pipx install tods-validate
 ```
 
-or `pip install tods-validate` into an environment of your choice.
+or `pip install tods-validate` into an environment of your choice. For CI
+environments without Python, a container image is published on releases:
+
+```sh
+docker run --rm -v "$PWD/feed:/feed:ro" ghcr.io/chelseakr/tods-validate /feed/tods --gtfs /feed/gtfs
+```
+
+There is also a [pre-commit](https://pre-commit.com) hook; see
+[.pre-commit-hooks.yaml](.pre-commit-hooks.yaml) for usage.
 
 ## Usage
 
@@ -132,8 +140,10 @@ jobs:
 ## Rules
 
 The full catalog of checks, with IDs, severities, and spec citations, is in
-[docs/rules.md](docs/rules.md). Rule IDs are stable: a CI pipeline can safely
-filter or suppress specific IDs.
+[docs/rules.md](docs/rules.md), or from the tool itself with
+`tods-validate rules` (`--format json` for tooling). Rule IDs are stable: a
+CI pipeline can safely filter or suppress specific IDs. The JSON report
+format is described by [docs/report.schema.json](docs/report.schema.json).
 
 Ambiguities in the spec discovered while building the validator are tracked
 in [docs/spec-questions.md](docs/spec-questions.md).
