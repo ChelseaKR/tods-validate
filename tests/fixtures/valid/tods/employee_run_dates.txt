@@ -1,0 +1,4 @@
+date,service_id,run_id,employee_id
+20260106,daily,10000,emp-100
+20260106,crew-weekday,200,emp-200
+20260107,daily,10000,emp-101

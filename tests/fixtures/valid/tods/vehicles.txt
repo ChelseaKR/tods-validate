@@ -1,0 +1,3 @@
+vehicle_id,vehicle_label,license_plate
+bus-1,Old Reliable,OR-E285104
+bus-2,Buster,OR-E251432

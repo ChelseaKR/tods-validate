@@ -1,0 +1,3 @@
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Work,s1,08:00:00,s1,12:00:00
+daily,2,1,Work,s1,10:00:00,s1,14:00:00

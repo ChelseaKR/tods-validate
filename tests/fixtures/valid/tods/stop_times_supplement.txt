@@ -1,0 +1,7 @@
+trip_id,arrival_time,departure_time,stop_id,stop_sequence
+deadhead-1,09:45:00,09:45:00,garage,1
+deadhead-1,09:50:00,09:50:00,garage-waypoint,2
+deadhead-1,09:55:00,09:55:00,stop-1,3
+deadhead-2,14:50:00,14:50:00,stop-1,1
+deadhead-2,14:55:00,14:55:00,garage-waypoint,2
+deadhead-2,15:00:00,15:00:00,garage,3

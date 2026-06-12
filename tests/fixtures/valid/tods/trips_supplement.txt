@@ -1,0 +1,3 @@
+route_id,service_id,trip_id,block_id,TODS_trip_type
+deadheads,daily,deadhead-1,BLOCK-A,pull-out
+deadheads,daily,deadhead-2,BLOCK-A,pull-back

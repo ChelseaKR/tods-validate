@@ -1,0 +1,2 @@
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,garage,10:00:00,garage,09:00:00

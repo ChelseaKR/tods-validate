@@ -1,0 +1,3 @@
+stop_id,stop_name,TODS_delete
+s1,,1
+s1,Replacement Name,

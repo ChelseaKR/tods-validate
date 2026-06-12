@@ -1,0 +1,2 @@
+stop_id,my_custom_note
+garage,internal only

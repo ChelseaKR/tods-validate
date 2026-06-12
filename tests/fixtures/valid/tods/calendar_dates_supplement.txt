@@ -1,0 +1,2 @@
+service_id,date,exception_type
+crew-weekday,20260703,2

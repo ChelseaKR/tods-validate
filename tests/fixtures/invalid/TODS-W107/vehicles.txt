@@ -1,0 +1,2 @@
+vehicle_id,vehicle_nickname
+bus-1,Buster

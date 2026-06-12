@@ -1,0 +1,3 @@
+vehicle_id,vehicle_label
+bus-1,Old Reliable
+bus-1,Duplicate
