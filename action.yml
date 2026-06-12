@@ -1,0 +1,38 @@
+name: tods-validate
+description: >-
+  Validate a Transit Operational Data Standard (TODS) feed and annotate
+  findings on the pull request.
+branding:
+  icon: check-circle
+  color: green
+
+inputs:
+  path:
+    description: Directory or .zip file containing the TODS files.
+    required: true
+  gtfs:
+    description: >-
+      Companion GTFS feed (directory or .zip). Leave empty if the GTFS files
+      sit next to the TODS files.
+    required: false
+    default: ""
+  fail-on:
+    description: Fail the job on findings at or above this severity (error or warning).
+    required: false
+    default: error
+
+runs:
+  using: composite
+  steps:
+    - name: Install tods-validate
+      shell: bash
+      run: python3 -m pip install --quiet "${{ github.action_path }}"
+
+    - name: Validate feed
+      shell: bash
+      run: |
+        args=("${{ inputs.path }}" --format github --fail-on "${{ inputs['fail-on'] }}")
+        if [ -n "${{ inputs.gtfs }}" ]; then
+          args+=(--gtfs "${{ inputs.gtfs }}")
+        fi
+        tods-validate "${args[@]}"
