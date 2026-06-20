@@ -1,0 +1,2 @@
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+daily,1,10,Operator,t1,s1,10:00:00,s2,10:30:00

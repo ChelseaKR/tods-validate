@@ -115,6 +115,10 @@ def invalid_enum(context: ValidationContext) -> Iterator[Finding]:
         "event_sequence must be a non-negative whole number."
     ),
     spec_section=SPEC_URL,
+    interpretation=(
+        "permissive: GTFS time syntax with hours beyond 24:00:00 is accepted, though "
+        "the spec's Time type does not state it explicitly (spec-questions #5)."
+    ),
 )
 def invalid_format(context: ValidationContext) -> Iterator[Finding]:
     for table, feed in _tods_tables(context):
@@ -220,6 +224,10 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
         "to a single block."
     ),
     spec_section=f"{SPEC_URL}#vehicle_assignmentstxt",
+    interpretation=(
+        "per-row reading: fires only for rows whose block_id is ambiguous, not for "
+        "every row once any block is shared (spec-questions #8)."
+    ),
 )
 def vehicle_assignment_ambiguous(context: ValidationContext) -> Iterator[Finding]:
     feed = context.package.get("vehicle_assignments.txt")
@@ -258,6 +266,10 @@ def vehicle_assignment_ambiguous(context: ValidationContext) -> Iterator[Finding
         "records they reference, and consumers are not required to trim them."
     ),
     spec_section=SPEC_URL,
+    interpretation=(
+        "strict: values are compared exactly; the spec defines no trimming rule, so "
+        "padded example values are flagged rather than silently trimmed (spec-questions #3)."
+    ),
 )
 def padded_value(context: ValidationContext) -> Iterator[Finding]:
     for table, feed in _tods_tables(context):

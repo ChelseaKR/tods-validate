@@ -25,13 +25,20 @@ are welcome as GitHub issues.
   `stop_times_supplement.txt:trip_id` resolving against supplemented trips).
 - A documented CI recipe chaining merge and gtfs-validator.
 
-## v0.4.0 — Distribution surfaces (in progress)
+## v0.4.0 — Distribution and analysis surfaces (shipped 2026-06-20)
 
 - Docker image on GHCR for CI environments without Python.
-- `tods-validate rules` (text and JSON) and a published JSON Schema for the report
-  format, so dashboards can consume findings without scraping text.
+- `tods-validate rules` (text and JSON, with category and interpretation
+  metadata) and a published JSON Schema for the report format, so dashboards
+  can consume findings without scraping text.
 - A pre-commit hook definition.
-- Performance benchmarks on large feeds.
+- `scripts/benchmark.py` for throughput on large synthetic feeds.
+- SARIF and HTML report formats; richer text/Markdown (by-rule grouping,
+  root-cause hints, path-to-green).
+- `diff`, `batch`, `stats`, and `anonymize` subcommands; a `merge` manifest.
+- Opt-in coverage (TODS-I50x) and advisory (TODS-I60x) rules via `--enable`.
+- A public Python API (`validate_feed`), `--baseline`, `--profile`, config
+  `extends`, and input-safety hardening (SECURITY.md).
 
 ## v0.5.0 — Spec tracking
 

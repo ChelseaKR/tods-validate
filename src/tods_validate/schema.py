@@ -17,6 +17,10 @@ from dataclasses import dataclass
 from enum import Enum
 
 SPEC_VERSION = "2.1.0"
+# Spec versions this validator can be asked to target via --spec-version. Only
+# 2.1.0 is implemented today; the flag exists so feeds and CI can be explicit
+# and so a mismatch fails loudly rather than validating against the wrong text.
+SUPPORTED_SPEC_VERSIONS = ("2.1.0",)
 SPEC_URL = "https://tods-transit.org/spec/"
 
 
@@ -359,6 +363,7 @@ __all__ = [
     "GTFS_PRIMARY_KEYS",
     "SPEC_URL",
     "SPEC_VERSION",
+    "SUPPORTED_SPEC_VERSIONS",
     "TABLES",
     "FieldSpec",
     "FieldType",

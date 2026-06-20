@@ -56,6 +56,7 @@ def test_json_format_is_stable_and_parseable() -> None:
         "file",
         "row",
         "field",
+        "location",
         "message",
         "suggestion",
     }

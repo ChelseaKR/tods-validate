@@ -68,8 +68,20 @@ you pass `--fail-on warning`.
 Other output formats:
 
 - `--format json` prints a stable JSON document for tooling.
-- `--format markdown` prints a report suitable for pasting into an issue.
+- `--format markdown` prints a report suitable for pasting into an issue
+  (`--stamp` adds a provenance footer for a citable compliance artifact).
 - `--format github` prints GitHub Actions workflow annotations.
+- `--format sarif` prints SARIF for GitHub code-scanning and security
+  dashboards.
+- `--format html` prints a standalone, shareable report.
+
+On large feeds, `--max-findings N` caps how many findings are listed (the
+summary is unaffected) and `--quiet` prints only the summary. Text and Markdown
+reports group findings by rule and add a root-cause hint when one rule clusters.
+
+New developers can also call the validator in-process; see
+[docs/api.md](docs/api.md). Not a programmer? Start with
+[docs/getting-started.md](docs/getting-started.md).
 
 To suppress findings your agency has decided to accept, pass
 `--ignore TODS-W206` (repeatable), or put the policy in a
@@ -81,7 +93,14 @@ fail-on = "warning"
 ```
 
 Command-line flags win over the file. A config file in another location can
-be passed with `--config path/to/file.toml`.
+be passed with `--config path/to/file.toml`. A config may also `extends =
+"../base.toml"` to inherit a shared house policy, and `profile = "strict"`
+(or `lenient`) applies a named preset that other settings can still override.
+
+Some checks are off by default because they surface judgement calls rather than
+spec violations. Turn them on with `--enable coverage` (which GTFS trips have no
+run event; which blocks have no vehicle) or `--enable advisory` (e.g. long runs
+with no break), or by rule ID. See [docs/rules.md](docs/rules.md).
 
 References into GTFS are resolved after applying the supplement files, so a
 trip added by `trips_supplement.txt` is a valid target for
@@ -117,6 +136,24 @@ A CI job that checks the merged feed with MobilityData's gtfs-validator:
     curl -sSL -o gtfs-validator.jar https://github.com/MobilityData/gtfs-validator/releases/latest/download/gtfs-validator-cli.jar
     java -jar gtfs-validator.jar -i supplemented.zip -o validator-report
 ```
+
+## Other subcommands
+
+- `tods-validate stats feed/ --gtfs gtfs/` prints descriptive metrics (run
+  events, distinct runs, revenue vs non-revenue minutes, employees, vehicles,
+  and GTFS coverage) — facts about a feed, not a quality score.
+- `tods-validate diff old/ new/` validates two versions of a feed and reports
+  which findings were fixed, newly introduced, or still present; it exits
+  non-zero only on newly introduced errors, which is useful in review.
+- `tods-validate batch a/ b/ c/` validates several feeds and prints a roll-up
+  table (`--format json` for tooling).
+- `tods-validate anonymize feed/ -o feed-anon/` writes a copy with
+  person-identifying fields (employee IDs, license plates, vehicle IDs)
+  pseudonymized before sharing. This is pseudonymization, not guaranteed
+  anonymity; see [SECURITY.md](SECURITY.md).
+
+To fail CI only on findings introduced since a known-good run, capture a
+baseline (`--format json > baseline.json`) and pass `--baseline baseline.json`.
 
 ## GitHub Action
 

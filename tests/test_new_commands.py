@@ -1,0 +1,134 @@
+"""New CLI surfaces: stats, anonymize, diff, batch, baseline, formats, flags."""
+
+import json
+from pathlib import Path
+
+from click.testing import CliRunner
+
+from conftest import FIXTURES, VALID_GTFS, VALID_TODS
+from tods_validate.cli import main
+
+E201 = str(FIXTURES / "invalid" / "TODS-E201")
+
+
+def invoke(*args: str):
+    return CliRunner().invoke(main, list(args))
+
+
+def test_sarif_format_is_valid_json_with_runs() -> None:
+    result = invoke(E201, "--format", "sarif")
+    payload = json.loads(result.output)
+    assert payload["version"] == "2.1.0"
+    assert payload["runs"][0]["tool"]["driver"]["name"] == "tods-validate"
+    assert payload["runs"][0]["results"][0]["ruleId"].startswith("TODS-")
+
+
+def test_html_format_is_self_contained() -> None:
+    result = invoke(E201, "--format", "html")
+    assert result.output.lstrip().startswith("<!doctype html>")
+    assert "TODS-E201" in result.output
+    assert "http://" not in result.output  # no external assets
+
+
+def test_json_carries_report_metadata_and_location() -> None:
+    result = invoke(E201, "--format", "json")
+    payload = json.loads(result.output)
+    assert payload["reportVersion"]
+    assert payload["toolVersion"]
+    assert payload["summary"]["byRule"]["TODS-E201"] >= 1
+    assert payload["findings"][0]["location"].startswith("run_events.txt#L")
+
+
+def test_max_findings_caps_output_but_not_summary() -> None:
+    result = invoke(E201, "--max-findings", "0")
+    assert "more finding(s) not shown" in result.output
+    assert "Summary:" in result.output
+
+
+def test_quiet_suppresses_individual_findings() -> None:
+    result = invoke(E201, "--quiet")
+    assert "Summary:" in result.output
+    assert "is required but empty" not in result.output
+
+
+def test_spec_version_unsupported_is_exit_two() -> None:
+    result = invoke(E201, "--spec-version", "9.9.9")
+    assert result.exit_code == 2
+    assert "unsupported --spec-version" in result.output
+
+
+def test_enable_unknown_token_is_error() -> None:
+    result = invoke(E201, "--enable", "nonsense")
+    assert result.exit_code == 2
+    assert "unknown --enable token" in result.output
+
+
+def test_profile_strict_fails_on_warning() -> None:
+    result = invoke(str(FIXTURES / "invalid" / "TODS-W101"), "--profile", "strict")
+    assert result.exit_code == 1
+
+
+def test_baseline_suppresses_known_findings(tmp_path: Path) -> None:
+    baseline = tmp_path / "base.json"
+    baseline.write_text(invoke(E201, "--format", "json").output, encoding="utf-8")
+    result = invoke(E201, "--baseline", str(baseline))
+    assert result.exit_code == 0  # nothing new since the baseline
+
+
+def test_diff_reports_introduced_and_exit_code() -> None:
+    result = invoke("diff", str(VALID_TODS), E201)
+    assert "introduced: 1" in result.output
+    assert result.exit_code == 1
+
+
+def test_batch_rolls_up_and_fails_on_any_error() -> None:
+    result = invoke("batch", E201, str(FIXTURES / "invalid" / "TODS-W101"))
+    assert result.exit_code == 1
+    assert E201 in result.output
+
+
+def test_batch_json() -> None:
+    result = invoke("batch", "--format", "json", E201)
+    payload = json.loads(result.output)
+    assert payload["feeds"][0]["errors"] >= 1
+
+
+def test_stats_text_and_json() -> None:
+    text = invoke("stats", str(VALID_TODS), "--gtfs", str(VALID_GTFS))
+    assert "Run events" in text.output
+    js = invoke("stats", str(VALID_TODS), "--gtfs", str(VALID_GTFS), "--format", "json")
+    payload = json.loads(js.output)
+    assert payload["run_events"] == 11
+    assert payload["trip_coverage_pct"] == 100.0
+
+
+def test_anonymize_pseudonymizes_consistently(tmp_path: Path) -> None:
+    out = tmp_path / "anon"
+    result = invoke("anonymize", str(VALID_TODS), "-o", str(out), "--salt", "fixed")
+    assert result.exit_code == 0
+    erd = (out / "employee_run_dates.txt").read_text(encoding="utf-8")
+    assert "emp_" in erd
+    # The same employee maps to the same pseudonym throughout the file.
+    veh = (out / "vehicles.txt").read_text(encoding="utf-8")
+    va = (out / "vehicle_assignments.txt").read_text(encoding="utf-8")
+    veh_ids = {line.split(",")[0] for line in veh.splitlines()[1:]}
+    va_ids = {line.split(",")[3] for line in va.splitlines()[1:]}
+    assert va_ids <= veh_ids  # vehicle_id references still resolve
+
+
+def test_merge_writes_manifest(tmp_path: Path) -> None:
+    out = tmp_path / "merged"
+    result = invoke("merge", str(VALID_TODS), "--gtfs", str(VALID_GTFS), "-o", str(out))
+    assert result.exit_code == 0
+    manifest = json.loads((out / "merge-report.json").read_text(encoding="utf-8"))
+    assert manifest["validator"] == "tods-validate"
+    assert "trips.txt" in manifest["files"]
+
+
+def test_github_outputs_written(tmp_path: Path, monkeypatch) -> None:
+    output_file = tmp_path / "gh_output"
+    output_file.touch()
+    monkeypatch.setenv("GITHUB_OUTPUT", str(output_file))
+    invoke(E201, "--format", "github")
+    written = output_file.read_text(encoding="utf-8")
+    assert "error-count=1" in written

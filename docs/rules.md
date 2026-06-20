@@ -101,6 +101,8 @@ Severity: ERROR.
 
 A value does not match its field type: times must be HH:MM:SS (hours may exceed 24 for service after midnight), dates must be YYYYMMDD, and event_sequence must be a non-negative whole number.
 
+Interpretation: permissive: GTFS time syntax with hours beyond 24:00:00 is accepted, though the spec's Time type does not state it explicitly (spec-questions #5).
+
 Spec reference: <https://tods-transit.org/spec/>
 
 ### TODS-E204: Duplicate primary key
@@ -117,6 +119,8 @@ Severity: ERROR.
 
 service_id in vehicle_assignments.txt is required when the same block_id is used by more than one service. Without it, the assignment cannot be matched to a single block.
 
+Interpretation: per-row reading: fires only for rows whose block_id is ambiguous, not for every row once any block is shared (spec-questions #8).
+
 Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 
 ### TODS-W206: Value has leading or trailing spaces
@@ -124,6 +128,8 @@ Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 Severity: WARNING.
 
 A value is padded with spaces. IDs with stray spaces will not match the records they reference, and consumers are not required to trim them.
+
+Interpretation: strict: values are compared exactly; the spec defines no trimming rule, so padded example values are flagged rather than silently trimmed (spec-questions #3).
 
 Spec reference: <https://tods-transit.org/spec/>
 
@@ -249,6 +255,8 @@ Severity: ERROR.
 
 A run event's end_time is earlier than its start_time. Equal times are fine (the spec allows zero-duration events such as a report time); for work past midnight, use hours of 24 or more rather than wrapping around.
 
+Interpretation: the spec is silent on end<start; this treats it as an error and equal times as valid (spec-questions #5).
+
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
 ### TODS-E402: Two trip events in one run overlap in time
@@ -305,4 +313,36 @@ Severity: WARNING.
 
 Two rows in employee_run_dates.txt are exactly identical (same date, service, run, and employee). Multiple employees per run are fine; the same employee twice is usually an export bug.
 
+Interpretation: permissive: the spec's 'Primary Key: *' is read as not forbidding an exact duplicate row, so this is a warning rather than an error (spec-questions #6).
+
 Spec reference: <https://tods-transit.org/spec/#employee_run_datestxt>
+
+## Coverage (opt-in, informational) (TODS-x5xx)
+
+### TODS-I501: GTFS trips have no run event
+
+Severity: INFO. Needs a companion GTFS feed. Opt-in: off by default, enable with `--enable coverage` or `--enable TODS-I501`.
+
+Some trips in the companion GTFS feed are never referenced by a run event, so no crew work is described for them. This is informational: not every trip must appear in run_events.txt, but wide gaps can mean an incomplete export.
+
+Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
+
+### TODS-I502: Blocks have no vehicle assignment
+
+Severity: INFO. Needs a companion GTFS feed. Opt-in: off by default, enable with `--enable coverage` or `--enable TODS-I502`.
+
+Some blocks in the companion GTFS feed have no row in vehicle_assignments.txt, so no vehicle is assigned to operate them. Informational: vehicle assignments are optional, but unassigned blocks may signal an incomplete export.
+
+Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
+
+## Advisory (opt-in) (TODS-x6xx)
+
+### TODS-I601: Run has a long span with no break event
+
+Severity: INFO. Opt-in: off by default, enable with `--enable advisory` or `--enable TODS-I601`.
+
+A run is on duty for a long continuous span with no event whose type names a break, lunch, or meal. Advisory only: break modelling varies by agency and labor agreement, so this is never an error.
+
+Interpretation: advisory: 'break' detected by event_type containing break/lunch/meal
+
+Spec reference: <https://tods-transit.org/spec/#run_eventstxt>

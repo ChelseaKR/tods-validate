@@ -8,6 +8,7 @@ on:
 permissions:
   contents: read
   packages: write
+  id-token: write # for keyless cosign signing
 
 jobs:
   build-push:
@@ -27,8 +28,17 @@ jobs:
             type=semver,pattern={{version}}
             type=raw,value=latest
       - uses: docker/build-push-action@v6
+        id: build
         with:
           context: .
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          sbom: true
+          provenance: mode=max
+      - name: Install cosign
+        uses: sigstore/cosign-installer@v3
+      - name: Sign the image by digest
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: cosign sign --yes "ghcr.io/${{ github.repository }}@${DIGEST}"

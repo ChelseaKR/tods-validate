@@ -44,6 +44,22 @@ class Finding:
             parts.append(f"field {self.field!r}")
         return ", ".join(parts)
 
+    def pointer(self) -> str | None:
+        """A stable, machine-parseable location identifier.
+
+        Of the form ``file.txt#L4`` or ``file.txt#L4/field``, so consumers can
+        deep-link a finding without parsing the human ``location()`` string.
+        Returns None for findings not tied to a file.
+        """
+        if not self.file:
+            return None
+        ref = self.file
+        if self.row is not None:
+            ref += f"#L{self.row}"
+        if self.field:
+            ref += f"/{self.field}"
+        return ref
+
     def to_dict(self) -> dict[str, object]:
         return {
             "rule_id": self.rule_id,
@@ -51,6 +67,7 @@ class Finding:
             "file": self.file,
             "row": self.row,
             "field": self.field,
+            "location": self.pointer(),
             "message": self.message,
             "suggestion": self.suggestion,
         }

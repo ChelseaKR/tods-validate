@@ -75,6 +75,10 @@ def _events_by_run(context: ValidationContext) -> dict[tuple[str, str], list[_Ev
         "midnight, use hours of 24 or more rather than wrapping around."
     ),
     spec_section=_RUN_EVENTS_SECTION,
+    interpretation=(
+        "the spec is silent on end<start; this treats it as an error and equal "
+        "times as valid (spec-questions #5)."
+    ),
 )
 def event_ends_before_start(context: ValidationContext) -> Iterator[Finding]:
     for event in _events(context):
@@ -376,6 +380,10 @@ def vehicle_assignment_outside_service(context: ValidationContext) -> Iterator[F
         "employee twice is usually an export bug."
     ),
     spec_section=f"{SPEC_URL}#employee_run_datestxt",
+    interpretation=(
+        "permissive: the spec's 'Primary Key: *' is read as not forbidding an exact "
+        "duplicate row, so this is a warning rather than an error (spec-questions #6)."
+    ),
 )
 def duplicate_assignment(context: ValidationContext) -> Iterator[Finding]:
     assignments = context.package.get("employee_run_dates.txt")

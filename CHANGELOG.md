@@ -5,12 +5,41 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+## v0.4.0 - 2026-06-20
+
+Distribution, reporting, and analysis surfaces. No rule IDs changed; the JSON
+report gained fields (it is now `reportVersion` 1.1.0) without removing any.
+
+Added:
+
 - `tods-validate rules` lists the rule catalog from the tool itself
-  (`--format json` for tooling).
+  (`--format json` for tooling, now including category, default-enabled, and
+  spec-interpretation metadata).
 - Published JSON Schema for the `--format json` report
   (docs/report.schema.json), enforced by tests.
 - Dockerfile and a workflow publishing images to GHCR on each release.
 - pre-commit hook definition (.pre-commit-hooks.yaml).
+- New report formats: `--format sarif` (GitHub code-scanning / security
+  dashboards) and `--format html` (a standalone, shareable report).
+- JSON report now carries `toolVersion`, `reportVersion`, a per-rule
+  `summary.byRule` breakdown, and a stable `location` pointer per finding.
+- Text and Markdown reports group findings by rule, show the shortest path to a
+  clean run, and add root-cause hints when one rule clusters.
+- New flags on `validate`: `--enable` (opt-in rules/categories), `--profile`
+  (default/strict/lenient presets), `--spec-version`, `--baseline` (fail only
+  on findings new since a previous JSON report), `--max-findings`, `--quiet`,
+  `--stamp` (citable Markdown footer), and `--encoding`.
+- New subcommands: `diff` (compare two feeds), `batch` (validate many feeds
+  with a roll-up table), `stats` (descriptive feed metrics), and `anonymize`
+  (pseudonymize person-identifying fields).
+- `merge` now writes a `merge-report.json` manifest alongside the merged feed.
+- The GitHub Action exposes `error-count`, `warning-count`, and `info-count`
+  outputs and accepts an `enable` input.
+- New opt-in rules: TODS-I501 / TODS-I502 (coverage) and TODS-I601 (advisory).
+- Public Python API: `from tods_validate import validate_feed`.
+- Input-safety hardening of zip ingestion (zip-bomb and path-traversal
+  defenses, size limits) and a `SECURITY.md`.
+- `scripts/benchmark.py` for throughput measurement on large synthetic feeds.
 
 ## v0.3.0 - 2026-06-12
 

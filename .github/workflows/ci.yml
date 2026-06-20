@@ -52,3 +52,33 @@ jobs:
         with:
           path: tests/fixtures/valid/tods
           gtfs: tests/fixtures/valid/gtfs
+
+  merge-handoff:
+    # Materialize the TODS-Supplemented GTFS and hand it to gtfs-validator, so
+    # the merge contract is exercised end to end. Informational: a downstream
+    # change should surface here without blocking unrelated work.
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: python -m pip install .
+      - name: Merge the valid fixture feed
+        run: |
+          tods-validate merge tests/fixtures/valid/tods \
+            --gtfs tests/fixtures/valid/gtfs -o supplemented.zip
+      - name: Validate the merged feed with gtfs-validator
+        run: |
+          curl -sSL -o gtfs-validator.jar \
+            https://github.com/MobilityData/gtfs-validator/releases/latest/download/gtfs-validator-cli.jar
+          java -jar gtfs-validator.jar -i supplemented.zip -o validator-report
+      - uses: actions/upload-artifact@v4
+        with:
+          name: gtfs-validator-report
+          path: validator-report

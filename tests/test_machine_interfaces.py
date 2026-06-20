@@ -37,7 +37,17 @@ def test_rules_json_lists_every_rule() -> None:
     payload = json.loads(result.output)
     assert {r["id"] for r in payload} == {r.id for r in all_rules()}
     sample = payload[0]
-    assert set(sample) == {"id", "severity", "title", "description", "specSection", "needsGtfs"}
+    assert set(sample) == {
+        "id",
+        "severity",
+        "title",
+        "description",
+        "specSection",
+        "needsGtfs",
+        "category",
+        "defaultEnabled",
+        "interpretation",
+    }
 
 
 def test_rules_text_lists_every_rule() -> None:

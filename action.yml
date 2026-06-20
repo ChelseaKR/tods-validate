@@ -20,6 +20,23 @@ inputs:
     description: Fail the job on findings at or above this severity (error or warning).
     required: false
     default: error
+  enable:
+    description: >-
+      Space-separated opt-in rules or categories to turn on (coverage, advisory,
+      experimental, or specific rule IDs).
+    required: false
+    default: ""
+
+outputs:
+  error-count:
+    description: Number of errors found.
+    value: ${{ steps.validate.outputs.error-count }}
+  warning-count:
+    description: Number of warnings found.
+    value: ${{ steps.validate.outputs.warning-count }}
+  info-count:
+    description: Number of informational findings.
+    value: ${{ steps.validate.outputs.info-count }}
 
 runs:
   using: composite
@@ -29,10 +46,14 @@ runs:
       run: python3 -m pip install --quiet "${{ github.action_path }}"
 
     - name: Validate feed
+      id: validate
       shell: bash
       run: |
         args=("${{ inputs.path }}" --format github --fail-on "${{ inputs['fail-on'] }}")
         if [ -n "${{ inputs.gtfs }}" ]; then
           args+=(--gtfs "${{ inputs.gtfs }}")
         fi
+        for token in ${{ inputs.enable }}; do
+          args+=(--enable "$token")
+        done
         tods-validate "${args[@]}"

@@ -35,6 +35,13 @@ class ValidationContext:
 CheckFunction = Callable[[ValidationContext], Iterator[Finding]]
 
 
+# Categories group rules by how aggressively they fire. "core" rules check the
+# spec and run by default. "coverage" and "advisory" rules are opt-in (see
+# default_enabled) because they surface judgement calls, not spec violations,
+# and would be noise in a default CI gate.
+CATEGORIES = ("core", "coverage", "advisory", "experimental")
+
+
 @dataclass(frozen=True)
 class Rule:
     id: str
@@ -48,6 +55,15 @@ class Rule:
     # Rules that resolve IDs into the companion GTFS feed are skipped when no
     # companion feed is available.
     needs_gtfs: bool = False
+    # See CATEGORIES.
+    category: str = "core"
+    # Opt-in rules (default_enabled=False) run only when their ID or category
+    # is passed to validate()/--enable.
+    default_enabled: bool = True
+    # Where the spec is ambiguous, how this rule resolves it (e.g. "permissive:
+    # accepts GTFS times beyond 24:00:00"). Surfaced in `rules --format json`
+    # so consumers can audit interpretation choices. None when unambiguous.
+    interpretation: str | None = None
 
 
 REGISTRY: list[Rule] = []
@@ -60,8 +76,13 @@ def rule(
     description: str,
     spec_section: str,
     needs_gtfs: bool = False,
+    category: str = "core",
+    default_enabled: bool = True,
+    interpretation: str | None = None,
 ) -> Callable[[CheckFunction], CheckFunction]:
     """Register a check function. Used as a decorator in the rule modules."""
+    if category not in CATEGORIES:
+        raise ValueError(f"unknown rule category {category!r}")
 
     def decorator(check: CheckFunction) -> CheckFunction:
         if any(r.id == id for r in REGISTRY):
@@ -75,6 +96,9 @@ def rule(
                 spec_section=spec_section,
                 check=check,
                 needs_gtfs=needs_gtfs,
+                category=category,
+                default_enabled=default_enabled,
+                interpretation=interpretation,
             )
         )
         return check
@@ -82,11 +106,23 @@ def rule(
     return decorator
 
 
-def validate(context: ValidationContext) -> list[Finding]:
-    """Run every applicable rule and return findings in file/row order."""
+def _is_enabled(r: Rule, enabled: frozenset[str]) -> bool:
+    if r.default_enabled:
+        return True
+    return r.id in enabled or r.category in enabled
+
+
+def validate(context: ValidationContext, enabled: frozenset[str] = frozenset()) -> list[Finding]:
+    """Run every applicable rule and return findings in file/row order.
+
+    ``enabled`` additionally turns on opt-in rules: it may contain rule IDs or
+    category names ("coverage", "advisory", "experimental").
+    """
     findings: list[Finding] = []
     for r in REGISTRY:
         if r.needs_gtfs and context.gtfs is None:
+            continue
+        if not _is_enabled(r, enabled):
             continue
         findings.extend(r.check(context))
     findings.sort(key=lambda f: (f.file or "", f.row or 0, f.rule_id))
@@ -98,7 +134,7 @@ def all_rules() -> Iterable[Rule]:
 
 
 # Importing the rule modules populates the registry.
-from . import fields, references, semantics, structure  # noqa: E402,F401
+from . import coverage, fields, references, semantics, structure  # noqa: E402,F401
 
 __all__ = [
     "REGISTRY",

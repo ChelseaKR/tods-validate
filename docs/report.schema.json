@@ -7,6 +7,14 @@
   "required": ["validator", "specVersion", "source", "summary", "findings"],
   "properties": {
     "validator": { "const": "tods-validate" },
+    "toolVersion": {
+      "type": "string",
+      "description": "Version of tods-validate that produced the report."
+    },
+    "reportVersion": {
+      "type": "string",
+      "description": "Version of this report schema. Fields are only added within a major version."
+    },
     "specVersion": {
       "type": "string",
       "description": "TODS specification version the rules implement."
@@ -21,7 +29,12 @@
       "properties": {
         "errors": { "type": "integer", "minimum": 0 },
         "warnings": { "type": "integer", "minimum": 0 },
-        "infos": { "type": "integer", "minimum": 0 }
+        "infos": { "type": "integer", "minimum": 0 },
+        "byRule": {
+          "type": "object",
+          "description": "Count of findings per rule ID, most frequent first.",
+          "additionalProperties": { "type": "integer", "minimum": 1 }
+        }
       },
       "additionalProperties": false
     },
@@ -29,7 +42,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["rule_id", "severity", "file", "row", "field", "message", "suggestion"],
+        "required": ["rule_id", "severity", "file", "row", "field", "location", "message", "suggestion"],
         "properties": {
           "rule_id": { "type": "string", "pattern": "^TODS-[EWI][0-9]{3}$" },
           "severity": { "enum": ["ERROR", "WARNING", "INFO"] },
@@ -40,6 +53,10 @@
             "description": "1-based line number; the header row is line 1."
           },
           "field": { "type": ["string", "null"] },
+          "location": {
+            "type": ["string", "null"],
+            "description": "Stable machine location identifier, e.g. 'run_events.txt#L4/end_time'."
+          },
           "message": { "type": "string" },
           "suggestion": { "type": ["string", "null"] }
         },

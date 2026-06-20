@@ -22,6 +22,8 @@ _BANDS = {
     "2": "Field values",
     "3": "References between files",
     "4": "Semantic checks",
+    "5": "Coverage (opt-in, informational)",
+    "6": "Advisory (opt-in)",
 }
 
 
@@ -50,12 +52,21 @@ def generate() -> str:
                 continue
             severity = Severity[r.severity.name].name
             needs = " Needs a companion GTFS feed." if r.needs_gtfs else ""
+            optin = (
+                f" Opt-in: off by default, enable with `--enable {r.category}` or "
+                f"`--enable {r.id}`."
+                if not r.default_enabled
+                else ""
+            )
             lines.append(f"### {r.id}: {r.title}")
             lines.append("")
-            lines.append(f"Severity: {severity}.{needs}")
+            lines.append(f"Severity: {severity}.{needs}{optin}")
             lines.append("")
             lines.append(r.description)
             lines.append("")
+            if r.interpretation:
+                lines.append(f"Interpretation: {r.interpretation}")
+                lines.append("")
             lines.append(f"Spec reference: <{r.spec_section}>")
             lines.append("")
     return "\n".join(lines)
