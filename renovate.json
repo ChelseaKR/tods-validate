@@ -1,0 +1,14 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended", "helpers:pinGitHubActionDigestsToSemver"],
+  "minimumReleaseAge": "72 hours",
+  "customManagers": [
+    {
+      "customType": "regex",
+      "managerFilePatterns": ["/docs/standards/\\.standards-version$/"],
+      "matchStrings": ["standards_version=(?<currentValue>v[0-9.]+)"],
+      "depNameTemplate": "ChelseaKR/portfolio-standards",
+      "datasourceTemplate": "github-releases"
+    }
+  ]
+}
