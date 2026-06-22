@@ -16,7 +16,7 @@ from it, or under what filename conventions a consumer should discover it.
 with or without GTFS files in the same package. If GTFS files are present they
 are used as the companion feed.
 
-## 2. The "Run as Directed" example violates the primary key rule
+## 2. The "Run as Directed" example appears to violate the primary key rule
 
 In the spec's [Run as Directed example](https://tods-transit.org/spec/examples/#run-as-directed-work),
 the last two rows of `run_events.txt` both use `event_sequence` 30 on run
