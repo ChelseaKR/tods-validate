@@ -42,4 +42,7 @@ jobs:
       - name: Sign the image by digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
-        run: cosign sign --yes "ghcr.io/${{ github.repository }}@${DIGEST}"
+          REPO: ${{ github.repository }}
+        run: |
+          IMAGE="ghcr.io/${REPO,,}"
+          cosign sign --yes "${IMAGE}@${DIGEST}"
