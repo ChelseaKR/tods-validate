@@ -16,12 +16,16 @@ published spec at <https://tods-transit.org/>.
 
 ## 1. Packaging is undefined
 
-The spec defines ten files but never says how a TODS dataset is packaged or
-distributed: a zip, a directory, alongside the public GTFS feed or separate
-from it, or under what filename conventions a consumer should discover it.
+The spec names the ten files and their filename conventions (the `_supplement`
+suffix and the exact filenames), but never says how a TODS dataset is
+physically packaged or distributed: a zip, a directory, or how a consumer
+discovers and retrieves the files. It frames TODS as a typically non-public
+layer separate from the public GTFS feed, but the packaging and transport
+format is never formalized.
 
-*Reference:* the [spec reference](https://tods-transit.org/spec/) lists the
-files but contains no packaging or distribution section.
+*Reference:* the Files table ([spec](https://tods-transit.org/spec/)) defines
+the filenames and the `_supplement` suffix; no section specifies a packaging,
+bundling, or discovery format.
 *Validator behavior:* accepts a directory or a .zip of top-level .txt files,
 with or without GTFS files in the same package. If GTFS files are present they
 are used as the companion feed.
@@ -97,14 +101,22 @@ error (TODS-E401).
 
 ## 6. `employee_run_dates.txt` declares Primary Key `*`
 
-A primary key of `*` (every field) would make exactly duplicated rows invalid,
-but the prose only discusses run-and-date combinations appearing multiple times
-for multiple employees. Whether a fully identical duplicate row (same employee,
-run, and date twice) is valid is unstated.
+`employee_run_dates.txt` declares `Primary Key: *`, but TODS never defines what
+`*` means: it has no conventions or terms section, and it states GTFS field
+inheritance only for Supplement files, not for its TODS-Specific files. Under
+GTFS's `*` convention (all fields jointly form the key) an exactly-duplicated
+row would be invalid, but because TODS does not state this for its own files,
+the status of a fully identical duplicate row (same employee, run, and date
+twice) is left implicit. The prose only discusses run-and-date combinations
+recurring across different employees, which have distinct keys.
 
 *Reference:* `employee_run_dates.txt` Primary Key
-([spec](https://tods-transit.org/spec/#employee_run_datestxt)).
-*Validator behavior:* exact duplicates are a warning (TODS-W408), not an error.
+([spec](https://tods-transit.org/spec/#employee_run_datestxt)); TODS states
+GTFS-convention inheritance only for Supplement files and has no section
+defining `*`.
+*Validator behavior:* exact duplicates are flagged as a warning (TODS-W408);
+under a strict reading of `*` they are arguably invalid, so this is a deliberate
+leniency.
 
 ## 7. How strictly should added supplement rows meet GTFS requirements
 
