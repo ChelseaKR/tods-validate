@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tods-validate playground</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font: 16px/1.5 system-ui, sans-serif;
+        max-width: 56rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      h1 { margin-bottom: 0.25rem; }
+      .lede { color: #555; margin-top: 0; }
+      .panel {
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        padding: 1rem;
+        margin: 1rem 0;
+      }
+      button {
+        font: inherit;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        border: 1px solid #888;
+        cursor: pointer;
+      }
+      button:disabled { opacity: 0.5; cursor: progress; }
+      #status { color: #555; }
+      iframe#report {
+        width: 100%;
+        min-height: 24rem;
+        border: 1px solid #ccc;
+        border-radius: 8px;
+        margin-top: 1rem;
+      }
+      code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
+    </style>
+  </head>
+  <body>
+    <h1>tods-validate playground</h1>
+    <p class="lede">
+      Validate a Transit Operational Data Standard (TODS) feed in your browser.
+      Nothing is uploaded: the validator runs entirely on your machine via
+      Pyodide (WebAssembly), so it is safe for non-public operational data.
+    </p>
+
+    <div class="panel">
+      <p>
+        Choose your TODS <code>.txt</code> files, and the companion GTFS files if
+        you have them (select them all together):
+      </p>
+      <input type="file" id="files" multiple />
+      <button id="run" disabled>Validate</button>
+      <p id="status">Loading Python (this takes a few seconds the first time)…</p>
+    </div>
+
+    <iframe id="report" title="Validation report" sandbox="allow-same-origin"></iframe>
+
+    <!-- Pyodide runtime. Update the version to the current Pyodide release. -->
+    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+    <script>
+      const status = document.getElementById("status");
+      const runBtn = document.getElementById("run");
+      const filesInput = document.getElementById("files");
+      const report = document.getElementById("report");
+      const selected = new Map(); // filename -> Uint8Array
+      let pyodide;
+
+      async function boot() {
+        pyodide = await loadPyodide();
+        await pyodide.loadPackage("micropip");
+        const micropip = pyodide.pyimport("micropip");
+        await micropip.install("tods-validate");
+        status.textContent = "Ready. Choose your feed files, then click Validate.";
+        runBtn.disabled = false;
+      }
+
+      filesInput.addEventListener("change", async (event) => {
+        selected.clear();
+        for (const file of event.target.files) {
+          selected.set(file.name, new Uint8Array(await file.arrayBuffer()));
+        }
+        status.textContent = `${selected.size} file(s) selected.`;
+      });
+
+      runBtn.addEventListener("click", async () => {
+        if (selected.size === 0) {
+          status.textContent = "Select your feed files first.";
+          return;
+        }
+        status.textContent = "Validating…";
+        try {
+          pyodide.FS.mkdir("/feed");
+        } catch (_) {
+          /* already exists from a previous run */
+        }
+        for (const [name, bytes] of selected) {
+          pyodide.FS.writeFile("/feed/" + name, bytes);
+        }
+        try {
+          const html = await pyodide.runPythonAsync(`
+from tods_validate.api import validate_feed
+from tods_validate.report import render_html
+result = validate_feed("/feed")
+render_html(result.findings, "your feed")
+`);
+          report.srcdoc = html;
+          status.textContent = "Done.";
+        } catch (err) {
+          status.textContent = "Validation error: " + err;
+        } finally {
+          for (const name of selected.keys()) {
+            try {
+              pyodide.FS.unlink("/feed/" + name);
+            } catch (_) {
+              /* ignore */
+            }
+          }
+        }
+      });
+
+      boot().catch((err) => {
+        status.textContent = "Failed to load Python: " + err;
+      });
+    </script>
+  </body>
+</html>

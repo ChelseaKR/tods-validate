@@ -7,6 +7,9 @@ new checks may be added in minor releases.
 
 Added:
 
+- A browser playground (`web/`) that validates a feed entirely in the browser
+  via Pyodide, with no upload, deployable to GitHub Pages. The Python it calls
+  is guarded by tests; the page itself needs a browser to verify.
 - TODS-W315: a run event that works a trip end to end should start at the
   trip's first stop and end at its last stop (in the supplemented
   `stop_times.txt`); a mismatch is a warning, skipped for mid-trip events. The
