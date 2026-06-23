@@ -20,6 +20,7 @@ from .anonymize import anonymize_package
 from .baseline import diff_findings, load_baseline_identities, new_findings
 from .config import Config, ConfigError, load_config
 from .findings import Finding, Severity
+from .fix import fix_package
 from .loader import PackageNotFoundError
 from .merge import merge_feeds
 from .report import (
@@ -451,6 +452,42 @@ def anonymize(path: str, output_path: str, salt: str | None, encoding: str | Non
     for target, count in sorted(result.replacements.items()):
         click.echo(f"{target}: {count} value(s) pseudonymized")
     click.echo(f"Wrote {len(result.written)} file(s) to {output_path}.")
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=False))
+@click.option(
+    "-o",
+    "--output",
+    "output_path",
+    type=click.Path(),
+    default=None,
+    help=(
+        "Write the fixed package here (a directory, or a path ending in .zip). "
+        "Without it, fix is a dry run that only reports what it would change."
+    ),
+)
+@click.option("--encoding", default=None)
+def fix(path: str, output_path: str | None, encoding: str | None) -> None:
+    """Apply safe, deterministic fixes (currently: trim TODS-W206 whitespace padding).
+
+    A dry run by default; pass -o/--output to write the fixed package. Re-encodes
+    files as UTF-8 without a BOM.
+    """
+    try:
+        result = fix_package(path, Path(output_path) if output_path is not None else None, encoding)
+    except PackageNotFoundError as exc:
+        _fail(str(exc))
+    click.echo(f"tods-validate fix: {result.source}")
+    if not result.changed_any:
+        click.echo("  Nothing to fix.")
+        return
+    for name, count in sorted(result.trimmed.items()):
+        click.echo(f"  {name}: trimmed whitespace on {count} value(s)")
+    if result.written:
+        click.echo(f"  wrote {len(result.written)} file(s) to {output_path}")
+    else:
+        click.echo(f"  dry run: re-run with -o OUTPUT to write {result.total_trimmed} fix(es)")
 
 
 @main.command()

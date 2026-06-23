@@ -7,6 +7,9 @@ new checks may be added in minor releases.
 
 Added:
 
+- `tods-validate fix` applies safe, deterministic fixes — currently trimming the
+  TODS-W206 whitespace padding that stops IDs from matching. It is a dry run by
+  default and writes a cleaned, UTF-8/no-BOM package with `-o`.
 - `tods-validate stats --format markdown` prints a feed profile (now including a
   date range and a file-presence list) suitable for pasting into an issue or a
   working-group thread.

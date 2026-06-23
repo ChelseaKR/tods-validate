@@ -16,14 +16,12 @@ individuals. Treat the output accordingly.
 
 from __future__ import annotations
 
-import csv
 import hashlib
-import io
 import secrets
-import zipfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from ._pkgio import serialize_feed, write_package
 from .loader import load_package
 
 _VEHICLE_PREFIX = "veh"
@@ -66,7 +64,7 @@ def anonymize_package(
         }
         if not sensitive or not feed.headers:
             # Re-serialize unchanged files too, so output is a complete package.
-            entries[name] = _serialize(feed.headers, [dict(r.values) for r in feed.rows])
+            entries[name] = serialize_feed(feed.headers, [dict(r.values) for r in feed.rows])
             continue
         counts = dict.fromkeys(sensitive, 0)
         rows = []
@@ -79,29 +77,8 @@ def anonymize_package(
             rows.append(values)
         for col, count in counts.items():
             result.replacements[f"{name}:{col}"] = count
-        entries[name] = _serialize(feed.headers, rows)
+        entries[name] = serialize_feed(feed.headers, rows)
 
-    _write(entries, output)
+    write_package(entries, output)
     result.written = sorted(entries)
     return result
-
-
-def _serialize(headers: tuple[str, ...], rows: list[dict[str, str]]) -> bytes:
-    buffer = io.StringIO()
-    writer = csv.writer(buffer, lineterminator="\n")
-    writer.writerow(headers)
-    for values in rows:
-        writer.writerow([values.get(h, "") for h in headers])
-    return buffer.getvalue().encode("utf-8")
-
-
-def _write(entries: dict[str, bytes], output: Path) -> None:
-    if output.suffix.lower() == ".zip":
-        output.parent.mkdir(parents=True, exist_ok=True)
-        with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as zf:
-            for name in sorted(entries):
-                zf.writestr(name, entries[name])
-    else:
-        output.mkdir(parents=True, exist_ok=True)
-        for name, data in entries.items():
-            (output / name).write_bytes(data)
