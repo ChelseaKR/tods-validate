@@ -83,6 +83,10 @@ class CompanionGTFS:
     route_ids: set[str] = field(default_factory=set)
     service_ids: set[str] = field(default_factory=set)
     block_services: dict[str, set[str]] = field(default_factory=dict)
+    # First and last stop_id of each trip, from stop_times after supplements,
+    # used to check run_events start/end locations against the trip endpoints.
+    trip_first_stop: dict[str, str] = field(default_factory=dict)
+    trip_last_stop: dict[str, str] = field(default_factory=dict)
     # Operating dates per service_id, from calendar + calendar_dates after
     # supplements. Only populated for services whose calendar rows parse.
     service_dates: dict[str, frozenset[date]] = field(default_factory=dict)
@@ -155,6 +159,19 @@ def build_companion(gtfs: Package | None, tods: Package, source: str) -> Compani
         companion.trip_block[trip_id] = block_id
         if block_id:
             companion.block_services.setdefault(block_id, set()).add(row.get("service_id", ""))
+
+    stop_times = effective("stop_times.txt")
+    stops_by_trip: dict[str, list[tuple[int, str]]] = {}
+    for (trip_id, sequence), st_row in stop_times.items():
+        try:
+            order = int(sequence)
+        except ValueError:
+            continue
+        stops_by_trip.setdefault(trip_id, []).append((order, st_row.get("stop_id", "")))
+    for trip_id, ordered in stops_by_trip.items():
+        ordered.sort()
+        companion.trip_first_stop[trip_id] = ordered[0][1]
+        companion.trip_last_stop[trip_id] = ordered[-1][1]
 
     companion.stop_ids = {key[0] for key in effective("stops.txt")}
     companion.route_ids = {key[0] for key in effective("routes.txt")}

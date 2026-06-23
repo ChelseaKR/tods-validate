@@ -7,6 +7,11 @@ new checks may be added in minor releases.
 
 Added:
 
+- TODS-W315: a run event that works a trip end to end should start at the
+  trip's first stop and end at its last stop (in the supplemented
+  `stop_times.txt`); a mismatch is a warning, skipped for mid-trip events. The
+  companion GTFS now ingests `stop_times`, so this checks an operational
+  consistency constraint no GTFS-only validator can see.
 - `tods-validate fix` applies safe, deterministic fixes — currently trimming the
   TODS-W206 whitespace padding that stops IDs from matching. It is a dry run by
   default and writes a cleaned, UTF-8/no-BOM package with `-o`.

@@ -86,3 +86,30 @@ def test_stop_times_for_deleted_trip_does_not_trip_e314(tmp_path: Path) -> None:
     _, findings = run(tmp_path)
     e314 = [f for f in findings if f.rule_id == "TODS-E314"]
     assert e314 == [], f"deleted trip should not trip E314, got {[f.message for f in e314]}"
+
+
+def test_run_event_endpoint_mismatch_w315() -> None:
+    findings = [f for f in run_invalid_fixture("TODS-W315") if f.rule_id == "TODS-W315"]
+    assert len(findings) == 1  # only start_location mismatches; end_location matches
+    msg = findings[0].message
+    assert "start_location" in msg
+    assert "'S3'" in msg  # the actual (wrong) location
+    assert "'S1'" in msg  # the trip's first stop
+    assert "T1" in msg
+
+
+def test_endpoint_check_skips_mid_trip_events(tmp_path: Path) -> None:
+    # Same start_location mismatch, but flagged as a mid-trip start: no W315.
+    (tmp_path / "trips.txt").write_text("trip_id,route_id,service_id\nT1,R1,weekday\n")
+    (tmp_path / "stop_times.txt").write_text(
+        "trip_id,stop_sequence,stop_id,arrival_time,departure_time\n"
+        "T1,1,S1,09:00:00,09:00:00\nT1,2,S2,10:00:00,10:00:00\n"
+    )
+    (tmp_path / "stops.txt").write_text("stop_id\nS1\nS2\nS3\n")
+    (tmp_path / "run_events.txt").write_text(
+        "service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,"
+        "end_location,end_time,start_mid_trip\n"
+        "weekday,1,10,operator,T1,S3,09:30:00,S2,10:00:00,1\n"
+    )
+    _, findings = run(tmp_path)
+    assert not any(f.rule_id == "TODS-W315" for f in findings)

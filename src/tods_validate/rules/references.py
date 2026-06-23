@@ -489,6 +489,60 @@ def run_event_block_mismatch(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    id="TODS-W315",
+    severity=Severity.WARNING,
+    title="Run event location does not match the trip's first or last stop",
+    description=(
+        "A run event works a trip end to end (trip_id set, the matching mid_trip flag "
+        "not 1), but its start_location is not the trip's first stop, or its "
+        "end_location is not the trip's last stop, in the supplemented stop_times.txt."
+    ),
+    spec_section=f"{SPEC_URL}#run_eventstxt",
+    needs_gtfs=True,
+    interpretation=(
+        "the spec says these locations 'should' be the trip endpoints, so a mismatch is "
+        "a warning; skipped for mid-trip events and for trips with no stop_times."
+    ),
+)
+def run_event_endpoint_mismatch(context: ValidationContext) -> Iterator[Finding]:
+    assert context.gtfs is not None
+    gtfs = context.gtfs
+    feed = context.package.get("run_events.txt")
+    if feed is None or "trip_id" not in feed.headers:
+        return
+    for row in feed.rows:
+        trip_id = row.values.get("trip_id", "")
+        if not trip_id or trip_id not in gtfs.trip_first_stop:
+            continue
+        endpoints = (
+            ("start_location", "start_mid_trip", gtfs.trip_first_stop[trip_id], "first"),
+            ("end_location", "end_mid_trip", gtfs.trip_last_stop[trip_id], "last"),
+        )
+        for loc_field, mid_field, expected, which in endpoints:
+            if row.values.get(mid_field, "") == "1":
+                continue  # a mid-trip event need not start or end at an endpoint
+            actual = row.values.get(loc_field, "")
+            if actual and expected and actual != expected:
+                edge = "starts" if which == "first" else "ends"
+                yield Finding(
+                    rule_id="TODS-W315",
+                    severity=Severity.WARNING,
+                    file="run_events.txt",
+                    row=row.line,
+                    field=loc_field,
+                    message=(
+                        f"run_events.txt row {row.line}: {loc_field} {actual!r} is not the "
+                        f"{which} stop of trip {trip_id!r} ({expected!r}) in stop_times.txt. "
+                        f"If the event {edge} mid-trip, set {mid_field} to 1."
+                    ),
+                    suggestion=(
+                        f"Use the trip's {which} stop as {loc_field}, or set {mid_field}=1 "
+                        "for a mid-trip event."
+                    ),
+                )
+
+
+@rule(
     id="TODS-E311",
     severity=Severity.ERROR,
     title="Vehicle assignment points to a block that does not exist",

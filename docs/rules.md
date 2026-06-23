@@ -247,6 +247,16 @@ A supplement row names a route, service, trip, or stop that is not in the supple
 
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
+### TODS-W315: Run event location does not match the trip's first or last stop
+
+Severity: WARNING. Needs a companion GTFS feed.
+
+A run event works a trip end to end (trip_id set, the matching mid_trip flag not 1), but its start_location is not the trip's first stop, or its end_location is not the trip's last stop, in the supplemented stop_times.txt.
+
+Interpretation: the spec says these locations 'should' be the trip endpoints, so a mismatch is a warning; skipped for mid-trip events and for trips with no stop_times.
+
+Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
+
 ## Semantic checks (TODS-x4xx)
 
 ### TODS-E401: Event ends before it starts
