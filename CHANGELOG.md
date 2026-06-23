@@ -5,6 +5,11 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+## v0.5.0 - 2026-06-22
+
+Correctness fixes (no rule IDs changed), a runnable bundled sample feed with a
+fixed quickstart, and a conformance check that runs the spec's own examples.
+
 Fixed (no rule IDs changed):
 
 - TODS-E204 now detects duplicate `vehicle_assignments` primary keys when the
