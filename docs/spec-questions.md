@@ -50,10 +50,13 @@ Presumably the same fields are meant.
 
 ## 5. Time bounds for `start_time`/`end_time` are unstated
 
-GTFS times may exceed 24:00:00 for service past midnight, and the examples
-suggest TODS follows GTFS conventions, but the spec's Time type for
-`run_events.txt` never says so explicitly. It also does not state whether an
-event's `end_time` must be greater than or equal to its `start_time`
+The `Time` type for `run_events.txt` `start_time`/`end_time` is never defined:
+there is no field-types section, and the spec never states the format. GTFS
+time allows hours `>= 24:00:00` for service past midnight, but no example
+demonstrates that case (the after-midnight inspection example uses 00:45 to
+03:00, and every example time stays under 24:00:00), so whether GTFS time
+syntax is intended for these fields is left open. The spec also does not state
+whether an event's `end_time` must be greater than or equal to its `start_time`
 (zero-duration events are explicitly allowed, negative durations are never
 mentioned).
 
