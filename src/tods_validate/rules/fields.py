@@ -10,8 +10,9 @@ from ..loader import FeedFile
 from ..schema import SPEC_URL, TABLES, FieldSpec, FieldType, Presence, TableSpec
 from . import ValidationContext, rule
 
-# GTFS Time: H:MM:SS or HH:MM:SS; hours may exceed 24 for service past midnight.
-_TIME_RE = re.compile(r"^(\d{1,2}):([0-5]\d):([0-5]\d)$")
+# GTFS Time: H:MM:SS or HH:MM:SS; hours may exceed 24 for service past midnight
+# and have no upper bound in the spec, so the hour field is not width-capped.
+_TIME_RE = re.compile(r"^(\d+):([0-5]\d):([0-5]\d)$")
 _DATE_RE = re.compile(r"^\d{8}$")
 
 
@@ -190,11 +191,24 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
             continue
         if any(f not in feed.headers for f in table.primary_key):
             continue  # TODS-E106 already reported the missing column
+        # A blank *required* key field means the row is already malformed
+        # (reported by TODS-E201), so skip it. But a blank optional/conditional
+        # key field (e.g. vehicle_assignments.service_id) is a legitimate key
+        # value and must still take part in the uniqueness check, otherwise two
+        # rows that collide on the required components with a blank optional one
+        # go undetected.
+        required_key = {
+            fs.name
+            for fs in table.fields
+            if fs.name in table.primary_key and fs.presence is Presence.REQUIRED
+        }
         seen: dict[tuple[str, ...], int] = {}
         for row in feed.rows:
             key = tuple(row.values.get(f, "") for f in table.primary_key)
-            if any(v == "" for v in key):
-                continue  # TODS-E201 already reported the blank key field
+            if any(
+                v == "" and f in required_key for f, v in zip(table.primary_key, key, strict=True)
+            ):
+                continue  # TODS-E201 already reported the blank required key field
             if key in seen:
                 pretty = ", ".join(
                     f"{f}={v!r}" for f, v in zip(table.primary_key, key, strict=True)

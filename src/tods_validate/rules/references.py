@@ -617,6 +617,13 @@ def delete_target_missing(context: ValidationContext) -> Iterator[Finding]:
 def supplement_reference_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
     gtfs = context.gtfs
+    # Trips deleted via trips_supplement (TODS_delete=1) leave the supplemented
+    # feed. The spec says a deleted trip's stop_times "would thus be ignored,"
+    # so a stop_times_supplement row pointing at a deleted trip is not a missing
+    # reference and must not raise E314.
+    deleted_trips = {
+        key[0] for key in gtfs.base_keys.get("trips.txt", set()) if key[0] not in gtfs.trip_service
+    }
     checks: list[tuple[str, str, bool, set[str], str]] = [
         (
             "trips_supplement.txt",
@@ -655,6 +662,12 @@ def supplement_reference_missing(context: ValidationContext) -> Iterator[Finding
             if row.values.get("TODS_delete", "") == "1":
                 continue  # other values on a delete row are ignored
             value = row.values.get(field_name, "")
+            if (
+                filename == "stop_times_supplement.txt"
+                and field_name == "trip_id"
+                and value in deleted_trips
+            ):
+                continue  # spec: stop_times for a deleted trip are ignored
             if value and value not in valid_ids:
                 yield Finding(
                     rule_id="TODS-E314",

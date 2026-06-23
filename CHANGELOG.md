@@ -5,6 +5,22 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+Fixed (no rule IDs changed):
+
+- TODS-E204 now detects duplicate `vehicle_assignments` primary keys when the
+  optional `service_id` is blank (the common case). Previously a blank optional
+  key component silently suppressed the whole uniqueness check, so real
+  duplicate keys passed clean and coalesced during `merge`.
+- Time values with hours `>= 100:00:00` are now accepted (GTFS time has no upper
+  hour bound). They previously raised a false TODS-E203 and were dropped from the
+  time-based semantic checks (E401/E402/W403).
+- TODS-E314 no longer fires on a `stop_times_supplement` row whose trip was
+  deleted via `trips_supplement` (`TODS_delete=1`); the spec says such
+  stop_times are ignored, not an error.
+- Duplicate header columns now keep the first occurrence's value (matching the
+  TODS-E105 message that the duplicate column is ignored) instead of letting a
+  later duplicate column silently win.
+
 ## v0.4.0 - 2026-06-20
 
 Distribution, reporting, and analysis surfaces. No rule IDs changed; the JSON

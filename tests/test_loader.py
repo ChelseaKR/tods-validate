@@ -17,6 +17,16 @@ def test_loads_directory() -> None:
     assert feed.rows[0].line == 2  # header is line 1
 
 
+def test_duplicate_header_keeps_first_occurrence(tmp_path: Path) -> None:
+    # TODS-E105 states the duplicate column is ignored; confirm the first
+    # occurrence's value is the one kept, not a later duplicate silently winning.
+    (tmp_path / "run_events.txt").write_text("service_id,run_id,service_id\nfirst,10,second\n")
+    package = load_package(tmp_path)
+    feed = package.files["run_events.txt"]
+    assert any(p.code == "duplicate_header" for p in feed.problems)
+    assert feed.rows[0].values["service_id"] == "first"
+
+
 def test_loads_zip(tmp_path: Path) -> None:
     archive = tmp_path / "feed.zip"
     with zipfile.ZipFile(archive, "w") as zf:

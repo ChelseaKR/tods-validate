@@ -1,5 +1,7 @@
 """Reference rules (TODS-x3xx), including resolution into the companion GTFS feed."""
 
+from pathlib import Path
+
 import pytest
 
 from conftest import FIXTURES, rule_ids, run_invalid_fixture
@@ -70,3 +72,17 @@ def test_delete_and_readd_cites_both_rows() -> None:
     assert len(findings) == 1
     assert "row 2" in findings[0].message
     assert "row 3" in findings[0].message
+
+
+def test_stop_times_for_deleted_trip_does_not_trip_e314(tmp_path: Path) -> None:
+    # A trip deleted via trips_supplement leaves the supplemented feed; the spec
+    # says its stop_times "would thus be ignored," so a stop_times_supplement row
+    # pointing at the deleted trip must not be flagged as a missing reference.
+    (tmp_path / "trips.txt").write_text("trip_id,route_id,service_id\nT1,R1,weekday\n")
+    (tmp_path / "trips_supplement.txt").write_text("trip_id,TODS_delete\nT1,1\n")
+    (tmp_path / "stop_times_supplement.txt").write_text(
+        "trip_id,stop_sequence,arrival_time\nT1,1,10:00:00\n"
+    )
+    _, findings = run(tmp_path)
+    e314 = [f for f in findings if f.rule_id == "TODS-E314"]
+    assert e314 == [], f"deleted trip should not trip E314, got {[f.message for f in e314]}"

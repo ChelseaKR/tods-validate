@@ -172,7 +172,14 @@ def _parse_csv(name: str, data: bytes, encoding: str | None = None) -> FeedFile:
                     line=i,
                 )
             )
-        values = {h: (raw[j] if j < len(raw) else "") for j, h in enumerate(header)}
+        # On a duplicate header, keep the first occurrence so the duplicate
+        # column is genuinely ignored (as the TODS-E105 message states), rather
+        # than silently letting a later duplicate column's value win.
+        values: dict[str, str] = {}
+        for j, h in enumerate(header):
+            if h in values:
+                continue
+            values[h] = raw[j] if j < len(raw) else ""
         extra = tuple(raw[width:])
         feed.rows.append(Row(line=i, values=values, extra_cells=extra))
 
