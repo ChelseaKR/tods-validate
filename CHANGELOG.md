@@ -18,6 +18,10 @@ Added:
 - `tods-validate stats --format markdown` prints a feed profile (now including a
   date range and a file-presence list) suitable for pasting into an issue or a
   working-group thread.
+- A downloadable conformance corpus, attached to each release: every fixture
+  plus an `expectations.json` mapping each to the rule IDs it should produce, so
+  another validator can run the suite without cloning the repo
+  (`scripts/build_conformance_corpus.py`).
 
 ## v0.5.0 - 2026-06-22
 

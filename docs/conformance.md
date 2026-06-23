@@ -16,6 +16,18 @@ The contract enforced in CI (`tests/test_conformance.py`):
    produces a finding with rule ID `TODS-XXXX`.
 3. The valid feed produces no findings, even with opt-in rules enabled.
 
+## Download
+
+Each [GitHub release](https://github.com/ChelseaKR/tods-validate/releases)
+attaches `tods-conformance-corpus.zip`: every fixture above, plus an
+`expectations.json` mapping each fixture to the rule IDs it should produce, so
+another validator can run the corpus and diff against expectations without
+cloning this repo. Build the same archive locally with:
+
+```sh
+python scripts/build_conformance_corpus.py dist/tods-conformance-corpus.zip
+```
+
 ## Using it to test your exporter
 
 Point `tods-validate` at your own output and assert on the rule IDs you expect
