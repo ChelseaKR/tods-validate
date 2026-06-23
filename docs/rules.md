@@ -115,7 +115,7 @@ Spec reference: <https://tods-transit.org/spec/>
 
 ### TODS-E205: vehicle_assignments needs service_id to be unambiguous
 
-Severity: ERROR.
+Severity: ERROR. Needs a companion GTFS feed.
 
 service_id in vehicle_assignments.txt is required when the same block_id is used by more than one service. Without it, the assignment cannot be matched to a single block.
 

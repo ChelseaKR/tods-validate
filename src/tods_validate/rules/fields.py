@@ -238,6 +238,10 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
         "to a single block."
     ),
     spec_section=f"{SPEC_URL}#vehicle_assignmentstxt",
+    # Ambiguity is decided from which services use each block, read out of the
+    # companion GTFS (trips.txt). Without it the check cannot run, so depend on
+    # GTFS rather than silently passing.
+    needs_gtfs=True,
     interpretation=(
         "per-row reading: fires only for rows whose block_id is ambiguous, not for "
         "every row once any block is shared (spec-questions #8)."

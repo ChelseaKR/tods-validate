@@ -43,12 +43,22 @@ tods-validate exports/tods/ --gtfs exports/gtfs.zip
 ```
 
 When the TODS files sit next to the GTFS files in one package, the GTFS files
-are picked up automatically:
+are picked up automatically. A complete sample feed ships in this repo, so you
+can try it right after installing:
 
 ```console
-$ tods-validate /tmp/demo-feed
-tods-validate: /tmp/demo-feed (TODS v2.1.0)
+$ tods-validate examples/sample-feed
+tods-validate: examples/sample-feed (TODS v2.1.0)
 
+No problems found.
+$ echo $?
+0
+```
+
+On a feed with problems, each finding names the file, row, field, and what good
+looks like:
+
+```text
 2 errors:
   ERROR TODS-E203 [run_events.txt, row 4, field 'end_time']
     run_events.txt row 4: end_time is '9:45', which is not a valid time. Use HH:MM:SS, e.g. '09:45:00' or '25:10:00' for 1:10 AM the next service day.
@@ -57,8 +67,6 @@ tods-validate: /tmp/demo-feed (TODS v2.1.0)
     Fix: Correct the trip_id, or add the trip via trips_supplement.txt if it is non-revenue service.
 
 Summary: 2 error(s), 0 warning(s), 0 info.
-$ echo $?
-1
 ```
 
 The exit code is 0 when no errors are found, 1 when there are errors, and 2

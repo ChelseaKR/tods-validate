@@ -158,8 +158,11 @@ def _parse_csv(name: str, data: bytes, encoding: str | None = None) -> FeedFile:
 
     width = len(header)
     for i, raw in enumerate(raw_rows[1:], start=2):
-        if raw == [] or all(cell == "" for cell in raw):
-            continue  # skip blank lines
+        # Skip genuinely empty lines (a bare newline). An all-blank ",,," data
+        # row is kept so TODS-E201 reports its missing required values instead
+        # of the row being silently dropped.
+        if raw == []:
+            continue
         if len(raw) != width:
             feed.problems.append(
                 LoadProblem(

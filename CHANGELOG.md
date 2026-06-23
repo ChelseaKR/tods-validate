@@ -20,6 +20,17 @@ Fixed (no rule IDs changed):
 - Duplicate header columns now keep the first occurrence's value (matching the
   TODS-E105 message that the duplicate column is ignored) instead of letting a
   later duplicate column silently win.
+- All-blank data rows (a stray `,,,` line past the header) are no longer
+  silently dropped; their missing required values are now reported (TODS-E201).
+- TODS-E205 (vehicle_assignments block ambiguity) is now marked as requiring a
+  companion GTFS feed, so a TODS-only run reports it as unchecked instead of
+  silently passing the check.
+
+Other:
+
+- Bundled a runnable sample feed at `examples/sample-feed/` and pointed the
+  README quickstart at it, so a new install has something that passes on the
+  first run. The GitHub Action now sets up Python explicitly.
 
 ## v0.4.0 - 2026-06-20
 

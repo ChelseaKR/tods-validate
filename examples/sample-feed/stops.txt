@@ -1,0 +1,4 @@
+stop_id,stop_name,stop_lat,stop_lon
+stop-1,First and Main,34.050000,-118.250000
+stop-2,Second and Pine,34.060000,-118.260000
+stop-3,Third and Oak,34.070000,-118.270000

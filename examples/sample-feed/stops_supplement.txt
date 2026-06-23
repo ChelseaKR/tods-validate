@@ -1,0 +1,3 @@
+stop_id,stop_name,location_type,TODS_location_type
+garage,Division 1 Garage,0,garage
+garage-waypoint,Garage Approach Waypoint,0,
