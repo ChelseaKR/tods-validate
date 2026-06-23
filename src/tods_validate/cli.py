@@ -211,6 +211,11 @@ def main() -> None:
     "--encoding", default=None, help="Override UTF-8 decoding for non-conforming exports."
 )
 @click.option(
+    "--watch",
+    is_flag=True,
+    help="Re-validate whenever the feed changes (polls the files; Ctrl-C to stop).",
+)
+@click.option(
     "--config",
     "config_path",
     type=click.Path(exists=False),
@@ -234,6 +239,7 @@ def validate(
     quiet: bool,
     stamp: bool,
     encoding: str | None,
+    watch: bool,
     config_path: str | None,
 ) -> None:
     """Validate the TODS feed at PATH.
@@ -257,26 +263,45 @@ def validate(
     effective_spec = spec_version or config.spec_version or SPEC_VERSION
     _check_spec_version(effective_spec)
 
-    try:
-        package, findings = run(
+    def _validate_once() -> list[Finding]:
+        package, found = run(
             path, gtfs_path, enabled=frozenset(enable), encoding=effective_encoding
         )
+        if ignore:
+            found = [f for f in found if f.rule_id not in ignore]
+        click.echo(
+            _render(
+                output_format,
+                found,
+                package.source,
+                max_findings=effective_max,
+                quiet=quiet,
+                stamp=stamp,
+            )
+        )
+        return found
+
+    if watch:
+        from .watch import watch as watch_feed
+
+        click.echo(f"Watching {path} for changes; press Ctrl-C to stop.", err=True)
+
+        def _tick() -> None:
+            try:
+                _validate_once()
+            except PackageNotFoundError as exc:
+                click.echo(f"tods-validate: {exc}", err=True)
+
+        try:
+            watch_feed(path, _tick)
+        except KeyboardInterrupt:
+            sys.exit(0)
+        return
+
+    try:
+        findings = _validate_once()
     except PackageNotFoundError as exc:
         _fail(str(exc))
-
-    if ignore:
-        findings = [f for f in findings if f.rule_id not in ignore]
-
-    click.echo(
-        _render(
-            output_format,
-            findings,
-            package.source,
-            max_findings=effective_max,
-            quiet=quiet,
-            stamp=stamp,
-        )
-    )
     _write_github_outputs(findings)
 
     # The exit code considers only findings new since the baseline, if given.

@@ -7,6 +7,8 @@ new checks may be added in minor releases.
 
 Added:
 
+- `tods-validate validate --watch` re-validates whenever the feed changes
+  (polls the files), the cheap interim ahead of editor/LSP integration.
 - A browser playground (`web/`) that validates a feed entirely in the browser
   via Pyodide, with no upload, deployable to GitHub Pages. The Python it calls
   is guarded by tests; the page itself needs a browser to verify.
