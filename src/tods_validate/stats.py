@@ -12,7 +12,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
-from .gtfs_companion import build_companion
+from .gtfs_companion import build_companion, parse_gtfs_date
 from .loader import load_package
 from .rules.fields import parse_time
 
@@ -37,6 +37,9 @@ class FeedStats:
     trip_coverage_pct: float | None = None
     gtfs_blocks: int | None = None
     blocks_with_vehicle: int | None = None
+    # Operational profile: which files shipped, and the span of dated assignments.
+    files_present: tuple[str, ...] = ()
+    service_date_range: tuple[str, str] | None = None
 
 
 def _event_minutes(start: str, end: str) -> int:
@@ -113,6 +116,19 @@ def collect_stats(
         stats.gtfs_blocks = len(all_blocks)
         stats.blocks_with_vehicle = len(assigned_blocks & all_blocks)
 
+    stats.files_present = tuple(sorted(package.files))
+    dated: list[str] = []
+    for fname in ("vehicle_assignments.txt", "employee_run_dates.txt"):
+        feed = package.get(fname)
+        if feed is not None and "date" in feed.headers:
+            dated.extend(
+                value
+                for value in (row.values.get("date", "") for row in feed.rows)
+                if parse_gtfs_date(value) is not None
+            )
+    if dated:
+        stats.service_date_range = (min(dated), max(dated))
+
     return stats
 
 
@@ -120,21 +136,30 @@ def stats_to_dict(stats: FeedStats) -> dict[str, object]:
     return asdict(stats)
 
 
-def render_stats_text(stats: FeedStats) -> str:
-    lines = [f"tods-validate stats: {stats.source}", ""]
-    rows: list[tuple[str, object]] = [
-        ("Run events", stats.run_events),
-        ("Distinct runs", stats.runs),
-        ("Trip (revenue) events", stats.trip_events),
-        ("Deadhead/other events", stats.deadhead_events),
-        ("Revenue minutes", stats.revenue_minutes),
-        ("Non-revenue minutes", stats.nonrevenue_minutes),
-        ("Employees", stats.employees),
-        ("Employee assignments", stats.employee_assignments),
-        ("Vehicles", stats.vehicles),
-        ("Vehicle assignments", stats.vehicle_assignments),
-        ("Distinct blocks", stats.distinct_blocks),
-    ]
+def _stat_rows(stats: FeedStats) -> list[tuple[str, object]]:
+    rows: list[tuple[str, object]] = []
+    if stats.service_date_range is not None:
+        start, end = stats.service_date_range
+        rows.append(("Date range", f"{start} to {end}"))
+    if stats.files_present:
+        rows.append(
+            ("Files present", f"{len(stats.files_present)}: {', '.join(stats.files_present)}")
+        )
+    rows.extend(
+        [
+            ("Run events", stats.run_events),
+            ("Distinct runs", stats.runs),
+            ("Trip (revenue) events", stats.trip_events),
+            ("Deadhead/other events", stats.deadhead_events),
+            ("Revenue minutes", stats.revenue_minutes),
+            ("Non-revenue minutes", stats.nonrevenue_minutes),
+            ("Employees", stats.employees),
+            ("Employee assignments", stats.employee_assignments),
+            ("Vehicles", stats.vehicles),
+            ("Vehicle assignments", stats.vehicle_assignments),
+            ("Distinct blocks", stats.distinct_blocks),
+        ]
+    )
     if stats.gtfs_trips is not None:
         rows.extend(
             [
@@ -145,7 +170,20 @@ def render_stats_text(stats: FeedStats) -> str:
                 ("Blocks with a vehicle", stats.blocks_with_vehicle),
             ]
         )
+    return rows
+
+
+def render_stats_text(stats: FeedStats) -> str:
+    lines = [f"tods-validate stats: {stats.source}", ""]
+    rows = _stat_rows(stats)
     width = max(len(label) for label, _ in rows)
     for label, value in rows:
         lines.append(f"  {label.ljust(width)}  {value}")
+    return "\n".join(lines)
+
+
+def render_stats_markdown(stats: FeedStats) -> str:
+    """A feed profile suitable for pasting into an issue or working-group thread."""
+    lines = [f"# TODS feed profile: {stats.source}", "", "| Metric | Value |", "| --- | --- |"]
+    lines.extend(f"| {label} | {value} |" for label, value in _stat_rows(stats))
     return "\n".join(lines)

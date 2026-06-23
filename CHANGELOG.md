@@ -5,6 +5,12 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+Added:
+
+- `tods-validate stats --format markdown` prints a feed profile (now including a
+  date range and a file-presence list) suitable for pasting into an issue or a
+  working-group thread.
+
 ## v0.5.0 - 2026-06-22
 
 Correctness fixes (no rule IDs changed), a runnable bundled sample feed with a

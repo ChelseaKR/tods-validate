@@ -31,7 +31,7 @@ from .report import (
 from .rules import CATEGORIES, all_rules
 from .runner import run
 from .schema import SPEC_VERSION, SUPPORTED_SPEC_VERSIONS
-from .stats import collect_stats, render_stats_text, stats_to_dict
+from .stats import collect_stats, render_stats_markdown, render_stats_text, stats_to_dict
 
 
 def _fail(message: str) -> NoReturn:
@@ -403,7 +403,7 @@ def batch(paths: tuple[str, ...], gtfs_path: str | None, output_format: str, fai
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["text", "json"]),
+    type=click.Choice(["text", "json", "markdown"]),
     default="text",
     show_default=True,
 )
@@ -416,6 +416,8 @@ def stats(path: str, gtfs_path: str | None, output_format: str, encoding: str | 
         _fail(str(exc))
     if output_format == "json":
         click.echo(json.dumps(stats_to_dict(feed_stats), indent=2))
+    elif output_format == "markdown":
+        click.echo(render_stats_markdown(feed_stats))
     else:
         click.echo(render_stats_text(feed_stats))
 

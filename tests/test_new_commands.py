@@ -100,6 +100,17 @@ def test_stats_text_and_json() -> None:
     payload = json.loads(js.output)
     assert payload["run_events"] == 11
     assert payload["trip_coverage_pct"] == 100.0
+    # Operational profile additions.
+    assert payload["files_present"]  # which files shipped
+    assert len(payload["service_date_range"]) == 2  # [min, max] dated assignment
+
+
+def test_stats_markdown_profile() -> None:
+    md = invoke("stats", str(VALID_TODS), "--gtfs", str(VALID_GTFS), "--format", "markdown")
+    assert "# TODS feed profile:" in md.output
+    assert "| Metric | Value |" in md.output
+    assert "Date range" in md.output
+    assert "Files present" in md.output
 
 
 def test_anonymize_pseudonymizes_consistently(tmp_path: Path) -> None:
