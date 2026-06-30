@@ -23,6 +23,14 @@ Added:
   `lsp` extra (`pip install 'tods-validate[lsp]'`, which brings in pygls); the
   diagnostic-mapping core is pure and unit-tested without an editor.
 
+Changed:
+
+- `tods-validate fix` now does more than trim whitespace: it also drops
+  entirely-blank rows (the `,,,` lines that otherwise raise a wall of E201) and
+  removes rows that are byte-identical to an earlier one (the TODS-W408 duplicate
+  assignment). A row that shares a primary key but differs in any value is a real
+  conflict and is left untouched for a human. Still a dry run by default.
+
 Fixed:
 
 - The reported tool version (`toolVersion` in the JSON/HTML reports and

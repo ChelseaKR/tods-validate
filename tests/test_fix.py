@@ -86,3 +86,53 @@ def test_fix_cli_nothing_to_fix(tmp_path: Path) -> None:
     result = CliRunner().invoke(main, ["fix", str(src)])
     assert result.exit_code == 0
     assert "Nothing to fix" in result.output
+
+
+_HEADER = (
+    "service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time\n"
+)
+_ROW = "weekday,10000,10,sign-in,garage,08:45:00,garage,08:50:00\n"
+
+
+def test_fix_drops_entirely_blank_rows(tmp_path: Path) -> None:
+    src = _src(tmp_path, _HEADER + _ROW + ",,,,,,,\n")  # a stray all-blank row
+    _, before = run(src)
+    assert any(f.rule_id == "TODS-E201" for f in before), "the blank row should trip E201"
+    result = fix_package(src, output=tmp_path / "out")
+    assert result.blank_rows_dropped == {"run_events.txt": 1}
+    _, after = run(tmp_path / "out")
+    assert not any(f.rule_id == "TODS-E201" for f in after)
+
+
+def test_fix_drops_exact_duplicate_rows(tmp_path: Path) -> None:
+    src = _src(tmp_path, _HEADER + _ROW + _ROW)  # the same row twice
+    result = fix_package(src, output=tmp_path / "out")
+    assert result.duplicate_rows_dropped == {"run_events.txt": 1}
+    body = (tmp_path / "out" / "run_events.txt").read_text().splitlines()
+    assert body.count(_ROW.strip()) == 1  # only one copy remains
+
+
+def test_fix_keeps_rows_that_share_a_key_but_differ(tmp_path: Path) -> None:
+    # Same primary key, different end_time: a real conflict, not a duplicate.
+    conflict = "weekday,10000,10,sign-in,garage,08:45:00,garage,08:55:00\n"
+    src = _src(tmp_path, _HEADER + _ROW + conflict)
+    result = fix_package(src, output=tmp_path / "out")
+    assert result.duplicate_rows_dropped == {}  # nothing dropped
+    kept = (tmp_path / "out" / "run_events.txt").read_text().splitlines()
+    assert len(kept) == 3  # header + both rows
+
+
+def test_fix_cli_reports_all_categories(tmp_path: Path) -> None:
+    src = _src(
+        tmp_path,
+        _HEADER
+        + "weekday ,10000,10,x,garage,08:45:00,garage,08:50:00\n"
+        + _ROW
+        + _ROW
+        + ",,,,,,,\n",
+    )
+    result = CliRunner().invoke(main, ["fix", str(src)])
+    assert result.exit_code == 0
+    assert "trimmed whitespace" in result.output
+    assert "blank row" in result.output
+    assert "duplicate row" in result.output

@@ -494,10 +494,11 @@ def anonymize(path: str, output_path: str, salt: str | None, encoding: str | Non
 )
 @click.option("--encoding", default=None)
 def fix(path: str, output_path: str | None, encoding: str | None) -> None:
-    """Apply safe, deterministic fixes (currently: trim TODS-W206 whitespace padding).
+    """Apply safe, deterministic fixes (trim whitespace, drop blank/duplicate rows).
 
-    A dry run by default; pass -o/--output to write the fixed package. Re-encodes
-    files as UTF-8 without a BOM.
+    Fixes TODS-W206 whitespace padding, drops entirely-blank rows, and drops rows
+    that exactly duplicate an earlier one (TODS-W408). A dry run by default; pass
+    -o/--output to write the fixed package. Re-encodes files as UTF-8 without a BOM.
     """
     try:
         result = fix_package(path, Path(output_path) if output_path is not None else None, encoding)
@@ -507,12 +508,22 @@ def fix(path: str, output_path: str | None, encoding: str | None) -> None:
     if not result.changed_any:
         click.echo("  Nothing to fix.")
         return
-    for name, count in sorted(result.trimmed.items()):
-        click.echo(f"  {name}: trimmed whitespace on {count} value(s)")
+    for name in sorted(
+        set(result.trimmed) | set(result.blank_rows_dropped) | set(result.duplicate_rows_dropped)
+    ):
+        parts = []
+        if name in result.trimmed:
+            parts.append(f"trimmed whitespace on {result.trimmed[name]} value(s)")
+        if name in result.blank_rows_dropped:
+            parts.append(f"dropped {result.blank_rows_dropped[name]} blank row(s)")
+        if name in result.duplicate_rows_dropped:
+            parts.append(f"dropped {result.duplicate_rows_dropped[name]} duplicate row(s)")
+        click.echo(f"  {name}: {', '.join(parts)}")
+    total = result.total_trimmed + result.total_blank_dropped + result.total_duplicates_dropped
     if result.written:
         click.echo(f"  wrote {len(result.written)} file(s) to {output_path}")
     else:
-        click.echo(f"  dry run: re-run with -o OUTPUT to write {result.total_trimmed} fix(es)")
+        click.echo(f"  dry run: re-run with -o OUTPUT to write {total} fix(es)")
 
 
 @main.command()
