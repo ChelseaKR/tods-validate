@@ -47,6 +47,28 @@ A frozen dataclass: `rule_id`, `severity`, `message`, `file`, `row`, `field`,
 `file.txt#L4/field` identifier). `to_dict()` matches
 [docs/report.schema.json](report.schema.json).
 
+## `suggest_fixes(path, gtfs=None, *, enable=(), encoding=None)`
+
+Validates the feed and returns a `list[Suggestion]`: one entry per finding the
+validator knows how to fix mechanically. Arguments mirror `validate_feed`.
+
+```python
+from tods_validate import suggest_fixes
+
+for s in suggest_fixes("exports/tods"):
+    if s.kind == "auto":                # safe; `tods-validate fix` applies it
+        print(s.location(), s.current, "->", s.proposed)
+    else:                               # "review": derivable, confirm by hand
+        print("review:", s.location(), s.description)
+```
+
+A `Suggestion` is a frozen dataclass: `rule_id`, `kind` (`"auto"` or `"review"`),
+`description`, `file`, `row`, `field`, `current`, `proposed`. `current` and
+`proposed` are the before and after of a value change, or both `None` for a
+structural fix such as deleting a duplicate row. Helpers: `location()` and
+`to_dict()`. Suggestions never change the feed; applying them is up to the
+caller.
+
 ## Stability
 
 These shapes follow the project's semantic-versioning promise: fields are only

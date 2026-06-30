@@ -30,6 +30,16 @@ Added:
   for TODS files, so the diagnostics, hovers, and quick fixes show up in the
   editor. It is a thin client (build it with `npm install && npm run compile`,
   press F5 to try it); it is not published to the Marketplace.
+- `tods-validate validate --suggest` lists concrete fix suggestions for the
+  mechanically-fixable findings after the report, each marked `auto` (safe and
+  meaning-preserving, the kind `tods-validate fix` applies) or `review` (derivable
+  but worth a human's confirmation, such as a time written `9:45` -> `09:45:00` or
+  a date written `2026-03-15` -> `20260315`). A suggestion is only offered when its
+  proposed value is one the validator would accept and is reachable by adding
+  leading zeros, a zero seconds field, or removing date separators, so it never
+  changes what a value means. Text and Markdown output only; the JSON report is
+  left untouched so it stays a stable machine contract. The same suggestions are
+  available programmatically via `tods_validate.suggest_fixes`.
 
 Changed:
 

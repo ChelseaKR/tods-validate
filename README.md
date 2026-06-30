@@ -91,6 +91,42 @@ New developers can also call the validator in-process; see
 [docs/api.md](docs/api.md). Not a programmer? Start with
 [docs/getting-started.md](docs/getting-started.md).
 
+## Fixing common problems
+
+Some findings have a mechanical fix. Pass `--suggest` to list it after the
+report, marked `auto` (safe and meaning-preserving) or `review` (derivable, but
+worth a look because only you know the intent):
+
+```console
+$ tods-validate validate exports/tods --suggest
+...
+Suggestions (1 auto, 1 to review):
+  [review] run_events.txt, row 4, field 'end_time': Write the time as HH:MM:SS: '9:45' -> '09:45:00'
+  [auto] run_events.txt, row 2, field 'run_id': Trim the surrounding spaces so the value matches exactly: '10000 ' -> '10000'
+Apply the auto fixes with: tods-validate fix PATH -o OUTPUT
+```
+
+A suggestion is only offered when its proposed value is one the validator would
+accept and is reachable by adding leading zeros, a zero seconds field, or
+removing date separators, so it never changes what a value means. `--suggest`
+affects text and Markdown output; the JSON report is left unchanged so it stays
+a stable machine contract, and the same suggestions are available from the
+Python API as `tods_validate.suggest_fixes`.
+
+The `auto` suggestions are the ones `tods-validate fix` applies across a whole
+package without a human in the loop:
+
+```sh
+tods-validate fix exports/tods -o exports/tods-fixed
+```
+
+It trims whitespace padding (TODS-W206), drops entirely-blank rows, and drops
+rows byte-identical to an earlier one (the TODS-W408 duplicate), re-encoding each
+file as UTF-8 without a BOM. A row that shares a primary key but differs in any
+value is a real conflict and is left for you. Without `-o` it is a dry run that
+only reports what it would change. The `review` suggestions are never applied
+automatically; correct those by hand.
+
 To suppress findings your agency has decided to accept, pass
 `--ignore TODS-W206` (repeatable), or put the policy in a
 `tods-validate.toml` next to where you run the validator:

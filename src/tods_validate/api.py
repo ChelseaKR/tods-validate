@@ -24,6 +24,7 @@ from pathlib import Path
 
 from .findings import Finding, Severity
 from .runner import run
+from .suggest import Suggestion, suggest_for_findings
 
 
 @dataclass(frozen=True)
@@ -78,4 +79,23 @@ def validate_feed(
     return ValidationResult(source=package.source, findings=findings)
 
 
-__all__ = ["ValidationResult", "validate_feed"]
+def suggest_fixes(
+    path: str | Path,
+    gtfs: str | Path | None = None,
+    *,
+    enable: Iterable[str] = (),
+    encoding: str | None = None,
+) -> list[Suggestion]:
+    """Validate the feed at ``path`` and return concrete fix suggestions for it.
+
+    Each :class:`tods_validate.suggest.Suggestion` names a finding the validator
+    knows how to fix mechanically, classified ``auto`` (safe and meaning-preserving,
+    the kind ``tods-validate fix`` applies) or ``review`` (derivable but worth a
+    human's confirmation). Arguments mirror :func:`validate_feed`. Suggestions
+    never change the feed; applying them is up to the caller.
+    """
+    package, findings = run(path, gtfs, enabled=frozenset(enable), encoding=encoding)
+    return suggest_for_findings(findings, package)
+
+
+__all__ = ["Suggestion", "ValidationResult", "suggest_fixes", "validate_feed"]
