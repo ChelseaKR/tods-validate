@@ -40,9 +40,21 @@ Added:
   changes what a value means. Text and Markdown output only; the JSON report is
   left untouched so it stays a stable machine contract. The same suggestions are
   available programmatically via `tods_validate.suggest_fixes`.
+- A test-helper module (`tods_validate.testing`) with `assert_feed_valid` and
+  `assert_feed_produces`, so a TODS exporter can gate its own pytest suite on the
+  same checks the CLI and Action run without shelling out. On failure they raise
+  with the human-readable report rather than a stack trace. See docs/api.md.
+- A contributor guide for authoring rules (docs/authoring-rules.md): how to pick
+  a severity and allocate an ID, the scheduler-grade message style, and the
+  fixture/conformance contract CI enforces.
 
 Changed:
 
+- The `--format html` report is now an explicit accessibility pass: it declares
+  its language and a responsive viewport, uses `header`/`main` landmarks, gives
+  the findings table a caption and column-scoped headers, and lightens the info
+  severity color so all three severities clear WCAG AA contrast on the white
+  background. The README gained a short accessibility statement.
 - `tods-validate fix` now does more than trim whitespace: it also drops
   entirely-blank rows (the `,,,` lines that otherwise raise a wall of E201) and
   removes rows that are byte-identical to an earlier one (the TODS-W408 duplicate
@@ -54,6 +66,8 @@ Fixed:
 - The reported tool version (`toolVersion` in the JSON/HTML reports and
   `--version`) is now read from the installed package metadata instead of a
   hand-edited constant that had drifted to `0.4.0`.
+- The README and `merge`-recipe GitHub Action snippets now reference the current
+  `@v0.6.0` instead of the stale `@v0.4.0` they were pinned at.
 
 ## v0.6.0 - 2026-06-29
 

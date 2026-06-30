@@ -60,6 +60,29 @@ def test_html_escapes_and_is_standalone() -> None:
     assert "&lt;script&gt;" in out
 
 
+def test_html_report_is_accessible() -> None:
+    out = render_html(_findings("TODS-E307", 2), "feed/")
+    # Declared language and a responsive viewport so the page reflows on zoom.
+    assert "<html lang='en'>" in out
+    assert "name='viewport'" in out
+    # Document landmarks give assistive tech an outline.
+    assert "<header>" in out
+    assert "<main>" in out
+    # The findings table is navigable: a caption plus column-scoped headers.
+    assert "<caption>" in out
+    assert out.count("scope='col'") == 4
+    # Severity reaches a screen reader as a word, not color alone.
+    assert ">ERROR<" in out
+
+
+def test_html_severity_colors_clear_contrast() -> None:
+    # The info green was lightened away from the original low-contrast #0b5 so
+    # all three severities clear WCAG AA (4.5:1) on the white background.
+    out = render_html([], "feed/")
+    assert "#0b5" not in out
+    assert ".sev-info{color:#0a7d3f}" in out
+
+
 def test_markdown_stamp_is_optional() -> None:
     plain = render_markdown(_findings("TODS-E307", 1), "feed/")
     stamped = render_markdown(_findings("TODS-E307", 1), "feed/", stamp=True)

@@ -69,6 +69,34 @@ structural fix such as deleting a duplicate row. Helpers: `location()` and
 `to_dict()`. Suggestions never change the feed; applying them is up to the
 caller.
 
+## Test helpers
+
+`tods_validate.testing` packages `validate_feed` as two pytest-friendly
+assertions, for exporter teams who want a CI gate against the same checks the
+CLI runs. They are kept out of the top-level namespace so importing the library
+never pulls in test-only code; import them from `tods_validate.testing`.
+
+### `assert_feed_valid(path, gtfs=None, *, enable=(), encoding=None, fail_on="error", ignore=())`
+
+Asserts the feed has no findings at or above `fail_on` (`"error"` by default,
+`"warning"` to gate on warnings; a `Severity` is also accepted). `ignore` is a
+set of rule IDs to accept. Raises `AssertionError` carrying the rendered report;
+returns the `ValidationResult` on success.
+
+### `assert_feed_produces(path, expected, gtfs=None, *, enable=(), encoding=None, exactly=False)`
+
+Asserts that validating `path` produces the `expected` rule ID(s) — a single ID
+or an iterable. A subset check by default; pass `exactly=True` to require the
+produced set to match with nothing extra. This is the helper for
+regression-testing that a known-bad input keeps tripping the right rule.
+
+```python
+from tods_validate.testing import assert_feed_valid, assert_feed_produces
+
+assert_feed_valid("exports/tods", gtfs="exports/gtfs")          # clean, or raises
+assert_feed_produces("fixtures/bad-trip", "TODS-E307")          # still caught
+```
+
 ## Stability
 
 These shapes follow the project's semantic-versioning promise: fields are only

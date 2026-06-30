@@ -40,8 +40,26 @@ result = validate_feed("my-exporter/output/tods", gtfs="my-exporter/output/gtfs"
 assert result.ok, [(f.rule_id, f.message) for f in result.errors]
 ```
 
-To regression-test that a known-bad input still trips the right rule, compare
-the set of rule IDs against a recorded expectation.
+For a drop-in pytest gate, `tods_validate.testing` wraps that pattern and raises
+with the same human-readable report the CLI prints:
+
+```python
+from tods_validate.testing import assert_feed_valid, assert_feed_produces
+
+def test_exporter_output_is_clean(tmp_path):
+    my_exporter.write(tmp_path)
+    assert_feed_valid(tmp_path / "tods", gtfs=tmp_path / "gtfs")
+
+def test_dangling_trip_is_caught(tmp_path):
+    my_exporter.write_with_dangling_trip(tmp_path)
+    assert_feed_produces(tmp_path / "tods", "TODS-E307")
+```
+
+`assert_feed_valid` takes `fail_on="warning"` to gate on warnings too and
+`ignore=[...]` for rule IDs you have decided to accept; `assert_feed_produces`
+takes `exactly=True` to require the produced rule-ID set to match with nothing
+extra. Both return the `ValidationResult` so a passing test can inspect further.
+See [api.md](api.md#test-helpers).
 
 ## Contributing fixtures
 
