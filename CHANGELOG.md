@@ -3,7 +3,11 @@
 Notable changes to tods-validate. Rule IDs are never renumbered or reused;
 new checks may be added in minor releases.
 
-## Unreleased
+## v0.6.0 - 2026-06-29
+
+New surfaces for working with a feed live (`--watch`, browser playground),
+acting on findings (`fix`), and sharing results (`stats --format markdown`,
+conformance corpus), plus a new cross-feed operational check (TODS-W315).
 
 Added:
 
