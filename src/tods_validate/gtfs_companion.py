@@ -87,6 +87,11 @@ class CompanionGTFS:
     # used to check run_events start/end locations against the trip endpoints.
     trip_first_stop: dict[str, str] = field(default_factory=dict)
     trip_last_stop: dict[str, str] = field(default_factory=dict)
+    # The first stop's departure_time and the last stop's arrival_time, used to
+    # check run_events start/end times against the trip's scheduled span. Each
+    # falls back to the other time when one is blank, as GTFS permits.
+    trip_first_departure: dict[str, str] = field(default_factory=dict)
+    trip_last_arrival: dict[str, str] = field(default_factory=dict)
     # Operating dates per service_id, from calendar + calendar_dates after
     # supplements. Only populated for services whose calendar rows parse.
     service_dates: dict[str, frozenset[date]] = field(default_factory=dict)
@@ -161,17 +166,23 @@ def build_companion(gtfs: Package | None, tods: Package, source: str) -> Compani
             companion.block_services.setdefault(block_id, set()).add(row.get("service_id", ""))
 
     stop_times = effective("stop_times.txt")
-    stops_by_trip: dict[str, list[tuple[int, str]]] = {}
+    stops_by_trip: dict[str, list[tuple[int, str, str, str]]] = {}
     for (trip_id, sequence), st_row in stop_times.items():
         try:
             order = int(sequence)
         except ValueError:
             continue
-        stops_by_trip.setdefault(trip_id, []).append((order, st_row.get("stop_id", "")))
+        arrival = st_row.get("arrival_time", "")
+        departure = st_row.get("departure_time", "")
+        stops_by_trip.setdefault(trip_id, []).append(
+            (order, st_row.get("stop_id", ""), arrival or departure, departure or arrival)
+        )
     for trip_id, ordered in stops_by_trip.items():
         ordered.sort()
         companion.trip_first_stop[trip_id] = ordered[0][1]
         companion.trip_last_stop[trip_id] = ordered[-1][1]
+        companion.trip_first_departure[trip_id] = ordered[0][3]
+        companion.trip_last_arrival[trip_id] = ordered[-1][2]
 
     companion.stop_ids = {key[0] for key in effective("stops.txt")}
     companion.route_ids = {key[0] for key in effective("routes.txt")}

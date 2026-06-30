@@ -1,0 +1,3 @@
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Pullout,garage,08:00:00,stopA,08:30:00
+daily,1,2,Operate,stopB,08:30:00,garage,09:30:00

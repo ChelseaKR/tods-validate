@@ -15,6 +15,7 @@ from ..findings import Finding, Severity
 from ..loader import FeedFile, Package, Row
 from ..schema import SPEC_URL, TABLES
 from . import ValidationContext, rule
+from .fields import parse_time
 
 _SUPPLEMENT_SECTION = f"{SPEC_URL}#supplement-files"
 
@@ -538,6 +539,69 @@ def run_event_endpoint_mismatch(context: ValidationContext) -> Iterator[Finding]
                     suggestion=(
                         f"Use the trip's {which} stop as {loc_field}, or set {mid_field}=1 "
                         "for a mid-trip event."
+                    ),
+                )
+
+
+@rule(
+    id="TODS-W316",
+    severity=Severity.WARNING,
+    title="Run event time does not match the trip's scheduled time",
+    description=(
+        "A run event works a trip end to end (trip_id set, the matching mid_trip flag "
+        "not 1), but its start_time is not the trip's first scheduled departure, or its "
+        "end_time is not the trip's last scheduled arrival, in the supplemented "
+        "stop_times.txt."
+    ),
+    spec_section=f"{SPEC_URL}#run_eventstxt",
+    needs_gtfs=True,
+    interpretation=(
+        "the companion of TODS-W315 for time: a run event claiming to work a whole trip "
+        "should span the trip's scheduled times, so a mismatch is a warning; skipped for "
+        "mid-trip events, for trips with no stop_times, and when either time is unparseable."
+    ),
+)
+def run_event_time_mismatch(context: ValidationContext) -> Iterator[Finding]:
+    assert context.gtfs is not None
+    gtfs = context.gtfs
+    feed = context.package.get("run_events.txt")
+    if feed is None or "trip_id" not in feed.headers:
+        return
+    for row in feed.rows:
+        trip_id = row.values.get("trip_id", "")
+        if not trip_id or trip_id not in gtfs.trip_first_departure:
+            continue
+        endpoints = (
+            ("start_time", "start_mid_trip", gtfs.trip_first_departure[trip_id], "departs"),
+            ("end_time", "end_mid_trip", gtfs.trip_last_arrival[trip_id], "arrives"),
+        )
+        for time_field, mid_field, expected, verb in endpoints:
+            if row.values.get(mid_field, "") == "1":
+                continue  # a mid-trip event need not span the whole trip
+            actual = row.values.get(time_field, "")
+            # Compare parsed seconds so 24:00:00 and 00:00:00 are not confused, and
+            # only when both sides actually parse (E203 flags the ones that do not).
+            if not actual or not expected:
+                continue
+            actual_seconds = parse_time(actual)
+            expected_seconds = parse_time(expected)
+            if actual_seconds is None or expected_seconds is None:
+                continue
+            if actual_seconds != expected_seconds:
+                yield Finding(
+                    rule_id="TODS-W316",
+                    severity=Severity.WARNING,
+                    file="run_events.txt",
+                    row=row.line,
+                    field=time_field,
+                    message=(
+                        f"run_events.txt row {row.line}: {time_field} {actual!r} is not when "
+                        f"trip {trip_id!r} {verb} ({expected!r}) in stop_times.txt. If the "
+                        f"event works only part of the trip, set {mid_field} to 1."
+                    ),
+                    suggestion=(
+                        f"Use the trip's scheduled time as {time_field}, or set {mid_field}=1 "
+                        "for an event that does not span the whole trip."
                     ),
                 )
 

@@ -257,6 +257,16 @@ Interpretation: the spec says these locations 'should' be the trip endpoints, so
 
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
+### TODS-W316: Run event time does not match the trip's scheduled time
+
+Severity: WARNING. Needs a companion GTFS feed.
+
+A run event works a trip end to end (trip_id set, the matching mid_trip flag not 1), but its start_time is not the trip's first scheduled departure, or its end_time is not the trip's last scheduled arrival, in the supplemented stop_times.txt.
+
+Interpretation: the companion of TODS-W315 for time: a run event claiming to work a whole trip should span the trip's scheduled times, so a mismatch is a warning; skipped for mid-trip events, for trips with no stop_times, and when either time is unparseable.
+
+Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
+
 ## Semantic checks (TODS-x4xx)
 
 ### TODS-E401: Event ends before it starts
@@ -326,6 +336,16 @@ Two rows in employee_run_dates.txt are exactly identical (same date, service, ru
 Interpretation: permissive: the spec's 'Primary Key: *' is read as not forbidding an exact duplicate row, so this is a warning rather than an error (spec-questions #6).
 
 Spec reference: <https://tods-transit.org/spec/#employee_run_datestxt>
+
+### TODS-W409: Consecutive run events do not connect in space
+
+Severity: WARNING.
+
+Within one run, an event ends at one location but the next event in event_sequence order starts somewhere else. An operator is one person who cannot teleport, so a gap usually means a missing deadhead event or a wrong location. Events with a blank endpoint are skipped.
+
+Interpretation: the spec does not state this explicitly, but a run is a continuous tour of duty; legitimate exceptions exist (so a warning), and adjacencies with a blank location are not flagged.
+
+Spec reference: <https://tods-transit.org/spec/#event_sequence-and-event-times>
 
 ## Coverage (opt-in, informational) (TODS-x5xx)
 

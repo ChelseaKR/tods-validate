@@ -7,6 +7,15 @@ new checks may be added in minor releases.
 
 Added:
 
+- TODS-W316: the time companion of W315. A run event that works a trip end to end
+  should start at the trip's first scheduled departure and end at its last
+  scheduled arrival; a mismatch is a warning, skipped for mid-trip events. Uses
+  the stop_times the companion GTFS already ingests.
+- TODS-W409: consecutive events in one run should connect in space — an event's
+  end_location should be the next event's start_location, since an operator
+  cannot teleport between locations. A gap is a warning (legitimate exceptions
+  exist), and adjacencies with a blank endpoint are skipped. TODS-only, no
+  companion GTFS needed.
 - A language server (`tods-validate lsp`, or the `tods-validate-lsp` entry point)
   that re-validates the whole feed when you open or save any TODS file and shows
   each finding inline at its row and field. Findings name a field, so the

@@ -30,6 +30,8 @@ class _Event:
     trip_id: str
     start: int | None  # seconds
     end: int | None
+    start_location: str
+    end_location: str
 
     @property
     def run(self) -> tuple[str, str]:
@@ -52,6 +54,8 @@ def _events(context: ValidationContext) -> list[_Event]:
                 trip_id=row.values.get("trip_id", ""),
                 start=parse_time(row.values.get("start_time", "")),
                 end=parse_time(row.values.get("end_time", "")),
+                start_location=row.values.get("start_location", ""),
+                end_location=row.values.get("end_location", ""),
             )
         )
     return events
@@ -414,3 +418,50 @@ def duplicate_assignment(context: ValidationContext) -> Iterator[Finding]:
             )
         else:
             seen[key] = row.line
+
+
+@rule(
+    id="TODS-W409",
+    severity=Severity.WARNING,
+    title="Consecutive run events do not connect in space",
+    description=(
+        "Within one run, an event ends at one location but the next event in "
+        "event_sequence order starts somewhere else. An operator is one person who "
+        "cannot teleport, so a gap usually means a missing deadhead event or a wrong "
+        "location. Events with a blank endpoint are skipped."
+    ),
+    spec_section=f"{SPEC_URL}#event_sequence-and-event-times",
+    interpretation=(
+        "the spec does not state this explicitly, but a run is a continuous tour of "
+        "duty; legitimate exceptions exist (so a warning), and adjacencies with a blank "
+        "location are not flagged."
+    ),
+)
+def run_events_discontinuous(context: ValidationContext) -> Iterator[Finding]:
+    for events in _events_by_run(context).values():
+        ordered = sorted(
+            (e for e in events if e.sequence is not None), key=lambda e: e.sequence or 0
+        )
+        for previous, current in zip(ordered, ordered[1:], strict=False):
+            if not previous.end_location or not current.start_location:
+                continue  # an unlocated endpoint says nothing about continuity
+            if previous.end_location != current.start_location:
+                yield Finding(
+                    rule_id="TODS-W409",
+                    severity=Severity.WARNING,
+                    file="run_events.txt",
+                    row=current.row.line,
+                    field="start_location",
+                    message=(
+                        f"run_events.txt row {current.row.line}: event_sequence "
+                        f"{current.sequence} starts at {current.start_location!r}, but the "
+                        f"previous event (sequence {previous.sequence}, row "
+                        f"{previous.row.line}) ended at {previous.end_location!r} in the same "
+                        "run. Consecutive events should connect; an operator cannot jump "
+                        "between locations."
+                    ),
+                    suggestion=(
+                        "Add the missing deadhead or move event between them, or correct the "
+                        "location so each event begins where the last one ended."
+                    ),
+                )

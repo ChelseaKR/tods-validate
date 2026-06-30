@@ -1,9 +1,16 @@
 """Semantic rules (TODS-x4xx)."""
 
+from pathlib import Path
+
 import pytest
 
 from conftest import rule_ids, run_invalid_fixture
 from tods_validate.findings import Finding
+from tods_validate.runner import run
+
+_RUN_EVENTS_HEADER = (
+    "service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time\n"
+)
 
 RULES = (
     "TODS-E401",
@@ -14,6 +21,7 @@ RULES = (
     "TODS-W406",
     "TODS-W407",
     "TODS-W408",
+    "TODS-W409",
 )
 
 
@@ -53,3 +61,44 @@ def test_double_booking_is_not_reported_for_distinct_employees() -> None:
     findings = [f for f in run_invalid_fixture("TODS-W404") if f.rule_id == "TODS-W404"]
     assert len(findings) == 1
     assert "emp-1" in findings[0].message
+
+
+def test_run_continuity_names_both_locations() -> None:
+    findings = [f for f in run_invalid_fixture("TODS-W409") if f.rule_id == "TODS-W409"]
+    assert len(findings) == 1
+    msg = findings[0].message
+    assert "'stopA'" in msg  # where the previous event ended
+    assert "'stopB'" in msg  # where this event starts instead
+
+
+def test_run_continuity_passes_when_events_connect(tmp_path: Path) -> None:
+    (tmp_path / "run_events.txt").write_text(
+        _RUN_EVENTS_HEADER
+        + "daily,1,1,Pullout,garage,08:00:00,stopA,08:30:00\n"
+        + "daily,1,2,Operate,stopA,08:30:00,garage,09:30:00\n"  # starts where #1 ended
+    )
+    _, findings = run(tmp_path)
+    assert not any(f.rule_id == "TODS-W409" for f in findings)
+
+
+def test_run_continuity_skips_blank_endpoints(tmp_path: Path) -> None:
+    # A break event with no location should not be read as a teleport.
+    (tmp_path / "run_events.txt").write_text(
+        _RUN_EVENTS_HEADER
+        + "daily,1,1,Operate,garage,08:00:00,stopA,08:30:00\n"
+        + "daily,1,2,Break,,08:30:00,,09:00:00\n"
+        + "daily,1,3,Operate,stopB,09:00:00,garage,10:00:00\n"
+    )
+    _, findings = run(tmp_path)
+    assert not any(f.rule_id == "TODS-W409" for f in findings)
+
+
+def test_run_continuity_does_not_cross_runs(tmp_path: Path) -> None:
+    # Two different runs; the gap between them is not a discontinuity.
+    (tmp_path / "run_events.txt").write_text(
+        _RUN_EVENTS_HEADER
+        + "daily,1,1,Operate,garage,08:00:00,stopA,09:00:00\n"
+        + "daily,2,1,Operate,stopZ,08:00:00,garage,09:00:00\n"
+    )
+    _, findings = run(tmp_path)
+    assert not any(f.rule_id == "TODS-W409" for f in findings)

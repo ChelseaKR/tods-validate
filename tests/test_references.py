@@ -113,3 +113,47 @@ def test_endpoint_check_skips_mid_trip_events(tmp_path: Path) -> None:
     )
     _, findings = run(tmp_path)
     assert not any(f.rule_id == "TODS-W315" for f in findings)
+
+
+def test_run_event_time_mismatch_w316() -> None:
+    findings = [f for f in run_invalid_fixture("TODS-W316") if f.rule_id == "TODS-W316"]
+    assert len(findings) == 1  # only start_time mismatches; end_time matches the schedule
+    msg = findings[0].message
+    assert findings[0].field == "start_time"
+    assert "'08:30:00'" in msg  # the run event's wrong start_time
+    assert "'09:00:00'" in msg  # the trip's scheduled departure
+    assert "T1" in msg
+
+
+def test_time_check_skips_mid_trip_events(tmp_path: Path) -> None:
+    # The start_time disagrees with the schedule, but the event is flagged mid-trip.
+    (tmp_path / "trips.txt").write_text("trip_id,route_id,service_id\nT1,R1,weekday\n")
+    (tmp_path / "stop_times.txt").write_text(
+        "trip_id,stop_sequence,stop_id,arrival_time,departure_time\n"
+        "T1,1,S1,09:00:00,09:00:00\nT1,2,S2,10:00:00,10:00:00\n"
+    )
+    (tmp_path / "stops.txt").write_text("stop_id\nS1\nS2\n")
+    (tmp_path / "run_events.txt").write_text(
+        "service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,"
+        "end_location,end_time,start_mid_trip\n"
+        "weekday,1,10,operator,T1,S1,08:30:00,S2,10:00:00,1\n"
+    )
+    _, findings = run(tmp_path)
+    assert not any(f.rule_id == "TODS-W316" for f in findings)
+
+
+def test_time_check_treats_2400_as_midnight(tmp_path: Path) -> None:
+    # The event ends at 24:00:00 and the trip arrives at 24:00:00: equal, no W316.
+    (tmp_path / "trips.txt").write_text("trip_id,route_id,service_id\nT1,R1,weekday\n")
+    (tmp_path / "stop_times.txt").write_text(
+        "trip_id,stop_sequence,stop_id,arrival_time,departure_time\n"
+        "T1,1,S1,23:00:00,23:00:00\nT1,2,S2,24:00:00,24:00:00\n"
+    )
+    (tmp_path / "stops.txt").write_text("stop_id\nS1\nS2\n")
+    (tmp_path / "run_events.txt").write_text(
+        "service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,"
+        "end_location,end_time\n"
+        "weekday,1,10,operator,T1,S1,23:00:00,S2,24:00:00\n"
+    )
+    _, findings = run(tmp_path)
+    assert not any(f.rule_id == "TODS-W316" for f in findings)
