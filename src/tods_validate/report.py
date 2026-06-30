@@ -326,7 +326,16 @@ _HTML_SEVERITY_LABEL = {
 
 
 def render_html(findings: list[Finding], source: str) -> str:
-    """A self-contained, shareable HTML report. No external assets."""
+    """A self-contained, shareable HTML report. No external assets.
+
+    Built to meet the same accessibility bar as the terminal output. Severity is
+    carried by a word (ERROR/WARNING/INFO), never color alone; the findings table
+    has a caption and column-scoped headers so a screen reader can navigate it;
+    the page declares ``lang`` and a responsive viewport so it reflows on zoom;
+    and the severity colors are chosen to clear WCAG AA contrast (4.5:1) on the
+    white background. Landmarks (``header``/``main``) give assistive tech a
+    document outline.
+    """
     counts = summarize(findings)
     esc = html.escape
     rows = []
@@ -352,26 +361,33 @@ def render_html(findings: list[Finding], source: str) -> str:
             f"<span class='sev-warning'>{counts[Severity.WARNING]} warning(s)</span>, "
             f"<span class='sev-info'>{counts[Severity.INFO]} info</span></p>"
             f"<p class='breakdown'>By rule: {breakdown}</p>"
-            "<table><thead><tr><th>Severity</th><th>Rule</th><th>Location</th>"
-            "<th>Message</th></tr></thead><tbody>" + "".join(rows) + "</tbody></table>"
+            "<table><caption>Findings, ordered by file, then row, then rule ID.</caption>"
+            "<thead><tr><th scope='col'>Severity</th><th scope='col'>Rule</th>"
+            "<th scope='col'>Location</th><th scope='col'>Message</th></tr></thead>"
+            "<tbody>" + "".join(rows) + "</tbody></table>"
         )
     )
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
+        "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         f"<title>TODS validation report — {esc(source)}</title>"
         "<style>"
         "body{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#1a1a1a}"
         "table{border-collapse:collapse;width:100%;margin-top:1rem}"
+        "caption{text-align:left;font-weight:600;padding:.4rem 0}"
         "th,td{border:1px solid #ddd;padding:.4rem .6rem;text-align:left;vertical-align:top}"
         "th{background:#f4f4f4}"
-        ".sev{font-weight:600}.sev-error{color:#b00020}.sev-warning{color:#9a6700}"
-        ".sev-info{color:#0b5}"
+        ".sev{font-weight:600}.sev-error{color:#b00020}.sev-warning{color:#8a5a00}"
+        ".sev-info{color:#0a7d3f}"
         ".counts span{font-weight:600}"
         "</style></head><body>"
+        "<header>"
         "<h1>TODS validation report</h1>"
         f"<p>Source: <code>{esc(source)}</code> · TODS v{SPEC_VERSION} · "
         f"tods-validate {__version__}</p>"
-        f"{body}</body></html>"
+        "</header>"
+        f"<main>{body}</main>"
+        "</body></html>"
     )
 
 

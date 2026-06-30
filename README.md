@@ -169,7 +169,7 @@ package first so the merge rests on clean inputs.
 A CI job that checks the merged feed with MobilityData's gtfs-validator:
 
 ```yaml
-- uses: ChelseaKR/tods-validate@v0.4.0
+- uses: ChelseaKR/tods-validate@v0.6.0
   with:
     path: feed/tods
     gtfs: feed/gtfs
@@ -240,7 +240,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ChelseaKR/tods-validate@v0.4.0
+      - uses: ChelseaKR/tods-validate@v0.6.0
         with:
           path: feed/tods
           gtfs: feed/gtfs        # omit if GTFS files sit next to the TODS files
@@ -266,6 +266,25 @@ GTFS. For those, run MobilityData's
 [gtfs-validator](https://github.com/MobilityData/gtfs-validator), optionally
 on the merged feed.
 
+## Accessibility
+
+Output is meant to be readable by everyone, including screen-reader and
+non-color users.
+
+- Severity is always carried by a word (`ERROR`, `WARNING`, `INFO`), never by
+  color alone, so a finding's seriousness survives being piped to a file or read
+  aloud.
+- Terminal and machine outputs (text, JSON, Markdown, GitHub, SARIF) emit no
+  ANSI color at all, so they are already plain under
+  [`NO_COLOR`](https://no-color.org/); there is nothing to disable.
+- The `--format html` report declares its language and a responsive viewport,
+  uses `header`/`main` landmarks, gives the findings table a caption and
+  column-scoped headers, and uses severity colors that clear WCAG AA contrast
+  (4.5:1) on its background. It ships as a single file with no external assets.
+
+If you hit an output that is hard to read with assistive technology, that is a
+bug — please report it.
+
 ## Development
 
 ```sh
@@ -279,7 +298,9 @@ pytest
 Lint and type-check with `ruff check src tests scripts` and `mypy`. The rule
 catalog is generated: after adding or changing a rule, run
 `python scripts/generate_rules_doc.py` and commit the result; CI fails if it
-drifts.
+drifts. To add a check, see [docs/authoring-rules.md](docs/authoring-rules.md),
+which covers severity choice, ID allocation, message style, and the
+fixture/conformance contract.
 
 ## License
 
