@@ -632,5 +632,19 @@ def rules_command(output_format: str) -> None:
         click.echo(f"{r.id}  {r.severity.name:7}  {r.title}{needs}{optin}")
 
 
+@main.command(name="lsp")
+def lsp_command() -> None:
+    """Run the language server over stdio (for editor integration).
+
+    Editors launch this; it is not meant to be run by hand. Requires the optional
+    'lsp' extra: pip install 'tods-validate[lsp]'.
+    """
+    try:
+        from .lsp import main as serve
+    except ImportError:
+        _fail("The language server needs the 'lsp' extra: pip install 'tods-validate[lsp]'")
+    serve()
+
+
 if __name__ == "__main__":
     main()

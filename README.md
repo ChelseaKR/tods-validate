@@ -163,6 +163,32 @@ A CI job that checks the merged feed with MobilityData's gtfs-validator:
 To fail CI only on findings introduced since a known-good run, capture a
 baseline (`--format json > baseline.json`) and pass `--baseline baseline.json`.
 
+## Editor integration
+
+For a fast loop while editing a feed by hand:
+
+- `tods-validate validate feed/ --watch` re-runs the validation whenever a file
+  in the feed changes and reprints the report.
+- `tods-validate lsp` runs a [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
+  server over stdio. Point an LSP-capable editor at it for any TODS file and it
+  re-validates the whole feed on open and save, underlining each finding at its
+  row and (where one is named) its exact field. Install the server with the
+  `lsp` extra:
+
+  ```sh
+  pip install 'tods-validate[lsp]'
+  ```
+
+  A minimal Neovim registration, as an example:
+
+  ```lua
+  vim.lsp.start({
+    name = "tods-validate",
+    cmd = { "tods-validate-lsp" },
+    root_dir = vim.fn.getcwd(),
+  })
+  ```
+
 ## GitHub Action
 
 If your TODS export lives in a repository, this workflow validates it on

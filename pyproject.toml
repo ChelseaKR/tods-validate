@@ -30,8 +30,10 @@ Repository = "https://github.com/ChelseaKR/tods-validate"
 
 [project.scripts]
 tods-validate = "tods_validate.cli:main"
+tods-validate-lsp = "tods_validate.lsp:main"
 
 [project.optional-dependencies]
+lsp = ["pygls>=2"]
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
@@ -39,6 +41,7 @@ dev = [
     "ruff>=0.5",
     "pre-commit>=3.7",
     "jsonschema>=4.21",
+    "pygls>=2",
 ]
 
 [tool.ruff]

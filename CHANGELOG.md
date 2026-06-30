@@ -3,6 +3,23 @@
 Notable changes to tods-validate. Rule IDs are never renumbered or reused;
 new checks may be added in minor releases.
 
+## Unreleased
+
+Added:
+
+- A language server (`tods-validate lsp`, or the `tods-validate-lsp` entry point)
+  that re-validates the whole feed when you open or save any TODS file and shows
+  each finding inline at its row and field. Findings name a field, so the
+  diagnostic underlines the offending value, not just the line. Needs the new
+  `lsp` extra (`pip install 'tods-validate[lsp]'`, which brings in pygls); the
+  diagnostic-mapping core is pure and unit-tested without an editor.
+
+Fixed:
+
+- The reported tool version (`toolVersion` in the JSON/HTML reports and
+  `--version`) is now read from the installed package metadata instead of a
+  hand-edited constant that had drifted to `0.4.0`.
+
 ## v0.6.0 - 2026-06-29
 
 New surfaces for working with a feed live (`--watch`, browser playground),
