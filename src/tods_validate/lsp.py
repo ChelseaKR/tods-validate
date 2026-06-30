@@ -15,7 +15,7 @@ disk, so an unsaved buffer would be validated stale.
 from __future__ import annotations
 
 import csv
-from collections.abc import Callable
+from collections.abc import Callable, Sequence
 from pathlib import Path
 
 from lsprotocol import types as lsp
@@ -163,6 +163,87 @@ def _disk_reader(root: Path) -> TextReader:
     return read
 
 
+# --- Quick fixes and hover (pure) ----------------------------------------
+# Rules whose fix is unambiguous enough to offer as a one-click editor action,
+# mirroring what `tods-validate fix` does deterministically across a package.
+_TRIM_WHITESPACE = "TODS-W206"
+_DELETE_DUPLICATE_ROW = "TODS-W408"
+FIXABLE = frozenset({_TRIM_WHITESPACE, _DELETE_DUPLICATE_ROW})
+
+LineReader = Callable[[int], "str | None"]
+
+
+def _whole_line_edit(line: int) -> lsp.TextEdit:
+    """A TextEdit that removes line ``line`` entirely, including its newline."""
+    return lsp.TextEdit(
+        range=lsp.Range(lsp.Position(line, 0), lsp.Position(line + 1, 0)), new_text=""
+    )
+
+
+def build_code_actions(
+    uri: str, diagnostics: Sequence[lsp.Diagnostic], get_line: LineReader
+) -> list[lsp.CodeAction]:
+    """Quick-fix code actions for the fixable diagnostics among ``diagnostics``.
+
+    ``get_line(index)`` returns the document's line text without its newline, or
+    None when out of range. Only TODS-W206 (trim the padded value in place) and
+    TODS-W408 (delete the duplicate row) are offered; everything else needs a
+    human's judgement and is left to ``validate``.
+    """
+    actions: list[lsp.CodeAction] = []
+    for diagnostic in diagnostics:
+        if diagnostic.code == _TRIM_WHITESPACE:
+            line = get_line(diagnostic.range.start.line)
+            if line is None:
+                continue
+            padded = line[diagnostic.range.start.character : diagnostic.range.end.character]
+            trimmed = padded.strip()
+            if trimmed == padded:
+                continue
+            edit = lsp.TextEdit(range=diagnostic.range, new_text=trimmed)
+            actions.append(
+                lsp.CodeAction(
+                    title="Trim surrounding whitespace",
+                    kind=lsp.CodeActionKind.QuickFix,
+                    diagnostics=[diagnostic],
+                    is_preferred=True,
+                    edit=lsp.WorkspaceEdit(changes={uri: [edit]}),
+                )
+            )
+        elif diagnostic.code == _DELETE_DUPLICATE_ROW:
+            actions.append(
+                lsp.CodeAction(
+                    title="Delete duplicate row",
+                    kind=lsp.CodeActionKind.QuickFix,
+                    diagnostics=[diagnostic],
+                    edit=lsp.WorkspaceEdit(
+                        changes={uri: [_whole_line_edit(diagnostic.range.start.line)]}
+                    ),
+                )
+            )
+    return actions
+
+
+def hover_markdown(rule_id: str) -> str | None:
+    """Markdown describing a rule, for an editor hover over one of its findings."""
+    from .rules import all_rules
+
+    for rule_def in all_rules():
+        if rule_def.id == rule_id:
+            return (
+                f"**{rule_def.id}** — {rule_def.title}  ({rule_def.severity.name})\n\n"
+                f"{rule_def.description}\n\n"
+                f"[TODS specification]({rule_def.spec_section})"
+            )
+    return None
+
+
+def _range_covers(span: lsp.Range, position: lsp.Position) -> bool:
+    """True when ``position`` falls within ``span`` (inclusive of the endpoints)."""
+    here = (position.line, position.character)
+    return (span.start.line, span.start.character) <= here <= (span.end.line, span.end.character)
+
+
 # --- The pygls server -----------------------------------------------------
 # Everything above is pure and import-clean with only lsprotocol. The server
 # below additionally needs pygls (the [lsp] extra).
@@ -176,31 +257,32 @@ class TodsLanguageServer(LanguageServer):
 
     def __init__(self) -> None:
         super().__init__(LANGUAGE_SERVER_NAME, __version__)
-        # URIs we have published non-empty diagnostics to, so we can clear a file
-        # once its findings are resolved.
-        self.published: set[str] = set()
+        # The diagnostics last published per URI, so a file can be cleared once
+        # its findings resolve, and so hover/code-action can look them up.
+        self.diagnostics_by_uri: dict[str, list[lsp.Diagnostic]] = {}
 
 
 def _publish(
     server: TodsLanguageServer, root: Path, by_file: dict[str, list[lsp.Diagnostic]]
 ) -> None:
     """Publish ``by_file`` and clear any file under ``root`` that is now clean."""
-    current: set[str] = set()
+    current: dict[str, list[lsp.Diagnostic]] = {}
     for filename, diagnostics in by_file.items():
         uri = uris.from_fs_path(str(root / filename))
         if uri is None:
             continue
-        current.add(uri)
+        current[uri] = diagnostics
         server.text_document_publish_diagnostics(
             lsp.PublishDiagnosticsParams(uri=uri, diagnostics=diagnostics)
         )
     root_prefix = uris.from_fs_path(str(root)) or ""
-    stale = {u for u in server.published if u.startswith(root_prefix) and u not in current}
+    stale = {u for u in server.diagnostics_by_uri if u.startswith(root_prefix) and u not in current}
     for uri in stale:
         server.text_document_publish_diagnostics(
             lsp.PublishDiagnosticsParams(uri=uri, diagnostics=[])
         )
-    server.published = (server.published | current) - stale
+        del server.diagnostics_by_uri[uri]
+    server.diagnostics_by_uri.update(current)
 
 
 def revalidate(server: TodsLanguageServer, doc_uri: str) -> None:
@@ -236,6 +318,40 @@ def build_server() -> TodsLanguageServer:
     @server.feature(lsp.TEXT_DOCUMENT_DID_SAVE)
     def _did_save(params: lsp.DidSaveTextDocumentParams) -> None:
         revalidate(server, params.text_document.uri)
+
+    @server.feature(lsp.TEXT_DOCUMENT_CODE_ACTION)
+    def _code_action(params: lsp.CodeActionParams) -> list[lsp.CodeAction] | None:
+        uri = params.text_document.uri
+        diagnostics = params.context.diagnostics or server.diagnostics_by_uri.get(uri, [])
+        lines = server.workspace.get_text_document(uri).source.splitlines()
+
+        def get_line(index: int) -> str | None:
+            return lines[index] if 0 <= index < len(lines) else None
+
+        return build_code_actions(uri, diagnostics, get_line) or None
+
+    @server.feature(lsp.TEXT_DOCUMENT_HOVER)
+    def _hover(params: lsp.HoverParams) -> lsp.Hover | None:
+        diagnostics = server.diagnostics_by_uri.get(params.text_document.uri, [])
+        seen: set[str] = set()
+        sections: list[str] = []
+        for diagnostic in diagnostics:
+            if not _range_covers(diagnostic.range, params.position):
+                continue
+            rule_id = str(diagnostic.code) if diagnostic.code is not None else ""
+            if rule_id in seen:
+                continue
+            seen.add(rule_id)
+            markdown = hover_markdown(rule_id)
+            if markdown:
+                sections.append(markdown)
+        if not sections:
+            return None
+        return lsp.Hover(
+            contents=lsp.MarkupContent(
+                kind=lsp.MarkupKind.Markdown, value="\n\n---\n\n".join(sections)
+            )
+        )
 
     return server
 

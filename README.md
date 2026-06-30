@@ -172,8 +172,10 @@ For a fast loop while editing a feed by hand:
 - `tods-validate lsp` runs a [Language Server Protocol](https://microsoft.github.io/language-server-protocol/)
   server over stdio. Point an LSP-capable editor at it for any TODS file and it
   re-validates the whole feed on open and save, underlining each finding at its
-  row and (where one is named) its exact field. Install the server with the
-  `lsp` extra:
+  row and (where one is named) its exact field. Hover a finding to see the rule's
+  description and spec link; for the safely fixable ones it offers a quick fix
+  ("Trim surrounding whitespace", "Delete duplicate row"). Install the server
+  with the `lsp` extra:
 
   ```sh
   pip install 'tods-validate[lsp]'

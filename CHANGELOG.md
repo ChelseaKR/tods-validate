@@ -22,6 +22,10 @@ Added:
   diagnostic underlines the offending value, not just the line. Needs the new
   `lsp` extra (`pip install 'tods-validate[lsp]'`, which brings in pygls); the
   diagnostic-mapping core is pure and unit-tested without an editor.
+- The language server now offers quick fixes and hovers. Hovering a finding
+  shows the rule's title, description, and spec link; the fixable findings carry
+  a code action — "Trim surrounding whitespace" (TODS-W206) and "Delete duplicate
+  row" (TODS-W408) — that edits the document in place.
 
 Changed:
 
