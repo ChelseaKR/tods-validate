@@ -203,6 +203,15 @@ def main() -> None:
 )
 @click.option("--quiet", is_flag=True, help="Print only the summary, not each finding (text).")
 @click.option(
+    "--suggest",
+    is_flag=True,
+    help=(
+        "After the report, list concrete fix suggestions for the mechanically-fixable "
+        "findings, each marked 'auto' (safe; tods-validate fix applies it) or 'review'. "
+        "Text and Markdown output only."
+    ),
+)
+@click.option(
     "--stamp",
     is_flag=True,
     help="Add a provenance footer (version, timestamp) to Markdown for a citable report.",
@@ -237,6 +246,7 @@ def validate(
     baseline_path: str | None,
     max_findings: int | None,
     quiet: bool,
+    suggest: bool,
     stamp: bool,
     encoding: str | None,
     watch: bool,
@@ -279,6 +289,11 @@ def validate(
                 stamp=stamp,
             )
         )
+        if suggest and output_format in ("text", "markdown"):
+            from .suggest import render_suggestions, suggest_for_findings
+
+            click.echo("")
+            click.echo(render_suggestions(suggest_for_findings(found, package), output_format))
         return found
 
     if watch:
