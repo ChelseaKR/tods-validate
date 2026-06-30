@@ -1,0 +1,51 @@
+{
+  "name": "tods-validate",
+  "displayName": "TODS Validate",
+  "description": "Inline validation for Transit Operational Data Standard (TODS) feeds, powered by the tods-validate language server.",
+  "version": "0.1.0",
+  "publisher": "tods-validate",
+  "license": "Apache-2.0",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/ChelseaKR/tods-validate"
+  },
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Linters",
+    "Programming Languages"
+  ],
+  "activationEvents": [
+    "workspaceContains:**/run_events.txt",
+    "workspaceContains:**/vehicle_assignments.txt"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "configuration": {
+      "title": "TODS Validate",
+      "properties": {
+        "tods-validate.serverPath": {
+          "type": "string",
+          "default": "tods-validate-lsp",
+          "description": "Path to the tods-validate-lsp executable. Install it with: pip install 'tods-validate[lsp]'."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "package": "vsce package"
+  },
+  "dependencies": {
+    "vscode-languageclient": "^9.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/vscode": "^1.75.0",
+    "@vscode/vsce": "^3.0.0",
+    "typescript": "^5.4.0"
+  }
+}

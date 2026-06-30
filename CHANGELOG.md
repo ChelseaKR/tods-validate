@@ -26,6 +26,10 @@ Added:
   shows the rule's title, description, and spec link; the fixable findings carry
   a code action — "Trim surrounding whitespace" (TODS-W206) and "Delete duplicate
   row" (TODS-W408) — that edits the document in place.
+- A VS Code extension under `editor/vscode/` that launches the language server
+  for TODS files, so the diagnostics, hovers, and quick fixes show up in the
+  editor. It is a thin client (build it with `npm install && npm run compile`,
+  press F5 to try it); it is not published to the Marketplace.
 
 Changed:
 
