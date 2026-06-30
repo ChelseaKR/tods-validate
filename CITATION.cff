@@ -1,0 +1,12 @@
+cff-version: 1.2.0
+title: tods-validate
+message: "If you use this work, please cite it."
+type: software
+authors:
+  - family-names: Kelly-Reif
+    given-names: Chelsea
+repository-code: "https://github.com/ChelseaKR/tods-validate"
+url: "https://github.com/ChelseaKR/tods-validate"
+version: 0.6.0
+date-released: 2026-06-29
+license: Apache-2.0
