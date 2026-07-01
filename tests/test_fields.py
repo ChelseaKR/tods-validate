@@ -71,6 +71,20 @@ def test_duplicate_primary_key_detects_blank_optional_key(tmp_path: Path) -> Non
     assert e204[0].row == 3
 
 
+def test_impossible_calendar_date_is_flagged(tmp_path: Path) -> None:
+    # "20260231" has eight digits, so it passes the YYYYMMDD shape, but February
+    # has no 31st. TODS-E203 must still reject it, which only holds if the check
+    # validates the calendar date and not merely the digit pattern.
+    (tmp_path / "employee_run_dates.txt").write_text(
+        "date,service_id,run_id,employee_id\n20260231,daily,1,emp-1\n"
+    )
+    _, findings = run(tmp_path)
+    e203 = [f for f in findings if f.rule_id == "TODS-E203"]
+    assert len(e203) == 1
+    assert e203[0].field == "date"
+    assert "20260231" in e203[0].message
+
+
 def test_enum_message_lists_allowed_values() -> None:
     findings = [f for f in run_invalid_fixture("TODS-E202") if f.rule_id == "TODS-E202"]
     assert len(findings) == 1
