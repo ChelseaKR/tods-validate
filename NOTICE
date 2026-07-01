@@ -1,0 +1,29 @@
+tods-validate
+Copyright 2026 Chelsea Kelly-Reif
+
+This product is licensed under the Apache License, Version 2.0 (see LICENSE).
+
+This is an independent open-source project. It is not affiliated with, endorsed
+by, or sponsored by Cal-ITP, MobilityData, Compiler LLC, the TODS working group,
+or any transit agency, vendor, or funder named in its documentation. References
+to the Transit Operational Data Standard (TODS), GTFS, and other tools and
+specifications are descriptive only.
+
+The sample feed under examples/ and the fixture feeds under tests/fixtures/ are
+hand-built and synthetic. They are illustrative reference material for
+exercising the validator and contain no real agency, personnel, or vehicle data.
+
+Interoperability with MobilityData's gtfs-validator (used in CI to check merged
+feeds) is by invocation only; that tool is not vendored or modified here and is
+distributed under its own license.
+
+Licensed under the Apache License, Version 2.0 (the "License"); you may not use
+this file except in compliance with the License. You may obtain a copy of the
+License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software distributed
+under the License is distributed on an "AS IS" BASIS, WITHOUT WARRANTIES OR
+CONDITIONS OF ANY KIND, either express or implied. See the License for the
+specific language governing permissions and limitations under the License.
