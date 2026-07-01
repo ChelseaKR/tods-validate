@@ -60,6 +60,27 @@ def test_missing_reference_file_is_a_warning_not_an_error() -> None:
     assert "TODS-E301" not in rule_ids(findings)
 
 
+def test_trip_reference_without_companion_trips_warns_w302(tmp_path: Path) -> None:
+    # run_events references a trip_id, but the companion GTFS has no trips.txt
+    # (and nothing supplements one in). Those references cannot be resolved, so
+    # W302 must say so. The warning hinges on noticing that run_events actually
+    # uses trip_ids; drop that observation and the gap would pass silently.
+    (tmp_path / "calendar.txt").write_text(
+        "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,"
+        "start_date,end_date\nweekday,1,1,1,1,1,0,0,20260101,20261231\n"
+    )
+    (tmp_path / "stops.txt").write_text("stop_id\nS1\n")
+    (tmp_path / "run_events.txt").write_text(
+        "service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,"
+        "end_location,end_time\nweekday,1,10,operator,T1,S1,09:00:00,S1,10:00:00\n"
+    )
+    _, findings = run(tmp_path)
+    w302 = [f for f in findings if f.rule_id == "TODS-W302" and "trips.txt" in f.message]
+    assert w302, "expected a W302 warning that the companion GTFS lacks trips.txt"
+    # A missing companion file is a warning, never a hard reference error.
+    assert "TODS-E307" not in rule_ids(findings)
+
+
 def test_block_mismatch_names_both_blocks() -> None:
     findings = [f for f in run_invalid_fixture("TODS-E310") if f.rule_id == "TODS-E310"]
     assert len(findings) == 1

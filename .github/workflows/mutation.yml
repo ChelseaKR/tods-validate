@@ -1,0 +1,50 @@
+name: Mutation testing (advisory)
+
+# Advisory only. This never runs on pull_request or push, so it cannot block a
+# merge. It runs on demand and once a week to surface tests that have stopped
+# pinning down the rules engine's behaviour. See docs/mutation-testing.md.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays at 06:00 UTC.
+    - cron: "0 6 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  mutmut:
+    runs-on: ubuntu-latest
+    # Belt and suspenders: even a non-zero exit must not fail the workflow.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev,mutation]"
+      - name: Run mutation testing on the rules engine
+        run: mutmut run || true
+      - name: Summarize survivors
+        if: always()
+        run: |
+          mutmut results || true
+          mutmut export-cicd-stats || true
+          if [ -f mutants/mutmut-cicd-stats.json ]; then
+            {
+              echo '### Mutation testing (advisory)'
+              echo '```json'
+              cat mutants/mutmut-cicd-stats.json
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Upload stats
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: mutation-stats
+          path: mutants/mutmut-cicd-stats.json
+          if-no-files-found: ignore

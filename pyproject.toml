@@ -43,6 +43,10 @@ dev = [
     "jsonschema>=4.21",
     "pygls>=2",
 ]
+# Advisory mutation testing (not part of the gate). Kept out of `dev` so the CI
+# gate install stays lean; installed only where mutation runs. See
+# docs/mutation-testing.md.
+mutation = ["mutmut>=3.6"]
 
 [tool.ruff]
 line-length = 100
@@ -62,3 +66,26 @@ addopts = "-q"
 
 [tool.coverage.run]
 source = ["tods_validate"]
+
+[tool.mutmut]
+# Advisory mutation testing, scoped to the validation rules engine (the checks
+# that emit TODS-E/W/I findings). The whole package is copied so imports
+# resolve, but only the rules modules are mutated. Not part of the CI gate; see
+# docs/mutation-testing.md for the baseline and how to run it.
+source_paths = ["src/tods_validate"]
+only_mutate = ["src/tods_validate/rules/*"]
+# Drive mutants with the rule test modules: each one asserts rule behaviour
+# against the fixture feeds (a passing + failing fixture per rule). Other
+# suites (CLI, config, playground) make cwd/file assumptions that do not hold
+# inside mutmut's mutants/ copy, so they are left out of the mutation run.
+pytest_add_cli_args_test_selection = [
+    "tests/test_structure.py",
+    "tests/test_fields.py",
+    "tests/test_references.py",
+    "tests/test_semantics.py",
+    "tests/test_coverage_advisory.py",
+    "tests/test_conformance.py",
+    "tests/test_spec_examples.py",
+    "tests/test_valid_feed.py",
+    "tests/test_registry.py",
+]
