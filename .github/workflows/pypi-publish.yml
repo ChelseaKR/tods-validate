@@ -5,19 +5,33 @@ name: Publish to PyPI
 # One-time setup on PyPI: add a GitHub trusted publisher for project
 # "tods-validate" pointing at owner ChelseaKR, repo tods-validate,
 # workflow "pypi-publish.yml" (environment left blank).
+#
+# Supply-chain hardening (SECURITY-AND-SUPPLY-CHAIN-STANDARD Section 6):
+#   - CycloneDX 1.7 SBOM for the built wheel/sdist, blocking (Section 6.2).
+#   - SLSA build provenance attestation for dist/* (Section 6.4).
+# Caching is intentionally absent from this signing/publishing job (Section 6.4).
 
 on:
   release:
     types: [published]
   workflow_dispatch:
 
+# Least-privilege default; the publish job escalates only what it needs.
 permissions:
   contents: read
-  id-token: write # OIDC token for PyPI Trusted Publishing
+
+# Never run two publishes of the same ref at once (Section 6.4).
+concurrency:
+  group: pypi-publish-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # attach the SBOM to the GitHub release
+      id-token: write # OIDC for PyPI Trusted Publishing + provenance
+      attestations: write # SLSA build provenance attestation
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -27,5 +41,45 @@ jobs:
           python-version: "3.13"
       - run: python -m pip install --upgrade build
       - run: python -m build
+
+      # CycloneDX 1.7 SBOM of the built wheel and its dependency closure.
+      # Blocking: --validate fails the job on any schema violation (Section 6.2).
+      - name: Generate CycloneDX SBOM
+        run: |
+          python -m pip install --upgrade cyclonedx-bom
+          python -m venv sbom-env
+          ./sbom-env/bin/python -m pip install --upgrade pip
+          ./sbom-env/bin/python -m pip install dist/*.whl
+          cyclonedx-py environment ./sbom-env/bin/python \
+            --sv 1.7 \
+            --of JSON \
+            --output-reproducible \
+            --pyproject pyproject.toml \
+            --mc-type library \
+            --validate \
+            -o tods-validate-sbom.cdx.json
+
+      - name: Upload SBOM artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-cyclonedx
+          path: tods-validate-sbom.cdx.json
+          if-no-files-found: error
+
+      # SLSA build provenance for the wheel + sdist (Section 6.4, SLSA Build L2).
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373 # v4.1.1
+        with:
+          subject-path: "dist/*"
+
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # release/v1
+
+      # Attach the SBOM to the GitHub release for consumer verification.
+      - name: Upload SBOM to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: >-
+          gh release upload "${{ github.event.release.tag_name }}"
+          tods-validate-sbom.cdx.json --clobber
