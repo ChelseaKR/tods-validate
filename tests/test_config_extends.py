@@ -15,6 +15,16 @@ def test_profile_sets_defaults(tmp_path: Path) -> None:
     assert "coverage" in config.enable
 
 
+def test_profile_ingest_ready_is_at_least_as_strict_as_strict(tmp_path: Path) -> None:
+    cfg = tmp_path / "tods-validate.toml"
+    cfg.write_text('profile = "ingest-ready"\n', encoding="utf-8")
+    config = load_config(cfg)
+    assert config.fail_on == "warning"
+    assert "coverage" in config.enable
+    assert "advisory" in config.enable
+    assert config.ignore == ()
+
+
 def test_local_overrides_profile(tmp_path: Path) -> None:
     cfg = tmp_path / "tods-validate.toml"
     cfg.write_text('profile = "strict"\nfail-on = "error"\n', encoding="utf-8")

@@ -41,6 +41,10 @@ PROFILES: dict[str, dict[str, object]] = {
     "default": {},
     "strict": {"fail-on": "warning", "enable": ["coverage", "advisory"]},
     "lenient": {"fail-on": "error", "ignore": ["TODS-W206", "TODS-W107"]},
+    # For a downstream CAD/AVL consumer deciding whether to ingest a feed at
+    # all (a go/no-go gate, not an authoring workflow): at least as strict as
+    # "strict", with no ignores, so nothing is silently let through.
+    "ingest-ready": {"fail-on": "warning", "enable": ["coverage", "advisory"]},
 }
 
 

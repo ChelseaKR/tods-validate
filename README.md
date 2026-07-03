@@ -142,6 +142,10 @@ Command-line flags win over the file. A config file in another location can
 be passed with `--config path/to/file.toml`. A config may also `extends =
 "../base.toml"` to inherit a shared house policy, and `profile = "strict"`
 (or `lenient`) applies a named preset that other settings can still override.
+A third preset, `ingest-ready`, is for a downstream CAD/AVL system deciding
+whether to import a feed at all: it is at least as strict as `strict` (fails
+on warnings, enables `coverage` and `advisory`) and adds no ignores, so it
+doubles as a go/no-go gate rather than an authoring-time policy.
 
 Some checks are off by default because they surface judgement calls rather than
 spec violations. Turn them on with `--enable coverage` (which GTFS trips have no

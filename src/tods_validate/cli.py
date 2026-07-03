@@ -189,9 +189,13 @@ def main() -> None:
 )
 @click.option(
     "--profile",
-    type=click.Choice(["default", "strict", "lenient"]),
+    type=click.Choice(["default", "strict", "lenient", "ingest-ready"]),
     default=None,
-    help="Apply a named preset of settings (overridden by other flags).",
+    help=(
+        "Apply a named preset of settings (overridden by other flags). "
+        "'ingest-ready' is the go/no-go gate for a downstream CAD/AVL "
+        "consumer deciding whether to import a feed."
+    ),
 )
 @click.option(
     "--spec-version",
