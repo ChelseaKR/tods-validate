@@ -32,6 +32,7 @@ def no_tods_files(context: ValidationContext) -> Iterator[Finding]:
                 + "."
             ),
             suggestion="Check that the TODS files are at the top level, not in a subfolder.",
+            data={"expected": ",".join(sorted(TABLES))},
         )
 
 
@@ -59,6 +60,7 @@ def unknown_file(context: ValidationContext) -> Iterator[Finding]:
                     "If this was meant to be a TODS file, check the spelling against the "
                     "file list in the spec."
                 ),
+                data={"value": name},
             )
     for name in context.package.unparsed:
         yield Finding(
@@ -66,6 +68,7 @@ def unknown_file(context: ValidationContext) -> Iterator[Finding]:
             severity=Severity.INFO,
             file=name,
             message=f"{name} is not a CSV text file and was not validated.",
+            data={"value": name},
         )
 
 
@@ -91,6 +94,7 @@ def file_unreadable(context: ValidationContext) -> Iterator[Finding]:
                     file=name,
                     row=problem.line,
                     message=problem.message,
+                    data={"value": name, "code": problem.code},
                 )
 
 
@@ -125,6 +129,10 @@ def ragged_row(context: ValidationContext) -> Iterator[Finding]:
                         "Open the file in a text editor (not a spreadsheet) and check for "
                         "unquoted commas or missing trailing commas on this row."
                     ),
+                    data={
+                        "value": str(problem.actual),
+                        "expected": str(problem.expected),
+                    },
                 )
 
 
@@ -146,7 +154,9 @@ def duplicate_column(context: ValidationContext) -> Iterator[Finding]:
                     severity=Severity.ERROR,
                     file=name,
                     row=1,
+                    field=problem.column,
                     message=problem.message,
+                    data={"field": problem.column or ""},
                 )
 
 
@@ -186,6 +196,7 @@ def missing_required_column(context: ValidationContext) -> Iterator[Finding]:
                     field=column,
                     message=(f"{name} is missing the required column {column!r} ({why})."),
                     suggestion=f"Add a {column!r} column. See {SPEC_URL}{table.spec_anchor}.",
+                    data={"field": column},
                 )
 
 
@@ -223,6 +234,7 @@ def unknown_column_tods(context: ValidationContext) -> Iterator[Finding]:
                         "Check the spelling against the field list in the spec: "
                         f"{SPEC_URL}{table.spec_anchor}."
                     ),
+                    data={"value": column, "field": column},
                 )
 
 
@@ -258,4 +270,5 @@ def unknown_column_supplement(context: ValidationContext) -> Iterator[Finding]:
                         f"{table.gtfs_base} field or a TODS_ field. It will be treated "
                         "as an extension field."
                     ),
+                    data={"value": column, "field": column},
                 )

@@ -22,13 +22,15 @@ from . import __version__
 from .findings import Finding, Severity
 from .rules import REGISTRY, RunCoverage
 from .schema import SPEC_VERSION
+from .suggest import Suggestion
 
 # Bumped when the JSON report shape changes. Fields are only ever added, never
 # removed or renamed, within a major version; this lets consumers branch on
 # shape if they need to.
 #
 # 1.3.0 keeps the additive ``coverage`` manifest and per-finding ``data``,
-# and adds ``fingerprint`` (content-anchored identity for --baseline).
+# and adds ``fingerprint`` (content-anchored identity for --baseline) plus the
+# top-level ``suggestions`` array (machine-form ``--suggest`` output).
 REPORT_SCHEMA_VERSION = "1.3.0"
 
 # When a single rule fires at least this many times, reports add a one-line
@@ -188,7 +190,11 @@ def render_text(  # noqa: C901 - causality grouping adds display branches
 
 
 def render_json(
-    findings: list[Finding], source: str, *, coverage: RunCoverage | None = None
+    findings: list[Finding],
+    source: str,
+    *,
+    coverage: RunCoverage | None = None,
+    suggestions: list[Suggestion] | None = None,
 ) -> str:
     counts = summarize(findings)
     payload: dict[str, object] = {
@@ -209,6 +215,11 @@ def render_json(
         # Additive assurance manifest: which rules ran vs. were skipped and why,
         # so a clean report is qualified by its own scope. Schema 1.2.0.
         payload["coverage"] = coverage.to_dict()
+    if suggestions is not None:
+        # Machine-form companion to --suggest's text/Markdown block, so a
+        # dashboard can read structured current/proposed values instead of
+        # parsing prose. Schema 1.2.0.
+        payload["suggestions"] = [s.to_dict() for s in suggestions]
     return json.dumps(payload, indent=2)
 
 

@@ -110,6 +110,38 @@
         }
       },
       "additionalProperties": false
+    },
+    "suggestions": {
+      "type": "array",
+      "description": "Machine-form companion to the text/Markdown --suggest block: one entry per mechanically-derived fix. Present only when --suggest is used with JSON output. Added in report schema 1.2.0.",
+      "items": {
+        "type": "object",
+        "required": ["rule_id", "kind", "file", "row", "field", "current", "proposed", "description"],
+        "properties": {
+          "rule_id": { "type": "string", "pattern": "^TODS-[EWI][0-9]{3}$" },
+          "kind": {
+            "enum": ["auto", "review"],
+            "description": "'auto' is meaning-preserving (tods-validate fix applies it); 'review' wants a human's confirmation."
+          },
+          "file": { "type": ["string", "null"] },
+          "row": {
+            "type": ["integer", "null"],
+            "minimum": 1,
+            "description": "1-based line number; the header row is line 1."
+          },
+          "field": { "type": ["string", "null"] },
+          "current": {
+            "type": ["string", "null"],
+            "description": "The value found in the feed, when the fix changes one value."
+          },
+          "proposed": {
+            "type": ["string", "null"],
+            "description": "The value the fix would write, when the fix changes one value."
+          },
+          "description": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
     }
   },
   "additionalProperties": false

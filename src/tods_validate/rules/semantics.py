@@ -53,6 +53,10 @@ def event_ends_before_start(context: ValidationContext) -> Iterator[Finding]:
                     "If the event runs past midnight, keep counting hours upward: "
                     "write 1:10 AM the next day as '25:10:00'."
                 ),
+                data={
+                    "value": event.row.values.get("end_time", ""),
+                    "expected": event.row.values.get("start_time", ""),
+                },
             )
 
 
@@ -95,6 +99,11 @@ def overlapping_trip_events(context: ValidationContext) -> Iterator[Finding]:
                         f"{previous.row.line}). Trip events in one run must not "
                         "overlap; an employee cannot work two trips at once."
                     ),
+                    data={
+                        "value": current.row.values.get("start_time", ""),
+                        "expected": previous.row.values.get("end_time", ""),
+                        "referenced": f"run_events.txt#L{previous.row.line}",
+                    },
                 )
             if previous is None or (current.end or 0) > (previous.end or 0):
                 previous = current
@@ -133,6 +142,11 @@ def sequence_disagrees_with_time(context: ValidationContext) -> Iterator[Finding
                         f"{previous.row.values.get('start_time', '')}) in the same "
                         "run. Sequence values should increase through the day."
                     ),
+                    data={
+                        "value": str(current.sequence),
+                        "expected": str(previous.sequence),
+                        "referenced": f"run_events.txt#L{previous.row.line}",
+                    },
                 )
                 break  # one finding per run is enough to point at the problem
 
@@ -191,6 +205,10 @@ def employee_double_booked(context: ValidationContext) -> Iterator[Finding]:  # 
                             "If this is intentional (split duties), no change is "
                             "needed; otherwise check for a stale assignment."
                         ),
+                        data={
+                            "value": f"{run_b[0]},{run_b[1]}",
+                            "referenced": f"{run_a[0]},{run_a[1]}",
+                        },
                     )
 
 
@@ -242,6 +260,11 @@ def run_dates_exceed_trip_dates(context: ValidationContext) -> Iterator[Finding]
                     "calendar_dates_supplement.txt so they are a subset of the "
                     "trip's."
                 ),
+                data={
+                    "value": event.service_id,
+                    "expected": trip_service,
+                    "referenced": event.trip_id,
+                },
             )
 
 
@@ -284,6 +307,10 @@ def assignment_outside_service(context: ValidationContext) -> Iterator[Finding]:
                 suggestion=(
                     "Check the date, or extend the service via the calendar supplement files."
                 ),
+                data={
+                    "value": row.values.get("date", ""),
+                    "referenced": f"calendar.service_id={service_id}",
+                },
             )
 
 
@@ -322,6 +349,10 @@ def vehicle_assignment_outside_service(context: ValidationContext) -> Iterator[F
                     f"{service_id!r} operates, so block "
                     f"{row.values.get('block_id', '')!r} does not run then."
                 ),
+                data={
+                    "value": row.values.get("date", ""),
+                    "referenced": f"calendar.service_id={service_id}",
+                },
             )
 
 
@@ -366,6 +397,10 @@ def duplicate_assignment(context: ValidationContext) -> Iterator[Finding]:
                     f"{key[1]!r}, run_id {key[2]!r}, employee_id {key[3]!r})."
                 ),
                 suggestion="Remove the duplicate row.",
+                data={
+                    "value": ",".join(key),
+                    "referenced": f"employee_run_dates.txt#L{seen[key]}",
+                },
             )
         else:
             seen[key] = row.line
@@ -415,4 +450,9 @@ def run_events_discontinuous(context: ValidationContext) -> Iterator[Finding]:
                         "Add the missing deadhead or move event between them, or correct the "
                         "location so each event begins where the last one ended."
                     ),
+                    data={
+                        "value": current.start_location,
+                        "expected": previous.end_location,
+                        "referenced": f"run_events.txt#L{previous.row.line}",
+                    },
                 )

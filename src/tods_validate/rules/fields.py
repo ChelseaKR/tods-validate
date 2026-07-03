@@ -67,6 +67,7 @@ def missing_required_value(context: ValidationContext) -> Iterator[Finding]:
                             f"{table.filename} row {row.line}: {f.name!r} is required but empty."
                         ),
                         suggestion=f"See {SPEC_URL}{table.spec_anchor}.",
+                        data={"value": "", "field": f.name},
                     )
 
 
@@ -88,6 +89,7 @@ def invalid_enum(context: ValidationContext) -> Iterator[Finding]:
                 value = row.values.get(f.name, "")
                 if value not in f.enum_values:
                     allowed = ", ".join(repr(v) for v in f.enum_values if v) or "'1'"
+                    allowed_values = ",".join(v for v in f.enum_values if v) or "1"
                     yield Finding(
                         rule_id="TODS-E202",
                         severity=Severity.ERROR,
@@ -99,6 +101,7 @@ def invalid_enum(context: ValidationContext) -> Iterator[Finding]:
                             f"but the only allowed values are blank or {allowed}."
                         ),
                         suggestion=f"See {SPEC_URL}{table.spec_anchor}.",
+                        data={"value": value, "field": f.name, "allowed": allowed_values},
                     )
 
 
@@ -142,6 +145,7 @@ def invalid_format(context: ValidationContext) -> Iterator[Finding]:
                             "which is not a valid time. Use HH:MM:SS, e.g. '09:45:00' "
                             "or '25:10:00' for 1:10 AM the next service day."
                         ),
+                        data={"value": value, "field": f.name, "expected": "HH:MM:SS"},
                     )
                 elif f.type is FieldType.DATE and not _is_valid_date(value):
                     yield Finding(
@@ -154,6 +158,7 @@ def invalid_format(context: ValidationContext) -> Iterator[Finding]:
                             f"{table.filename} row {row.line}: {f.name} is {value!r}, "
                             "which is not a valid date. Use YYYYMMDD, e.g. '20260315'."
                         ),
+                        data={"value": value, "field": f.name, "expected": "YYYYMMDD"},
                     )
                 elif f.type is FieldType.NON_NEGATIVE_INTEGER and not value.isdigit():
                     yield Finding(
@@ -166,6 +171,11 @@ def invalid_format(context: ValidationContext) -> Iterator[Finding]:
                             f"{table.filename} row {row.line}: {f.name} is {value!r}, "
                             "which is not a non-negative whole number."
                         ),
+                        data={
+                            "value": value,
+                            "field": f.name,
+                            "expected": "non-negative integer",
+                        },
                     )
 
 
@@ -219,6 +229,11 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
                         f"({pretty}) already used on row {seen[key]}. Each "
                         f"({', '.join(table.primary_key)}) combination may appear once."
                     ),
+                    data={
+                        "value": pretty,
+                        "field": ",".join(table.primary_key),
+                        "referenced": f"{table.filename}#L{seen[key]}",
+                    },
                 )
             else:
                 seen[key] = row.line
@@ -268,6 +283,11 @@ def vehicle_assignment_ambiguous(context: ValidationContext) -> Iterator[Finding
                     "to identify which block instance the vehicle covers."
                 ),
                 suggestion="Fill in the service_id the assignment applies to.",
+                data={
+                    "value": block_id,
+                    "field": "service_id",
+                    "expected": ",".join(sorted(services)),
+                },
             )
 
 
@@ -302,4 +322,5 @@ def padded_value(context: ValidationContext) -> Iterator[Finding]:
                             "which has leading or trailing spaces."
                         ),
                         suggestion="Remove the padding so IDs match exactly.",
+                        data={"value": value, "field": name, "expected": value.strip()},
                     )

@@ -272,6 +272,10 @@ def delete_and_readd(context: ValidationContext) -> Iterator[Finding]:
                     suggestion=(
                         "Keep one row: either delete the GTFS row, or update its values, not both."
                     ),
+                    data={
+                        "value": pretty,
+                        "referenced": f"{name}#L{deletes[0].line}",
+                    },
                 )
 
 
