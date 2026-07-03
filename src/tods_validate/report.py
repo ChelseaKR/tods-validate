@@ -15,6 +15,7 @@ from __future__ import annotations
 import html
 import json
 from collections import Counter
+from collections.abc import Callable
 from datetime import UTC, datetime
 from typing import cast
 
@@ -481,66 +482,161 @@ _HTML_SEVERITY_LABEL = {
 }
 
 
+def _html_row(f: Finding, esc: Callable[[str], str]) -> str:
+    return (
+        "<tr"
+        f" data-sev='{esc(f.severity.name)}' data-rule='{esc(f.rule_id)}'"
+        f" data-file='{esc(f.file or '')}'>"
+        f"<td class='sev sev-{_HTML_SEVERITY_LABEL[f.severity]}'>{f.severity.name}</td>"
+        f"<td>{esc(f.rule_id)}</td>"
+        f"<td>{esc(f.location() or '-')}</td>"
+        f"<td>{esc(f.message)}"
+        + (f"<br><em>Fix: {esc(f.suggestion)}</em>" if f.suggestion else "")
+        + "</td></tr>"
+    )
+
+
 def render_html(
     findings: list[Finding], source: str, *, coverage: RunCoverage | None = None
 ) -> str:
     """A self-contained, shareable HTML report. No external assets.
 
     Built to meet the same accessibility bar as the terminal output. Severity is
-    carried by a word (ERROR/WARNING/INFO), never color alone; the findings table
-    has a caption and column-scoped headers so a screen reader can navigate it;
-    the page declares ``lang`` and a responsive viewport so it reflows on zoom;
-    and the severity colors are chosen to clear WCAG AA contrast (4.5:1) on the
-    white background. Landmarks (``header``/``main``) give assistive tech a
-    document outline.
+    carried by a word (ERROR/WARNING/INFO), never color alone; every per-rule
+    findings table has a caption and column-scoped headers so a screen reader can
+    navigate it; the page declares ``lang`` and a responsive viewport so it
+    reflows on zoom; and the severity colors are chosen to clear WCAG AA contrast
+    (4.5:1) in both light and dark color schemes (``prefers-color-scheme`` plus
+    ``color-scheme: light dark`` on the root, so the report never renders light
+    inside a dark host page). Landmarks (``header``/``main``) give assistive tech
+    a document outline.
+
+    At findings-report scale (thousands of rows), a single flat table stops
+    being usable, so findings are grouped into one collapsible ``<details>``
+    per rule ID (native, zero-JavaScript disclosure) ordered by
+    ``by_rule(findings).most_common()`` — the same deterministic tie-break
+    (first occurrence in the incoming file/row/rule-sorted list) used
+    elsewhere in this module. Rows within a group keep that incoming order.
+    An inline, dependency-free ``<script>`` adds severity/rule/file filtering
+    that toggles row and group visibility client-side; every control is a
+    plain ``<select>``/``<input>`` rendered in the DOM, and a "Showing N of M
+    findings" counter is always present as real text (N == M with JS
+    disabled), so the report is fully usable — all findings readable via
+    ``<details>``/``<summary>`` — with JavaScript off.
     """
     counts = summarize(findings)
     esc = html.escape
     scope = coverage.summary_line() if coverage is not None else None
     scope_html = f"<p class='scope'>{esc(scope)}</p>" if scope is not None else ""
-    rows = []
-    for f in findings:
-        rows.append(
-            "<tr>"
-            f"<td class='sev sev-{_HTML_SEVERITY_LABEL[f.severity]}'>{f.severity.name}</td>"
-            f"<td>{esc(f.rule_id)}</td>"
-            f"<td>{esc(f.location() or '-')}</td>"
-            f"<td>{esc(f.message)}"
-            + (f"<br><em>Fix: {esc(f.suggestion)}</em>" if f.suggestion else "")
-            + "</td></tr>"
+    rule_counts = by_rule(findings).most_common()
+    total = len(findings)
+
+    breakdown = ", ".join(f"{esc(rule_id)} ×{count}" for rule_id, count in rule_counts)
+
+    if not findings:
+        body = "<p>No problems found.</p>" + scope_html
+    else:
+        groups = []
+        for rule_id, count in rule_counts:
+            rows = "".join(_html_row(f, esc) for f in findings if f.rule_id == rule_id)
+            plural = "s" if count != 1 else ""
+            groups.append(
+                "<details class='rule-group' open>"
+                f"<summary>{esc(rule_id)} - {count} finding{plural}</summary>"
+                "<table><caption>Findings, ordered by file, then row, then rule ID.</caption>"
+                "<thead><tr><th scope='col'>Severity</th><th scope='col'>Rule</th>"
+                "<th scope='col'>Location</th><th scope='col'>Message</th></tr></thead>"
+                f"<tbody>{rows}</tbody></table></details>"
+            )
+        rule_options = "".join(
+            f"<option value='{esc(rule_id)}'>{esc(rule_id)} ({count})</option>"
+            for rule_id, count in rule_counts
         )
-    breakdown = ", ".join(
-        f"{esc(rule_id)} ×{count}" for rule_id, count in by_rule(findings).most_common()
-    )
-    body = (
-        "<p>No problems found.</p>" + scope_html
-        if not findings
-        else (
+        body = (
             "<p class='counts'>"
             f"<span class='sev-error'>{counts[Severity.ERROR]} error(s)</span>, "
             f"<span class='sev-warning'>{counts[Severity.WARNING]} warning(s)</span>, "
             f"<span class='sev-info'>{counts[Severity.INFO]} info</span></p>"
-            f"<p class='breakdown'>By rule: {breakdown}</p>"
-            + scope_html
-            + "<table><caption>Findings, ordered by file, then row, then rule ID.</caption>"
-            "<thead><tr><th scope='col'>Severity</th><th scope='col'>Rule</th>"
-            "<th scope='col'>Location</th><th scope='col'>Message</th></tr></thead>"
-            "<tbody>" + "".join(rows) + "</tbody></table>"
+            f"<p class='breakdown'>By rule: {breakdown}</p>" + scope_html + "<div class='filters'>"
+            "<label>Severity<select id='sev-filter'>"
+            "<option value=''>All severities</option>"
+            "<option value='ERROR'>Error</option>"
+            "<option value='WARNING'>Warning</option>"
+            "<option value='INFO'>Info</option>"
+            "</select></label>"
+            "<label>Rule<select id='rule-filter'>"
+            f"<option value=''>All rules</option>{rule_options}"
+            "</select></label>"
+            "<label>File<input type='text' id='file-filter' "
+            "placeholder='Filter by file…'></label>"
+            "</div>"
+            f"<p id='shown-count' aria-live='polite'>Showing {total} of {total} findings</p>"
+            + "".join(groups)
+            + "<script>"
+            "(function(){"
+            "var rows=Array.prototype.slice.call(document.querySelectorAll('tr[data-sev]'));"
+            "var groups=Array.prototype.slice.call("
+            "document.querySelectorAll('details.rule-group'));"
+            "var sevSel=document.getElementById('sev-filter');"
+            "var ruleSel=document.getElementById('rule-filter');"
+            "var fileInput=document.getElementById('file-filter');"
+            "var countEl=document.getElementById('shown-count');"
+            "var total=rows.length;"
+            "function apply(){"
+            "var sev=sevSel?sevSel.value:'';"
+            "var rule=ruleSel?ruleSel.value:'';"
+            "var file=fileInput?fileInput.value.trim().toLowerCase():'';"
+            "var shown=0;"
+            "groups.forEach(function(g){"
+            "var anyVisible=false;"
+            "var trs=Array.prototype.slice.call(g.querySelectorAll('tr[data-sev]'));"
+            "trs.forEach(function(tr){"
+            "var match=(!sev||tr.getAttribute('data-sev')===sev)"
+            "&&(!rule||tr.getAttribute('data-rule')===rule)"
+            "&&(!file||tr.getAttribute('data-file').toLowerCase().indexOf(file)!==-1);"
+            "tr.style.display=match?'':'none';"
+            "if(match){anyVisible=true;shown++;}"
+            "});"
+            "g.style.display=anyVisible?'':'none';"
+            "});"
+            "if(countEl){countEl.textContent='Showing '+shown+' of '+total+' findings';}"
+            "}"
+            "if(sevSel)sevSel.addEventListener('change',apply);"
+            "if(ruleSel)ruleSel.addEventListener('change',apply);"
+            "if(fileInput)fileInput.addEventListener('input',apply);"
+            "})();"
+            "</script>"
         )
-    )
     return (
         "<!doctype html><html lang='en'><head><meta charset='utf-8'>"
         "<meta name='viewport' content='width=device-width, initial-scale=1'>"
         f"<title>TODS validation report — {esc(source)}</title>"
         "<style>"
-        "body{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#1a1a1a}"
-        "table{border-collapse:collapse;width:100%;margin-top:1rem}"
+        ":root{color-scheme:light dark}"
+        "body{font:14px/1.5 system-ui,sans-serif;margin:2rem;color:#1a1a1a;background:#fff}"
+        "table{border-collapse:collapse;width:100%;margin-top:.5rem}"
         "caption{text-align:left;font-weight:600;padding:.4rem 0}"
         "th,td{border:1px solid #ddd;padding:.4rem .6rem;text-align:left;vertical-align:top}"
         "th{background:#f4f4f4}"
         ".sev{font-weight:600}.sev-error{color:#b00020}.sev-warning{color:#8a5a00}"
         ".sev-info{color:#0a7d3f}"
         ".counts span{font-weight:600}"
+        "details.rule-group{border:1px solid #ddd;border-radius:6px;"
+        "padding:.5rem .75rem;margin:.75rem 0}"
+        "details.rule-group summary{cursor:pointer;font-weight:600}"
+        ".filters{display:flex;flex-wrap:wrap;gap:1rem;margin:1rem 0}"
+        ".filters label{display:flex;flex-direction:column;gap:.25rem;font-size:.85rem}"
+        ".filters select,.filters input{font:inherit;padding:.3rem .5rem;"
+        "border:1px solid #bbb;border-radius:4px}"
+        "#shown-count{font-weight:600}"
+        "@media (prefers-color-scheme: dark){"
+        "body{background:#121212;color:#e8e8e8}"
+        "th,td{border-color:#444}"
+        "th{background:#242424}"
+        "details.rule-group{border-color:#444}"
+        ".filters select,.filters input{border-color:#555;background:#1e1e1e;color:#e8e8e8}"
+        ".sev-error{color:#ff6b6b}.sev-warning{color:#e0a530}.sev-info{color:#3ddc84}"
+        "}"
         "</style></head><body>"
         "<header>"
         "<h1>TODS validation report</h1>"

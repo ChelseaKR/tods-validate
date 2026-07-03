@@ -96,6 +96,88 @@ def test_html_severity_colors_clear_contrast() -> None:
     assert ".sev-info{color:#0a7d3f}" in out
 
 
+def _luminance(hexcolor: str) -> float:
+    hexcolor = hexcolor.lstrip("#")
+    r, g, b = (int(hexcolor[i : i + 2], 16) / 255 for i in (0, 2, 4))
+
+    def lin(c: float) -> float:
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+
+    return 0.2126 * lin(r) + 0.7152 * lin(g) + 0.0722 * lin(b)
+
+
+def _contrast(fg: str, bg: str) -> float:
+    l1, l2 = sorted((_luminance(fg), _luminance(bg)), reverse=True)
+    return (l1 + 0.05) / (l2 + 0.05)
+
+
+def test_html_severity_colors_clear_contrast_light_and_dark() -> None:
+    # Both palettes must clear WCAG AA (4.5:1) against their own background.
+    light_bg = "#ffffff"
+    dark_bg = "#121212"
+    light = {"error": "#b00020", "warning": "#8a5a00", "info": "#0a7d3f"}
+    dark = {"error": "#ff6b6b", "warning": "#e0a530", "info": "#3ddc84"}
+    for color in light.values():
+        assert _contrast(color, light_bg) >= 4.5
+    for color in dark.values():
+        assert _contrast(color, dark_bg) >= 4.5
+
+
+def test_html_declares_dark_scheme() -> None:
+    out = render_html(_findings("TODS-E307", 2), "feed/")
+    assert "color-scheme:light dark" in out
+    assert "@media (prefers-color-scheme: dark)" in out
+
+
+def test_html_groups_findings_by_rule_with_details_summary() -> None:
+    findings = _findings("TODS-E307", 3) + _findings("TODS-E308", 1)
+    out = render_html(findings, "feed/")
+    assert "<details class='rule-group' open>" in out
+    assert "<summary>TODS-E307 - 3 findings</summary>" in out
+    assert "<summary>TODS-E308 - 1 finding</summary>" in out
+    # Two rules, two groups, two per-group tables — headers repeat per group.
+    assert out.count("<caption>") == 2
+    assert out.count("scope='col'") == 8
+
+
+def test_html_shows_showing_n_of_m_counter_without_js() -> None:
+    out = render_html(_findings("TODS-E307", 5), "feed/")
+    assert "Showing 5 of 5 findings" in out
+
+
+def test_html_has_inline_filter_controls_and_no_external_assets() -> None:
+    out = render_html(_findings("TODS-E307", 3) + _findings("TODS-E308", 2), "feed/")
+    assert "id='sev-filter'" in out
+    assert "id='rule-filter'" in out
+    assert "id='file-filter'" in out
+    assert "<script>" in out
+    # Single-file, no-network contract: no external asset references.
+    assert "http://" not in out
+    assert "https://" not in out
+
+
+def test_html_ten_thousand_findings_renders_as_single_deterministic_string() -> None:
+    rule_ids = [f"TODS-E{300 + (i % 20)}" for i in range(10_000)]
+    findings = [
+        Finding(
+            rule_id=rule_ids[i],
+            severity=Severity(i % 3),
+            message=f"finding {i}",
+            file=f"file{i % 50}.txt",
+            row=i,
+        )
+        for i in range(10_000)
+    ]
+    out1 = render_html(findings, "feed/")
+    out2 = render_html(findings, "feed/")
+    assert isinstance(out1, str)
+    assert "http://" not in out1
+    assert "https://" not in out1
+    assert "Showing 10000 of 10000 findings" in out1
+    # Rendering twice from the same input is byte-identical (golden-file safe).
+    assert out1 == out2
+
+
 def test_markdown_stamp_is_optional() -> None:
     plain = render_markdown(_findings("TODS-E307", 1), "feed/")
     stamped = render_markdown(_findings("TODS-E307", 1), "feed/", stamp=True)
