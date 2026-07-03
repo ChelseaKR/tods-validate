@@ -11,14 +11,6 @@ Effort tiers: **S** ≤ a day · **M** a few days · **L** one to two weeks ·
 
 ## FIX-01 — One supplement-evaluation engine, proven equivalent
 
-**Status:** Done. `src/tods_validate/supplement.py` now exposes
-`apply_supplement()` as the single engine; `gtfs_companion.merge_supplement()`
-and `merge._merge_file()` both delegate to it and populate their existing
-return shapes (dict-of-rows, `MergeStats`) from its `SupplementResult`.
-Differential property test in `tests/test_supplement_equivalence.py` asserts
-the validation view and the materialized merge agree on surviving keys and
-values (`max_examples=750` committed; CI-scale ≥10k left as a follow-up knob).
-
 **Pitch:** collapse the duplicated supplement logic in
 `gtfs_companion.merge_supplement()` and `merge._merge_file()` into one shared
 module, with a differential test that the validation view and the
@@ -208,6 +200,12 @@ identity.
 ---
 
 ## FIX-08 — Finding causality and cascade suppression
+
+**Status:** Done. `Finding.caused_by` (`findings.py`), a `runner._link_causality`
+post-processing pass tagging TODS-E201 findings that share a row with a
+TODS-E104, and a `render_text` collapse into "and N follow-on finding(s)".
+`render_json`/`render_markdown` keep every finding and surface the link.
+`docs/report.schema.json` documents the new field. See `tests/test_causality.py`.
 
 **Pitch:** link derivative findings to their root cause and stop reporting
 the echo by default.
