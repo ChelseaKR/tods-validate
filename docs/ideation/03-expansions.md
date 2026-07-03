@@ -70,17 +70,6 @@ candidate, and say why ("differs only in case"). **Effort:** S–M.
 rate on real feeds before promoting beyond experimental. **Excellent:** on
 the conformance fixtures plus synthetic typo corpora, zero wrong proposals
 and ≥80% of single-typo breaks get the right one.
-✅ Implemented 2026-07-03 (branch `roadmap/exp-04-reference-aware-did-you-mean-sugg`)
-— `suggest.py` gained a stdlib-only edit-distance/normalization helper and a
-`_suggest_reference` generator registered for `TODS-E303`, firing only on a
-single unambiguous vehicle_id candidate (case, whitespace, zero-padding, or a
-one-character edit) and always as `REVIEW`. Scoped to E303 only per the
-verification pass's preferred smaller option: E307 (trip_id) and E309
-(start/end location) resolve against the companion GTFS, which
-`suggest_for_findings` does not currently receive; threading an optional
-`companion: CompanionGTFS | None` through it, `api.suggest_fixes`, and the
-CLI's `--suggest` handling is left as a follow-up, noted in a code comment on
-`_reference_candidates`.
 
 ### EXP-05 — `tods-validate init`: a valid skeleton package
 **Pitch:** scaffold a starter TODS package (headers from `schema.py`,
@@ -176,6 +165,19 @@ harmless. **Excellent:** cold start from Marketplace install to first inline
 diagnostic in under five minutes, documented with a walkthrough.
 
 ### EXP-11 — `tods-validate doctor`: one honest end-to-end pass
+
+**Status: done (2026-07-03).** Implemented as `tods-validate doctor PATH`:
+`doctor.py` runs validate → merge → (if java and a jar are already available
+via `--gtfs-validator-jar`/`GTFS_VALIDATOR_JAR`, never downloaded) gtfs-validator
+on the merged feed → stats in one pass, and `render_doctor_text`/
+`render_doctor_markdown`/`doctor_to_dict` print one combined report where
+every stage is explicitly labeled RAN, SKIPPED (with its reason), or FAILED —
+a skipped merge or gtfs-validator stage says "merged-feed GTFS validity NOT
+checked" rather than reading as a pass. `--format json` exposes a per-stage
+`status` field for tooling; the exit code fails on validate findings at the
+`--fail-on` severity or a FAILED gtfs-validator stage, never on a merely
+skipped one.
+
 **Pitch:** orchestrate the full publish-readiness sequence — validate → merge
 → (if Java present) gtfs-validator on the merged feed → stats — into one
 command with a single combined report that clearly labels any skipped stage.
