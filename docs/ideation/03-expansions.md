@@ -119,7 +119,7 @@ API widens the v1.0 stability commitment — curate hard. **Excellent:** a
 third-party notebook can load a feed, apply supplements, and tabulate runs in
 under ten lines without touching `csv`.
 
-### EXP-08 — Stable per-rule web pages (rule browser on Pages)
+### EXP-08 — Stable per-rule web pages (rule browser on Pages) — done
 **Pitch:** generate a static rule-catalog site from the registry — one URL
 per rule ID with description, severity, interpretation, spec citation, worked
 example, and fixture link — deployed alongside the playground.
@@ -132,6 +132,16 @@ publication form if the corpus goes upstream (E2). **Shape:** extend
 contract so links are permanent. **Effort:** M. **Risks/deps:** EXP-01's
 example source; keep generated pages in the docs-drift CI check.
 **Excellent:** every rule ID in every output format resolves to a stable URL.
+**Status (2026-07-03):** shipped, minus the worked-example/fixture link (still
+depends on EXP-01's example source, not yet built). `generate_rules_doc.py`
+now emits one `web/rules/<RULE_ID>.html` page per rule plus a
+`web/rules/index.html` catalog grouped by band, id/title/severity/needs-GTFS
+note/opt-in note/description/interpretation/spec link, self-contained
+(inline `<style>`, no external assets), and `--check` fails on drift so CI
+catches it. `report.py`'s SARIF `helpUri` now points at
+`RULE_PAGE_BASE + "<id>.html"` (spec citation kept alongside as
+`properties.specSection`), and the LSP hover text links both the rule page
+and the spec. See `roadmap/exp-08-stable-per-rule-web-pages-on-page`.
 
 ### EXP-09 — Workspace mode with a run-history ledger — **Done**
 **Status:** Implemented. `src/tods_validate/workspace.py` adds a
