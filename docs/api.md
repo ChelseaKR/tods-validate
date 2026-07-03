@@ -97,6 +97,13 @@ assert_feed_valid("exports/tods", gtfs="exports/gtfs")          # clean, or rais
 assert_feed_produces("fixtures/bad-trip", "TODS-E307")          # still caught
 ```
 
+## Reading feed data directly
+
+For callers who want the parsed feed data itself rather than validation
+findings — a report generator, a notebook, a data pipeline — see
+[docs/read-api.md](read-api.md) for the curated `tods_validate.read`
+namespace (`load_package`, `build_companion`, `to_rows`, and friends).
+
 ## Stability
 
 These shapes follow the project's semantic-versioning promise: fields are only

@@ -34,6 +34,9 @@ tods-validate-lsp = "tods_validate.lsp:main"
 
 [project.optional-dependencies]
 lsp = ["pygls>=2"]
+# tods_validate.read.to_dataframe(); the rest of the read namespace has no
+# dependency on pandas.
+dataframe = ["pandas>=2"]
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
@@ -59,6 +62,12 @@ select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RET", "PT"]
 [tool.mypy]
 strict = true
 files = ["src"]
+
+[[tool.mypy.overrides]]
+# pandas is an optional extra (tods_validate.read.to_dataframe); its stubs are
+# not part of the dev install, so only relax the missing-import check for it.
+module = "pandas"
+ignore_missing_imports = true
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
