@@ -21,10 +21,18 @@ emitted when its proposed value is one the validator itself would accept, and
 when reaching it from the original needs nothing but adding leading zeros,
 appending a zero seconds field, or removing date separators. No digit is ever
 changed, so a suggestion never alters what the value means.
+
+A third category applies to broken references (a ``vehicle_id`` that does not
+exist): when exactly one defined ID is a near-miss for the broken value -- the
+same apart from case, surrounding whitespace, zero-padding, or a single typo --
+the suggestion names it as a ``review`` "did you mean" candidate. It never
+fires on zero or on more than one equally-close candidate, because a guess
+that might point at the wrong vehicle is worse than no guess.
 """
 
 from __future__ import annotations
 
+import re
 from collections.abc import Callable
 from dataclasses import dataclass
 
@@ -204,12 +212,132 @@ def _suggest_format(finding: Finding, package: Package) -> Suggestion | None:
     )
 
 
+_DIGIT_RUN = re.compile(r"\d+")
+
+
+def _strip_zero_padding(value: str) -> str:
+    """``value`` with leading zeros dropped from every run of digits.
+
+    ``bus-01`` and ``bus-1`` both become ``bus-1``; a bare ``0`` is left alone.
+    Used only to detect zero-padding as the sole difference between two IDs,
+    never to change a value that will actually be applied.
+    """
+    return _DIGIT_RUN.sub(lambda m: str(int(m.group())), value)
+
+
+def _levenshtein_at_most_one(a: str, b: str) -> bool:
+    """True when ``a`` can be turned into ``b`` with a single insert/delete/substitute.
+
+    Runs in linear time instead of full O(len(a)*len(b)) dynamic programming,
+    since a distance of 2 or more is never a match here anyway.
+    """
+    if a == b:
+        return True
+    la, lb = len(a), len(b)
+    if abs(la - lb) > 1:
+        return False
+    if la == lb:
+        return sum(1 for x, y in zip(a, b, strict=True) if x != y) <= 1
+    shorter, longer = (a, b) if la < lb else (b, a)
+    i = j = 0
+    skipped = False
+    while i < len(shorter) and j < len(longer):
+        if shorter[i] == longer[j]:
+            i += 1
+            j += 1
+            continue
+        if skipped:
+            return False
+        skipped = True
+        j += 1
+    return True
+
+
+def _match_reason(value: str, candidate: str) -> str | None:
+    """Why ``candidate`` is a safe "did you mean" for ``value``, or None if it isn't.
+
+    Only the narrow, unambiguous differences below count as a match: everything
+    else (including a distance of 2+) yields no reason, so the caller never
+    proposes a guess that could just as easily point somewhere else.
+    """
+    if value == candidate:
+        return None
+    if value.strip() == candidate.strip():
+        return "differs only by surrounding whitespace"
+    if value.casefold() == candidate.casefold():
+        return "differs only by case"
+    if _strip_zero_padding(value) == _strip_zero_padding(candidate):
+        return "differs only by zero-padding"
+    normalized_value = _strip_zero_padding(value.strip()).casefold()
+    normalized_candidate = _strip_zero_padding(candidate.strip()).casefold()
+    if normalized_value == normalized_candidate:
+        return "differs only by case, whitespace, or zero-padding"
+    if _levenshtein_at_most_one(value, candidate):
+        return "is one character off"
+    return None
+
+
+def _reference_candidates(rule_id: str, package: Package) -> set[str]:
+    """The existing IDs a broken reference from ``rule_id`` could plausibly mean.
+
+    TODS-E303 is the only rule handled here: vehicle_assignments.vehicle_id is
+    checked against vehicles.txt, and both files live in the TODS package that
+    :func:`suggest_for_findings` already receives.
+
+    TODS-E307 (trip_id) and TODS-E309 (start_location/end_location) resolve
+    against the companion GTFS instead (``CompanionGTFS.trip_service`` and
+    ``.stop_ids``, built by ``gtfs_companion.build_companion``), which is not
+    currently passed to this module -- ``suggest_for_findings`` would need an
+    optional ``companion`` parameter, threaded through
+    ``api.suggest_fixes`` and the CLI's ``--suggest`` handling in ``cli.py``,
+    before those two rules could get the same treatment. Left as a follow-up.
+    """
+    if rule_id == "TODS-E303":
+        vehicles = package.get("vehicles.txt")
+        if vehicles is None:
+            return set()
+        return {row.values.get("vehicle_id", "") for row in vehicles.rows} - {""}
+    return set()
+
+
+def _suggest_reference(finding: Finding, package: Package) -> Suggestion | None:
+    """A "did you mean" suggestion when exactly one existing ID nearly matches.
+
+    Fires only when the broken value has a single candidate within the safety
+    rails of :func:`_match_reason` -- zero candidates means no suggestion is
+    worth making, and more than one means picking one would be a guess the
+    author didn't ask for. Always :data:`REVIEW`: even an unambiguous near-miss
+    is a hypothesis about the author's intent, not a mechanical, meaning-
+    preserving transform like the ``auto`` suggestions above.
+    """
+    value = _cell(package, finding.file, finding.row, finding.field)
+    if not value:
+        return None
+    candidates = _reference_candidates(finding.rule_id, package)
+    matches = [(c, _match_reason(value, c)) for c in candidates]
+    matches = [(c, reason) for c, reason in matches if reason is not None]
+    if len(matches) != 1:
+        return None
+    proposed, reason = matches[0]
+    return Suggestion(
+        rule_id=finding.rule_id,
+        kind=REVIEW,
+        description=f"This value {reason} from an existing {finding.field}",
+        file=finding.file,
+        row=finding.row,
+        field=finding.field,
+        current=value,
+        proposed=proposed,
+    )
+
+
 # Findings whose fix this module knows how to derive. A rule absent here simply
 # gets no suggestion; the finding's own message still explains what good looks like.
 _GENERATORS: dict[str, Callable[[Finding, Package], Suggestion | None]] = {
     "TODS-W206": _suggest_trim,
     "TODS-W408": _suggest_delete_duplicate,
     "TODS-E203": _suggest_format,
+    "TODS-E303": _suggest_reference,
 }
 
 SUGGESTIBLE = frozenset(_GENERATORS)
