@@ -5,10 +5,11 @@ Used by both the CLI and the test suite so they exercise identical behavior.
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from dataclasses import replace
 from pathlib import Path
 
-from .findings import Finding
+from .findings import Finding, Severity
 from .gtfs_companion import build_companion
 from .loader import Package, load_package
 from .rules import RunCoverage, ValidationContext, validate
@@ -24,12 +25,38 @@ _CASCADE_ROOT_RULE = "TODS-E104"
 _CASCADE_ECHO_RULES = frozenset({"TODS-E201"})
 
 
+def _apply_severity_remap(
+    findings: list[Finding], severity_remap: Mapping[str, str]
+) -> list[Finding]:
+    """Apply a rule_id -> severity-name remap, recording each original severity.
+
+    Kept as one place so every caller of ``run()`` (CLI, API, tests) inherits
+    identical remap behavior, and so every downstream renderer sees
+    ``severity_original`` set consistently for disclosure (see report.py).
+    """
+    if not severity_remap:
+        return findings
+    remapped: list[Finding] = []
+    for finding in findings:
+        new_level = severity_remap.get(finding.rule_id)
+        if new_level is None:
+            remapped.append(finding)
+            continue
+        new_severity = Severity[new_level.upper()] if isinstance(new_level, str) else new_level
+        if new_severity == finding.severity:
+            remapped.append(finding)
+            continue
+        remapped.append(replace(finding, severity=new_severity, severity_original=finding.severity))
+    return remapped
+
+
 def run_with_coverage(
     path: str | Path,
     gtfs_path: str | Path | None = None,
     *,
     enabled: frozenset[str] = frozenset(),
     encoding: str | None = None,
+    severity_remap: Mapping[str, str] | None = None,
 ) -> tuple[Package, list[Finding], RunCoverage]:
     """Load and validate the TODS package at ``path``.
 
@@ -43,6 +70,9 @@ def run_with_coverage(
 
     ``enabled`` turns on opt-in rules (rule IDs or category names). ``encoding``
     overrides the default UTF-8 decoding for non-conforming exports.
+    ``severity_remap`` maps rule ID -> severity name ("ERROR"/"WARNING"/"INFO"),
+    applied to findings after validation; see ``config.py``'s ``[severity]``
+    table for how it is populated and disclosed.
     """
     package = load_package(path, encoding=encoding)
     gtfs = None
@@ -56,6 +86,7 @@ def run_with_coverage(
         gtfs_source = "package"
     context = ValidationContext(package=package, gtfs=gtfs, gtfs_source=gtfs_source)
     findings, coverage = validate(context, enabled)
+    findings = _apply_severity_remap(findings, severity_remap or {})
     return package, _link_causality(findings), coverage
 
 
@@ -93,11 +124,18 @@ def run(
     *,
     enabled: frozenset[str] = frozenset(),
     encoding: str | None = None,
+    severity_remap: Mapping[str, str] | None = None,
 ) -> tuple[Package, list[Finding]]:
     """Load and validate the TODS package at ``path``; return package + findings.
 
     A thin wrapper over :func:`run_with_coverage` that drops the coverage
     manifest, for the many callers that only need the findings.
     """
-    package, findings, _ = run_with_coverage(path, gtfs_path, enabled=enabled, encoding=encoding)
+    package, findings, _ = run_with_coverage(
+        path,
+        gtfs_path,
+        enabled=enabled,
+        encoding=encoding,
+        severity_remap=severity_remap,
+    )
     return package, findings

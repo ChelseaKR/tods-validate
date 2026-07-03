@@ -42,7 +42,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["rule_id", "severity", "file", "row", "field", "location", "data", "message", "suggestion", "caused_by", "fingerprint"],
+        "required": ["rule_id", "severity", "file", "row", "field", "location", "data", "message", "suggestion", "caused_by", "fingerprint", "severity_original"],
         "properties": {
           "rule_id": { "type": "string", "pattern": "^TODS-[EWI][0-9]{3}$" },
           "severity": { "enum": ["ERROR", "WARNING", "INFO"] },
@@ -71,6 +71,10 @@
           "fingerprint": {
             "type": "string",
             "description": "SHA-256 hex content fingerprint used as the --baseline identity (rule_id, file, field, data); excludes row and message so inserted rows don't churn a baseline."
+          },
+          "severity_original": {
+            "enum": ["ERROR", "WARNING", "INFO", null],
+            "description": "The rule's spec-declared severity, set only when a config `[severity]` table remapped `severity` to a different value. Every remapped finding is also disclosed in text/Markdown/SARIF/HTML output."
           }
         },
         "additionalProperties": false

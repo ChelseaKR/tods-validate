@@ -28,7 +28,8 @@ from .schema import SPEC_VERSION
 # shape if they need to.
 #
 # 1.3.0 keeps the additive ``coverage`` manifest and per-finding ``data``,
-# and adds ``fingerprint`` (content-anchored identity for --baseline).
+# and adds ``fingerprint`` (content-anchored identity for --baseline) plus
+# findings[].severity_original for local severity remaps.
 REPORT_SCHEMA_VERSION = "1.3.0"
 
 # When a single rule fires at least this many times, reports add a one-line
@@ -74,6 +75,43 @@ def summarize(findings: list[Finding]) -> Counter[Severity]:
     return Counter(f.severity for f in findings)
 
 
+def _remapped(findings: list[Finding]) -> list[Finding]:
+    """Findings whose severity was changed by local policy (config.py's
+    ``[severity]`` table). Every renderer below must disclose these; this is
+    the single query point so no output path can accidentally skip it."""
+    return [f for f in findings if f.severity_original is not None]
+
+
+def _remap_note(finding: Finding) -> str:
+    """ "(spec: ORIGINAL)" per-finding annotation; empty string when unremapped."""
+    if finding.severity_original is None:
+        return ""
+    return f" (spec: {finding.severity_original.name})"
+
+
+def _disclosure_lines(findings: list[Finding]) -> list[str]:
+    """Plain-text 'Local policy: N severit(y/ies) remapped' disclosure block.
+
+    Listed as rule_id: ORIGINAL -> NEW, with "(acknowledged)" appended for
+    remaps that downgraded an ERROR-band rule (config.py only permits those
+    with an explicit acknowledgment, so any downgrade from ERROR reaching
+    this point was acknowledged by construction).
+    """
+    remapped = _remapped(findings)
+    if not remapped:
+        return []
+    plural = "y" if len(remapped) == 1 else "ies"
+    lines = [f"Local policy: {len(remapped)} severit{plural} remapped:"]
+    for f in remapped:
+        original = f.severity_original
+        if original is None:
+            continue
+        is_downgrade = original is Severity.ERROR and f.severity < Severity.ERROR
+        note = " (acknowledged)" if is_downgrade else ""
+        lines.append(f"  {f.rule_id}: {original.name} -> {f.severity.name}{note}")
+    return lines
+
+
 def by_rule(findings: list[Finding]) -> Counter[str]:
     """Count findings per rule ID, most frequent first when iterated."""
     return Counter(f.rule_id for f in findings)
@@ -114,7 +152,7 @@ def _max_findings(findings: list[Finding], limit: int | None) -> tuple[list[Find
     return findings[:limit], len(findings) - limit
 
 
-def render_text(  # noqa: C901 - causality grouping adds display branches
+def render_text(  # noqa: C901 - causality grouping and severity disclosure add display branches
     findings: list[Finding],
     source: str,
     *,
@@ -151,7 +189,7 @@ def render_text(  # noqa: C901 - causality grouping adds display branches
                 if f.caused_by is not None:
                     continue  # rendered as its root's follow-on line, below
                 location = f.location()
-                prefix = f"  {severity.name} {f.rule_id}"
+                prefix = f"  {severity.name} {f.rule_id}{_remap_note(f)}"
                 lines.append(f"{prefix} [{location}]" if location else prefix)
                 lines.append(f"    {f.message}")
                 if f.suggestion:
@@ -176,6 +214,10 @@ def render_text(  # noqa: C901 - causality grouping adds display branches
     path = _path_to_green(findings)
     if path:
         lines.append(path)
+    disclosure = _disclosure_lines(findings)
+    if disclosure:
+        lines.append("")
+        lines.extend(disclosure)
     lines.append(
         "Summary: "
         f"{counts[Severity.ERROR]} error(s), "
@@ -262,6 +304,12 @@ def render_markdown(  # noqa: C901 -- pragmatic complexity; ratchet tracked in d
         if scope is not None:
             lines.append("")
             lines.append(scope)
+        disclosure = _disclosure_lines(findings)
+        if disclosure:
+            lines.append("")
+            lines.append(f"> {disclosure[0]}")
+            for line in disclosure[1:]:
+                lines.append(f"> {line.strip()}")
         for severity in (Severity.ERROR, Severity.WARNING, Severity.INFO):
             group = [f for f in findings if f.severity == severity]
             if not group:
@@ -272,7 +320,7 @@ def render_markdown(  # noqa: C901 -- pragmatic complexity; ratchet tracked in d
             for f in group:
                 location = f.location()
                 where = f" ({location})" if location else ""
-                lines.append(f"- **{f.rule_id}**{where}: {f.message}")
+                lines.append(f"- **{f.rule_id}**{where}: {f.message}{_remap_note(f)}")
                 if f.suggestion:
                     lines.append(f"  - Fix: {f.suggestion}")
                 if f.caused_by:
@@ -364,6 +412,7 @@ def render_github(findings: list[Finding], source: str) -> str:
             properties.append(f"line={f.row}")
         properties.append(f"title={f.rule_id}")
         message = f.message if not f.suggestion else f"{f.message} Fix: {f.suggestion}"
+        message += _remap_note(f)
         lines.append(f"::{command} {','.join(properties)}::{_escape_annotation(message)}")
     counts = summarize(findings)
     lines.append(
@@ -371,6 +420,8 @@ def render_github(findings: list[Finding], source: str) -> str:
         f"{counts[Severity.WARNING]} warning(s), {counts[Severity.INFO]} info "
         f"in {source}."
     )
+    for line in _disclosure_lines(findings):
+        lines.append(f"::notice::{_escape_annotation(line.strip())}")
     return "\n".join(lines)
 
 
@@ -404,7 +455,7 @@ def _sarif_descriptor(rule_id: str, level: str) -> dict[str, object]:
     return descriptor
 
 
-def render_sarif(
+def render_sarif(  # noqa: C901 - SARIF shape branches for locations, data, and disclosure
     findings: list[Finding], source: str, *, coverage: RunCoverage | None = None
 ) -> str:
     """SARIF 2.1.0, for GitHub code-scanning and security dashboards.
@@ -423,6 +474,7 @@ def render_sarif(
         if f.rule_id not in seen_rules:
             seen_rules[f.rule_id] = _sarif_descriptor(f.rule_id, level)
         text = f.message if not f.suggestion else f"{f.message} Fix: {f.suggestion}"
+        text += _remap_note(f)
         result: dict[str, object] = {
             "ruleId": f.rule_id,
             "level": level,
@@ -441,6 +493,11 @@ def render_sarif(
                 }
             ]
         properties: dict[str, object] = {}
+        if f.severity_original is not None:
+            # Disclosure for SARIF consumers: the finding's level above is the
+            # remapped severity; properties.severityOriginal names the spec's
+            # own severity so no SARIF consumer can miss the remap.
+            properties["severityOriginal"] = f.severity_original.name
         if f.field:
             properties["field"] = f.field
         if f.data is not None:
@@ -466,6 +523,9 @@ def render_sarif(
                 "properties": {"coverage": coverage.to_dict()},
             }
         ]
+    disclosure = _disclosure_lines(findings)
+    if disclosure:
+        run["properties"] = {"severityRemapDisclosure": disclosure}
     sarif = {
         "version": "2.1.0",
         "$schema": "https://raw.githubusercontent.com/oasis-tcs/sarif-spec/master/Schemata/sarif-schema-2.1.0.json",
@@ -505,12 +565,18 @@ def render_html(
             f"<td class='sev sev-{_HTML_SEVERITY_LABEL[f.severity]}'>{f.severity.name}</td>"
             f"<td>{esc(f.rule_id)}</td>"
             f"<td>{esc(f.location() or '-')}</td>"
-            f"<td>{esc(f.message)}"
+            f"<td>{esc(f.message)}{esc(_remap_note(f))}"
             + (f"<br><em>Fix: {esc(f.suggestion)}</em>" if f.suggestion else "")
             + "</td></tr>"
         )
     breakdown = ", ".join(
         f"{esc(rule_id)} ×{count}" for rule_id, count in by_rule(findings).most_common()
+    )
+    disclosure_lines = _disclosure_lines(findings)
+    disclosure_html = (
+        "<p class='disclosure'>" + "<br>".join(esc(line) for line in disclosure_lines) + "</p>"
+        if disclosure_lines
+        else ""
     )
     body = (
         "<p>No problems found.</p>" + scope_html
@@ -522,6 +588,7 @@ def render_html(
             f"<span class='sev-info'>{counts[Severity.INFO]} info</span></p>"
             f"<p class='breakdown'>By rule: {breakdown}</p>"
             + scope_html
+            + disclosure_html
             + "<table><caption>Findings, ordered by file, then row, then rule ID.</caption>"
             "<thead><tr><th scope='col'>Severity</th><th scope='col'>Rule</th>"
             "<th scope='col'>Location</th><th scope='col'>Message</th></tr></thead>"

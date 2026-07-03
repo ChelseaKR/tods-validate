@@ -330,10 +330,15 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
         baseline_identities=baseline_identities,
     )
     _check_rule_ids(tuple(policy.ignore))
+    severity_remap = dict(config.severity_remap)
 
     def _validate_once() -> list[Finding]:
         package, found, coverage = run_with_coverage(
-            path, gtfs_path, enabled=frozenset(enable), encoding=effective_encoding
+            path,
+            gtfs_path,
+            enabled=frozenset(enable),
+            encoding=effective_encoding,
+            severity_remap=severity_remap,
         )
         gate = policy.apply(found)
         if gate.suppressed_ignored:

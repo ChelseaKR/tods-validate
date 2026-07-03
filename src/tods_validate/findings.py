@@ -92,6 +92,11 @@ class Finding:
     # Never used to drop a finding from machine-readable formats -- it only lets
     # renderers collapse an echo under its cause for humans.
     caused_by: str | None = None
+    # The rule's spec-declared severity, set only when local policy (a
+    # `[severity]` table, see config.py) remapped this finding to a
+    # different severity. None means ``severity`` is the spec's own value.
+    # Every report renderer must disclose remapped findings; see report.py.
+    severity_original: Severity | None = None
 
     def location(self) -> str:
         parts = []
@@ -146,4 +151,7 @@ class Finding:
             "suggestion": self.suggestion,
             "caused_by": self.caused_by,
             "fingerprint": self.fingerprint(),
+            "severity_original": (
+                str(self.severity_original) if self.severity_original is not None else None
+            ),
         }
