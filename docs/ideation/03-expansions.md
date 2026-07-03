@@ -133,7 +133,26 @@ contract so links are permanent. **Effort:** M. **Risks/deps:** EXP-01's
 example source; keep generated pages in the docs-drift CI check.
 **Excellent:** every rule ID in every output format resolves to a stable URL.
 
-### EXP-09 — Workspace mode with a run-history ledger
+### EXP-09 — Workspace mode with a run-history ledger — **Done**
+**Status:** Implemented. `src/tods_validate/workspace.py` adds a
+schema-versioned (`HISTORY_SCHEMA_VERSION`) `HistoryRecord`, built via
+`build_record()` by reusing `report.summarize()`/`report.by_rule()` so the
+ledger and the JSON report can never disagree about counts.
+`batch --history DIR` (or `[workspace]` `history-dir` in
+`tods-validate.toml`, CLI flag winning per the existing config precedence)
+appends one JSON object per run to `DIR/history.jsonl` via `append_record()`
+— append-only, artifact-shaped, no hosted service. A new `trend --history
+DIR` command reads the ledger with `load_history()` (missing/foreign-schema
+lines are skipped cleanly, not fatal) and prints `render_trend()`'s
+text-first, sparkline-free Markdown: one table per source/agency, oldest run
+first, with a Δ-errors and "new/worse rules" column so a regression is
+visible without re-running anything. Tests: `tests/test_workspace.py` and
+the `--history`/`trend`/`[workspace]` cases in `tests/test_config.py`,
+including an explicit assertion that finding message text never reaches the
+ledger. **Privacy constraint (kept):** a record stores only counts and rule
+IDs, documented as load-bearing in `workspace.py`'s module docstring and in
+`README.md`, never `Finding.message`/`suggestion` text.
+
 **Pitch:** a `[workspace]` config listing feeds plus a local append-only
 history (JSONL of report summaries per run), giving `batch` and `diff`
 memory: trends, "which agency regressed this pick," time-to-green.

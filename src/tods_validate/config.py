@@ -9,9 +9,17 @@ command-line flags in every CI job:
     fail-on = "warning"
     enable = ["coverage"]
 
+    [workspace]
+    history-dir = ".tods-history"
+
 Command-line flags take precedence over the file, which takes precedence over
 its named ``profile``. A config may also ``extends = "../base.toml"`` to inherit
 a shared house policy; the local file overrides the inherited one.
+
+The ``[workspace]`` table configures the run-history ledger (see
+``workspace.py``): ``history-dir`` sets where ``batch`` appends run summaries
+and where ``trend`` reads them from, so CI does not need to repeat
+``--history`` on every invocation.
 """
 
 from __future__ import annotations
@@ -31,7 +39,9 @@ _ALLOWED_KEYS = {
     "spec-version",
     "profile",
     "extends",
+    "workspace",
 }
+_WORKSPACE_KEYS = {"history-dir"}
 _FAIL_ON_VALUES = {"error", "warning"}
 
 
@@ -61,6 +71,7 @@ class Config:
     encoding: str | None = None
     spec_version: str | None = None
     profile: str | None = None
+    history_dir: str | None = None
     source: str | None = None
 
 
@@ -104,6 +115,8 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
         raise ConfigError(f"{where}: 'max-findings' must be a non-negative integer.")
     max_findings = raw_max if isinstance(raw_max, int) else None
 
+    history_dir = _workspace_history_dir(data.get("workspace"), where)
+
     return Config(
         ignore=_str_list("ignore"),
         fail_on=fail_on,
@@ -112,8 +125,29 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
         encoding=encoding,
         spec_version=spec_version,
         profile=profile,
+        history_dir=history_dir,
         source=where,
     )
+
+
+def _workspace_history_dir(raw: object, where: str) -> str | None:
+    """Pull ``history-dir`` out of an optional ``[workspace]`` table."""
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{where}: 'workspace' must be a table, e.g. [workspace].")
+    unknown = set(raw) - _WORKSPACE_KEYS
+    if unknown:
+        raise ConfigError(
+            f"{where}: [workspace] has unknown setting(s): {', '.join(sorted(unknown))}. "
+            f"Allowed settings are: {', '.join(sorted(_WORKSPACE_KEYS))}."
+        )
+    value = raw.get("history-dir")
+    if value is None:
+        return None
+    if not isinstance(value, str):
+        raise ConfigError(f"{where}: [workspace] 'history-dir' must be a path string.")
+    return value
 
 
 def _merge(base: Config, override: Config) -> Config:
@@ -128,6 +162,7 @@ def _merge(base: Config, override: Config) -> Config:
         encoding=override.encoding or base.encoding,
         spec_version=override.spec_version or base.spec_version,
         profile=override.profile or base.profile,
+        history_dir=override.history_dir or base.history_dir,
         source=override.source or base.source,
     )
 

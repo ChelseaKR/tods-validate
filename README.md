@@ -212,10 +212,19 @@ not on one that was honestly skipped.
   which findings were fixed, newly introduced, or still present; it exits
   non-zero only on newly introduced errors, which is useful in review.
 - `tods-validate batch a/ b/ c/` validates several feeds and prints a roll-up
-  table (`--format json` for tooling; `--format markdown --stamp` for a single
-  stamped fleet/portfolio compliance report — one artifact covering every
-  feed, with a pass/fail/error summary table, fleet totals, and a provenance
-  footer).
+  table (`--format json` for tooling).
+- `tods-validate batch a/ b/ --history .tods-history/` additionally appends
+  one schema-versioned summary record per feed to
+  `.tods-history/history.jsonl` (an append-only, artifact-shaped ledger —
+  plain files in the repo, no hosted service). `tods-validate trend --history
+  .tods-history/` then prints a text-first Markdown table, grouped by feed
+  ("agency"), showing each run's counts and any per-rule regression since the
+  same feed's previous run — "which agency regressed" answerable straight
+  from CI history. **Privacy:** a history record stores only counts and rule
+  IDs, never finding messages, since messages can carry stop, run, or
+  employee/vehicle identifiers; see the docstring in `workspace.py`. Set
+  `[workspace]` `history-dir` in `tods-validate.toml` to avoid repeating
+  `--history` in every job (CLI flag still wins over the config value).
 - `tods-validate anonymize feed/ -o feed-anon/` writes a copy with
   person-identifying fields (employee IDs, license plates, vehicle IDs)
   pseudonymized before sharing. This is pseudonymization, not guaranteed
