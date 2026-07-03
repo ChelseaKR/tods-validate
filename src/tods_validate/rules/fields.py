@@ -7,22 +7,18 @@ from collections.abc import Iterator
 
 from ..findings import Finding, Severity
 from ..loader import FeedFile
+from ..run_events import parse_time as parse_time
 from ..schema import SPEC_URL, TABLES, FieldSpec, FieldType, Presence, TableSpec
 from . import ValidationContext, rule
 
 # GTFS Time: H:MM:SS or HH:MM:SS; hours may exceed 24 for service past midnight
 # and have no upper bound in the spec, so the hour field is not width-capped.
-_TIME_RE = re.compile(r"^(\d+):([0-5]\d):([0-5]\d)$")
 _DATE_RE = re.compile(r"^\d{8}$")
 
-
-def parse_time(value: str) -> int | None:
-    """Return seconds since noon-minus-12h, or None if not a valid GTFS time."""
-    m = _TIME_RE.match(value)
-    if m is None:
-        return None
-    hours, minutes, seconds = (int(g) for g in m.groups())
-    return hours * 3600 + minutes * 60 + seconds
+# parse_time itself lives in tods_validate.run_events (imported above) so that
+# ValidationContext's derived-state parsing can use it without importing back
+# into this package; re-imported here under its original name so existing
+# `from .fields import parse_time` call sites are unaffected.
 
 
 def _is_valid_date(value: str) -> bool:

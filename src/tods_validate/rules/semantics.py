@@ -9,64 +9,15 @@ spec actually states are errors here.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
 
 from ..findings import Finding, Severity
 from ..gtfs_companion import parse_gtfs_date
 from ..loader import Row
+from ..run_events import _Event
 from ..schema import SPEC_URL
 from . import ValidationContext, rule
-from .fields import parse_time
 
 _RUN_EVENTS_SECTION = f"{SPEC_URL}#run_eventstxt"
-
-
-@dataclass(frozen=True)
-class _Event:
-    row: Row
-    service_id: str
-    run_id: str
-    sequence: int | None
-    trip_id: str
-    start: int | None  # seconds
-    end: int | None
-    start_location: str
-    end_location: str
-
-    @property
-    def run(self) -> tuple[str, str]:
-        return (self.service_id, self.run_id)
-
-
-def _events(context: ValidationContext) -> list[_Event]:
-    feed = context.package.get("run_events.txt")
-    if feed is None:
-        return []
-    events = []
-    for row in feed.rows:
-        sequence_raw = row.values.get("event_sequence", "")
-        events.append(
-            _Event(
-                row=row,
-                service_id=row.values.get("service_id", ""),
-                run_id=row.values.get("run_id", ""),
-                sequence=int(sequence_raw) if sequence_raw.isdigit() else None,
-                trip_id=row.values.get("trip_id", ""),
-                start=parse_time(row.values.get("start_time", "")),
-                end=parse_time(row.values.get("end_time", "")),
-                start_location=row.values.get("start_location", ""),
-                end_location=row.values.get("end_location", ""),
-            )
-        )
-    return events
-
-
-def _events_by_run(context: ValidationContext) -> dict[tuple[str, str], list[_Event]]:
-    runs: dict[tuple[str, str], list[_Event]] = {}
-    for event in _events(context):
-        if event.service_id and event.run_id:
-            runs.setdefault(event.run, []).append(event)
-    return runs
 
 
 @rule(
@@ -85,7 +36,7 @@ def _events_by_run(context: ValidationContext) -> dict[tuple[str, str], list[_Ev
     ),
 )
 def event_ends_before_start(context: ValidationContext) -> Iterator[Finding]:
-    for event in _events(context):
+    for event in context.events:
         if event.start is not None and event.end is not None and event.end < event.start:
             yield Finding(
                 rule_id="TODS-E401",
@@ -117,7 +68,7 @@ def event_ends_before_start(context: ValidationContext) -> Iterator[Finding]:
     spec_section=f"{SPEC_URL}#event_sequence-and-event-times",
 )
 def overlapping_trip_events(context: ValidationContext) -> Iterator[Finding]:
-    for events in _events_by_run(context).values():
+    for events in context.events_by_run.values():
         trip_events = [e for e in events if e.trip_id and e.start is not None and e.end is not None]
         trip_events.sort(key=lambda e: (e.start or 0, e.end or 0))
         # Sweep with the latest-ending event seen so far, so an event that
@@ -161,7 +112,7 @@ def overlapping_trip_events(context: ValidationContext) -> Iterator[Finding]:
     spec_section=f"{SPEC_URL}#event_sequence-and-event-times",
 )
 def sequence_disagrees_with_time(context: ValidationContext) -> Iterator[Finding]:
-    for events in _events_by_run(context).values():
+    for events in context.events_by_run.values():
         timed = [e for e in events if e.sequence is not None and e.start is not None]
         timed.sort(key=lambda e: e.sequence or 0)
         for previous, current in zip(timed, timed[1:], strict=False):
@@ -202,7 +153,7 @@ def employee_double_booked(context: ValidationContext) -> Iterator[Finding]:  # 
     if assignments is None:
         return
     spans: dict[tuple[str, str], tuple[int, int]] = {}
-    for run, events in _events_by_run(context).items():
+    for run, events in context.events_by_run.items():
         times = [(e.start, e.end) for e in events if e.start is not None and e.end is not None]
         if times:
             spans[run] = (min(t[0] for t in times), max(t[1] for t in times))
@@ -259,7 +210,7 @@ def run_dates_exceed_trip_dates(context: ValidationContext) -> Iterator[Finding]
     assert context.gtfs is not None
     dates = context.gtfs.service_dates
     reported: set[tuple[str, str]] = set()
-    for event in _events(context):
+    for event in context.events:
         if not event.trip_id or not event.service_id:
             continue
         trip_service = context.gtfs.trip_service.get(event.trip_id)
@@ -438,7 +389,7 @@ def duplicate_assignment(context: ValidationContext) -> Iterator[Finding]:
     ),
 )
 def run_events_discontinuous(context: ValidationContext) -> Iterator[Finding]:
-    for events in _events_by_run(context).values():
+    for events in context.events_by_run.values():
         ordered = sorted(
             (e for e in events if e.sequence is not None), key=lambda e: e.sequence or 0
         )
