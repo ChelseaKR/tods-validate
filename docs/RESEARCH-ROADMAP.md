@@ -90,7 +90,7 @@ Effort: **S** ≈ an afternoon · **M** ≈ a day or two · **L** ≈ a week or 
 | E5 | **Fleet/portfolio compliance artifact**: `batch` → one stamped report across agencies (artifact, not a hosted dashboard — stays in scope) | P11 | P2 | M | Extends `batch` + `--stamp`. **[NET-NEW]** |
 | E6 | **Strict "ingest-ready" consumer profile** as a named preset for CAD/AVL import gating | P10 | P2 | S | Profiles (`strict`/`lenient`) already exist as a mechanism. **[corroborates profile presets · NET-NEW preset]** |
 | E7 | **Conformance-"level" definition** (what "passing" means agency-to-agency) for procurement and oversight | P11,P7 | P3 | M | Aligns with MDIP interoperable-procurement framing. **[NET-NEW]** |
-| E8 | **Comparative / aggregate stats** across feeds (beyond per-feed descriptive) | P9,P11 | P3 | M | Extends `stats` + `batch`. **[NET-NEW]** |
+| E8 | **Comparative / aggregate stats** across feeds (beyond per-feed descriptive) | P9,P11 | P3 | M | Extends `stats` + `batch`. **[NET-NEW]** ✅ Implemented 2026-07-03 (working tree, uncommitted) — `stats` accepts multiple PATHs and prints a cross-feed comparison table plus a totals/means/min/max aggregate summary (`tods_validate.stats.collect_cross_stats`, `aggregate_stats`, `render_comparison_text`/`_markdown`, `comparison_to_dict`); documented in README.md |
 | E9 | **Propose a packaging/discovery convention upstream** (spec-questions #1) | P9,P4 | P3 | S | The spec defines filenames but no packaging/transport. **[corroborates `spec-questions.md` #1 · NET-NEW upstream]** |
 
 ## Sequenced roadmap

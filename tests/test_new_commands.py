@@ -113,6 +113,69 @@ def test_stats_markdown_profile() -> None:
     assert "Files present" in md.output
 
 
+def test_stats_single_path_output_is_unchanged() -> None:
+    """Passing exactly one PATH keeps the original single-feed profile shape."""
+    solo = invoke("stats", str(VALID_TODS), "--gtfs", str(VALID_GTFS), "--format", "json")
+    payload = json.loads(solo.output)
+    assert "feeds" not in payload  # not the comparison shape
+    assert "aggregate" not in payload
+    assert payload["source"] == str(VALID_TODS)
+    assert payload["run_events"] == 11
+
+
+def test_stats_comparison_text_has_per_feed_columns_and_aggregate() -> None:
+    result = invoke("stats", str(VALID_TODS), E201, "--gtfs", str(VALID_GTFS))
+    assert result.exit_code == 0
+    assert str(VALID_TODS) in result.output
+    assert E201 in result.output
+    assert "Aggregate" in result.output
+    assert "Run events" in result.output
+
+
+def test_stats_comparison_markdown_has_aggregate_table() -> None:
+    result = invoke(
+        "stats", str(VALID_TODS), E201, "--gtfs", str(VALID_GTFS), "--format", "markdown"
+    )
+    assert "# TODS feed comparison: 2 feed(s)" in result.output
+    assert "| Metric |" in result.output
+    assert "## Aggregate" in result.output
+    assert "| Total | Mean | Min | Max |" in result.output
+
+
+def test_stats_comparison_json_has_feeds_and_aggregate() -> None:
+    result = invoke("stats", str(VALID_TODS), E201, "--gtfs", str(VALID_GTFS), "--format", "json")
+    payload = json.loads(result.output)
+    assert len(payload["feeds"]) == 2
+    assert payload["feeds"][0]["source"] == str(VALID_TODS)
+    aggregate = payload["aggregate"]
+    assert aggregate["feed_count"] == 2
+    assert aggregate["error_count"] == 0
+    run_events = aggregate["metrics"]["run_events"]
+    assert run_events["total"] == 11 + 1  # VALID_TODS has 11, TODS-E201 has 1
+    assert run_events["min"] == 1
+    assert run_events["max"] == 11
+
+
+def test_stats_comparison_missing_feed_reported_without_crashing() -> None:
+    missing = str(FIXTURES / "does-not-exist")
+    result = invoke("stats", str(VALID_TODS), missing, "--format", "json")
+    assert result.exit_code == 0  # stats is descriptive; benign exit
+    payload = json.loads(result.output)
+    assert len(payload["feeds"]) == 2
+    broken = next(f for f in payload["feeds"] if f["source"] == missing)
+    assert broken["error"] is not None
+    ok_feed = next(f for f in payload["feeds"] if f["source"] == str(VALID_TODS))
+    assert ok_feed["error"] is None
+    # The unreadable feed is excluded from the aggregate numbers, not zeroed in.
+    assert payload["aggregate"]["feed_count"] == 1
+    assert payload["aggregate"]["error_count"] == 1
+    assert payload["aggregate"]["metrics"]["run_events"]["total"] == 11
+
+    text_result = invoke("stats", str(VALID_TODS), missing)
+    assert text_result.exit_code == 0
+    assert "error" in text_result.output.lower()
+
+
 def test_anonymize_pseudonymizes_consistently(tmp_path: Path) -> None:
     out = tmp_path / "anon"
     result = invoke("anonymize", str(VALID_TODS), "-o", str(out), "--salt", "fixed")

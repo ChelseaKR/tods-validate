@@ -185,7 +185,11 @@ A CI job that checks the merged feed with MobilityData's gtfs-validator:
 
 - `tods-validate stats feed/ --gtfs gtfs/` prints descriptive metrics (run
   events, distinct runs, revenue vs non-revenue minutes, employees, vehicles,
-  and GTFS coverage) — facts about a feed, not a quality score.
+  and GTFS coverage) — facts about a feed, not a quality score. Give it
+  several feeds (`tods-validate stats a/ b/ c/`) to get a cross-feed
+  comparison table plus an aggregate totals/means/min/max summary
+  (`--format json` for `{"feeds": [...], "aggregate": {...}}`); an unreadable
+  path among several is reported in place rather than aborting the rest.
 - `tods-validate diff old/ new/` validates two versions of a feed and reports
   which findings were fixed, newly introduced, or still present; it exits
   non-zero only on newly introduced errors, which is useful in review.
