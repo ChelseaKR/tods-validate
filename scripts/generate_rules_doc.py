@@ -67,6 +67,9 @@ def generate() -> str:
             if r.interpretation:
                 lines.append(f"Interpretation: {r.interpretation}")
                 lines.append("")
+            if r.example:
+                lines.append(f"Example: {r.example}")
+                lines.append("")
             lines.append(f"Spec reference: <{r.spec_section}>")
             lines.append("")
     return "\n".join(lines)

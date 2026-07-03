@@ -43,6 +43,8 @@ Severity: ERROR.
 
 A row has more or fewer values than the file's header declares columns. Values after the mismatch may be attributed to the wrong field.
 
+Example: Before: header is `trip_id,stop_sequence,arrival_time` but a data row is `T-1,1,08:00,extra`. After: quote fields containing commas, or remove the stray trailing value so the row has exactly 3 fields.
+
 Spec reference: <https://tods-transit.org/spec/#files>
 
 ### TODS-E105: Duplicate column name
@@ -58,6 +60,8 @@ Spec reference: <https://tods-transit.org/spec/#files>
 Severity: ERROR.
 
 A TODS file does not declare a column the spec marks Required (for supplement files: a primary-key column of the GTFS file being supplemented). Rows cannot be interpreted without it.
+
+Example: Before: `stop_time_overrides.txt` header is `trip_id,stop_sequence`. After: add the required key column — `trip_id,stop_id,stop_sequence`.
 
 Spec reference: <https://tods-transit.org/spec/>
 
@@ -131,6 +135,8 @@ A value is padded with spaces. IDs with stray spaces will not match the records 
 
 Interpretation: strict: values are compared exactly; the spec defines no trimming rule, so padded example values are flagged rather than silently trimmed (spec-questions #3).
 
+Example: Before: `stop_id` value is `"  1234  "`. After: trim on export — `1234`.
+
 Spec reference: <https://tods-transit.org/spec/>
 
 ## References between files (TODS-x3xx)
@@ -189,6 +195,8 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 A run event names a trip_id that is not in the companion GTFS trips.txt after supplements are applied.
 
+Example: Before: `run_events.txt` row has `trip_id=T-1042`, but the companion `trips.txt` was re-exported without `T-1042`. After: re-export the companion GTFS alongside the TODS feed, or update `trip_id` to the current trips.txt value.
+
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
 ### TODS-E308: Run uses a service that does not exist
@@ -197,6 +205,8 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 A run event names a service_id that is not defined in the companion GTFS calendar.txt or calendar_dates.txt after supplements are applied.
 
+Example: Before: `run_events.txt` uses `service_id=WKDY-OLD`, but calendars were regenerated with `service_id=WKDY-2026`. After: update the run event's service_id, or define `WKDY-OLD` in `calendar_supplement.txt`.
+
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
 ### TODS-E309: Run event starts or ends at a stop that does not exist
@@ -204,6 +214,8 @@ Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 Severity: ERROR. Needs a companion GTFS feed.
 
 A run event's start_location or end_location is not in the companion GTFS stops.txt after supplements are applied.
+
+Example: Before: `run_events.txt` row has `start_location=STOP-99`, but `stops.txt` renumbered it to `STOP-0099`. After: update start_location/end_location to the current stop_ids, or add the stop via `stops_supplement.txt`.
 
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
@@ -244,6 +256,8 @@ Spec reference: <https://tods-transit.org/spec/#supplement-files>
 Severity: ERROR. Needs a companion GTFS feed.
 
 A supplement row names a route, service, trip, or stop that is not in the supplemented GTFS feed (for example, a trip added by trips_supplement.txt with a route_id that exists nowhere). The merged feed would not form valid GTFS.
+
+Example: Before: `trips_supplement.txt` adds a trip with `route_id=RT-77`, but no such route exists in `routes.txt` or `routes_supplement.txt`. After: use an existing route_id, or add `RT-77` to `routes_supplement.txt`.
 
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 

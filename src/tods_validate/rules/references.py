@@ -348,6 +348,11 @@ def delete_with_values(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    example=(
+        "Before: `run_events.txt` row has `trip_id=T-1042`, but the companion "
+        "`trips.txt` was re-exported without `T-1042`. After: re-export the companion "
+        "GTFS alongside the TODS feed, or update `trip_id` to the current trips.txt value."
+    ),
 )
 def run_event_trip_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
@@ -385,6 +390,11 @@ def run_event_trip_missing(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    example=(
+        "Before: `run_events.txt` uses `service_id=WKDY-OLD`, but calendars were "
+        "regenerated with `service_id=WKDY-2026`. After: update the run event's "
+        "service_id, or define `WKDY-OLD` in `calendar_supplement.txt`."
+    ),
 )
 def run_event_service_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
@@ -426,6 +436,11 @@ def run_event_service_missing(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    example=(
+        "Before: `run_events.txt` row has `start_location=STOP-99`, but `stops.txt` "
+        "renumbered it to `STOP-0099`. After: update start_location/end_location to "
+        "the current stop_ids, or add the stop via `stops_supplement.txt`."
+    ),
 )
 def run_event_stop_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
@@ -731,6 +746,11 @@ def delete_target_missing(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=_SUPPLEMENT_SECTION,
     needs_gtfs=True,
+    example=(
+        "Before: `trips_supplement.txt` adds a trip with `route_id=RT-77`, but no such "
+        "route exists in `routes.txt` or `routes_supplement.txt`. After: use an existing "
+        "route_id, or add `RT-77` to `routes_supplement.txt`."
+    ),
 )
 def supplement_reference_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None

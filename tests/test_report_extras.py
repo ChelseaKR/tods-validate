@@ -37,6 +37,19 @@ def test_text_shows_root_cause_hint_when_clustered() -> None:
     assert "stale" in text
 
 
+def test_text_hint_includes_worked_example_when_clustered() -> None:
+    text = render_text(_findings("TODS-E307", 6), "feed/")
+    assert "Before:" in text
+    assert "After:" in text
+
+
+def test_markdown_hint_includes_worked_example_when_clustered() -> None:
+    markdown = render_markdown(_findings("TODS-E307", 6), "feed/")
+    assert "hint:" in markdown
+    assert "Before:" in markdown
+    assert "After:" in markdown
+
+
 def test_max_findings_hides_overflow() -> None:
     text = render_text(_findings("TODS-E307", 10), "feed/", max_findings=3)
     assert "7 more finding(s) not shown" in text
