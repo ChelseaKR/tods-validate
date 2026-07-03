@@ -279,6 +279,12 @@ The full catalog of checks, with IDs, severities, and spec citations, is in
 CI pipeline can safely filter or suppress specific IDs. The JSON report
 format is described by [docs/report.schema.json](docs/report.schema.json).
 
+For any one rule, `tods-validate explain RULE_ID` prints its full detail —
+description, spec citation, and a worked before/after example — offline, with
+`--format markdown` for pasting into an issue. It reads from the same rule
+registry as `docs/rules.md` and editor hovers, so all three describe a rule
+identically.
+
 Ambiguities in the spec discovered while building the validator are tracked
 in [docs/spec-questions.md](docs/spec-questions.md).
 

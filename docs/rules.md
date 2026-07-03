@@ -19,6 +19,24 @@ Severity: WARNING.
 
 The package contains none of the ten files defined by TODS. Every TODS file is optional, but a package with none of them has nothing to validate.
 
+Example (`(package root)`):
+
+Before:
+```csv
+agency.txt
+notes.txt
+```
+
+After:
+```csv
+agency.txt
+notes.txt
+run_events.txt
+vehicles.txt
+```
+
+Every TODS file is optional, but the package needs at least one to validate.
+
 Spec reference: <https://tods-transit.org/spec/#files>
 
 ### TODS-I102: File is not part of TODS or GTFS
@@ -26,6 +44,21 @@ Spec reference: <https://tods-transit.org/spec/#files>
 Severity: INFO.
 
 A file in the package is neither a TODS file nor a standard GTFS file. It is ignored by this validator.
+
+Example (`notes.txt`):
+
+Before:
+```csv
+note
+remember to update this feed
+```
+
+After:
+```csv
+(remove notes.txt, or rename it to a filename TODS or GTFS defines)
+```
+
+Not an error: the file is simply skipped. Fix the name if it was meant to be a TODS file.
 
 Spec reference: <https://tods-transit.org/spec/#files>
 
@@ -35,6 +68,21 @@ Severity: ERROR.
 
 A TODS file is empty, not UTF-8 encoded, or not parseable as CSV. The file's contents were not validated.
 
+Example (`vehicles.txt`):
+
+Before:
+```csv
+(empty file)
+```
+
+After:
+```csv
+vehicle_id,vehicle_label
+bus-1,Old Reliable
+```
+
+An empty, non-UTF-8, or unparseable file cannot be read at all; write at least a header row in UTF-8.
+
 Spec reference: <https://tods-transit.org/spec/#files>
 
 ### TODS-E104: Row has the wrong number of values
@@ -43,7 +91,21 @@ Severity: ERROR.
 
 A row has more or fewer values than the file's header declares columns. Values after the mismatch may be attributed to the wrong field.
 
-Example: Before: header is `trip_id,stop_sequence,arrival_time` but a data row is `T-1,1,08:00,extra`. After: quote fields containing commas, or remove the stray trailing value so the row has exactly 3 fields.
+Example (`vehicles.txt`):
+
+Before:
+```csv
+vehicle_id,vehicle_label
+bus-1,Old Reliable,extra-value
+```
+
+After:
+```csv
+vehicle_id,vehicle_label
+bus-1,Old Reliable
+```
+
+The row has three values but the header declares two columns; drop the stray trailing value.
 
 Spec reference: <https://tods-transit.org/spec/#files>
 
@@ -53,6 +115,22 @@ Severity: ERROR.
 
 A column name appears more than once in a file's header row.
 
+Example (`vehicles.txt`):
+
+Before:
+```csv
+vehicle_id,vehicle_id
+bus-1,bus-1
+```
+
+After:
+```csv
+vehicle_id,vehicle_label
+bus-1,Old Reliable
+```
+
+Rename the duplicated header so every column name in the file is unique.
+
 Spec reference: <https://tods-transit.org/spec/#files>
 
 ### TODS-E106: Required column is missing
@@ -61,7 +139,21 @@ Severity: ERROR.
 
 A TODS file does not declare a column the spec marks Required (for supplement files: a primary-key column of the GTFS file being supplemented). Rows cannot be interpreted without it.
 
-Example: Before: `stop_time_overrides.txt` header is `trip_id,stop_sequence`. After: add the required key column — `trip_id,stop_id,stop_sequence`.
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,start_location,start_time,end_location,end_time
+daily,1,1,garage,08:00:00,garage,08:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,garage,08:00:00,garage,08:00:00
+```
+
+event_type is Required; add the missing column.
 
 Spec reference: <https://tods-transit.org/spec/>
 
@@ -71,6 +163,22 @@ Severity: WARNING.
 
 A TODS-specific file declares a column the spec does not define. Consumers will ignore it; it is often a misspelled field name.
 
+Example (`vehicles.txt`):
+
+Before:
+```csv
+vehicle_id,vehicle_nickname
+bus-1,Buster
+```
+
+After:
+```csv
+vehicle_id,vehicle_label
+bus-1,Buster
+```
+
+vehicle_nickname is not a defined TODS field and consumers will ignore it; rename it to the field you meant (here, vehicle_label) or drop it.
+
 Spec reference: <https://tods-transit.org/spec/>
 
 ### TODS-I108: Supplement column is not defined by GTFS or TODS
@@ -78,6 +186,22 @@ Spec reference: <https://tods-transit.org/spec/>
 Severity: INFO.
 
 A supplement file declares a column that is neither a field of the GTFS file being supplemented nor a TODS_ field. It is carried through to the merged feed as a GTFS extension field.
+
+Example (`stops_supplement.txt`):
+
+Before:
+```csv
+stop_id,my_custom_note
+garage,internal only
+```
+
+After:
+```csv
+stop_id,TODS_my_custom_note
+garage,internal only
+```
+
+Not an error: the column is carried into the merged GTFS as an extension field. Prefix it TODS_ if it should stay TODS-only metadata instead.
 
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
@@ -89,6 +213,22 @@ Severity: ERROR.
 
 A field the spec marks Required is empty (for supplement files: a primary-key field, without which the row cannot be matched to GTFS).
 
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,,garage,08:00:00,garage,08:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,garage,08:00:00,garage,08:00:00
+```
+
+event_type is Required and cannot be blank; supply a value.
+
 Spec reference: <https://tods-transit.org/spec/>
 
 ### TODS-E202: Value is not an allowed option
@@ -96,6 +236,22 @@ Spec reference: <https://tods-transit.org/spec/>
 Severity: ERROR.
 
 An enum field has a value outside the options the spec allows (TODS_delete: blank or 1; start_mid_trip and end_mid_trip: blank, 0, 1, or 2).
+
+Example (`stops_supplement.txt`):
+
+Before:
+```csv
+stop_id,TODS_delete
+garage,yes
+```
+
+After:
+```csv
+stop_id,TODS_delete
+garage,1
+```
+
+TODS_delete only accepts 1 (or blank); 'yes' is not one of the allowed options.
 
 Spec reference: <https://tods-transit.org/spec/>
 
@@ -107,6 +263,22 @@ A value does not match its field type: times must be HH:MM:SS (hours may exceed 
 
 Interpretation: permissive: GTFS time syntax with hours beyond 24:00:00 is accepted, though the spec's Time type does not state it explicitly (spec-questions #5).
 
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,garage,9am,garage,08:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,garage,09:00:00,garage,08:00:00
+```
+
+Times must be HH:MM:SS (values past 24:00:00 are allowed for post-midnight events); '9am' does not match the format.
+
 Spec reference: <https://tods-transit.org/spec/>
 
 ### TODS-E204: Duplicate primary key
@@ -114,6 +286,24 @@ Spec reference: <https://tods-transit.org/spec/>
 Severity: ERROR.
 
 Two rows in a TODS-specific file share the same primary key (run_events: service_id + run_id + event_sequence; vehicles: vehicle_id; vehicle_assignments: date + block_id + service_id). Consumers cannot tell the rows apart.
+
+Example (`vehicles.txt`):
+
+Before:
+```csv
+vehicle_id,vehicle_label
+bus-1,Old Reliable
+bus-1,Duplicate
+```
+
+After:
+```csv
+vehicle_id,vehicle_label
+bus-1,Old Reliable
+bus-2,Duplicate
+```
+
+vehicle_id is the primary key; give the second row its own ID.
 
 Spec reference: <https://tods-transit.org/spec/>
 
@@ -125,6 +315,22 @@ service_id in vehicle_assignments.txt is required when the same block_id is used
 
 Interpretation: per-row reading: fires only for rows whose block_id is ambiguous, not for every row once any block is shared (spec-questions #8).
 
+Example (`vehicle_assignments.txt`):
+
+Before:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,,B1,bus-1
+```
+
+After:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,weekday,B1,bus-1
+```
+
+trips.txt reuses block_id B1 across more than one service, so service_id must be filled in to say which one this assignment is for.
+
 Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 
 ### TODS-W206: Value has leading or trailing spaces
@@ -135,7 +341,21 @@ A value is padded with spaces. IDs with stray spaces will not match the records 
 
 Interpretation: strict: values are compared exactly; the spec defines no trimming rule, so padded example values are flagged rather than silently trimmed (spec-questions #3).
 
-Example: Before: `stop_id` value is `"  1234  "`. After: trim on export — `1234`.
+Example (`vehicles.txt`):
+
+Before:
+```csv
+vehicle_id,vehicle_label
+bus-1 ,Old Reliable
+```
+
+After:
+```csv
+vehicle_id,vehicle_label
+bus-1,Old Reliable
+```
+
+Leading/trailing spaces are kept as part of the value by most parsers and silently break exact-match lookups elsewhere in the feed. `tods-validate fix` trims these automatically.
 
 Spec reference: <https://tods-transit.org/spec/>
 
@@ -147,6 +367,22 @@ Severity: ERROR.
 
 A row in employee_run_dates.txt names a (service_id, run_id) pair that has no events in run_events.txt. The assignment cannot be matched to a run.
 
+Example (`employee_run_dates.txt`):
+
+Before:
+```csv
+date,service_id,run_id,employee_id
+20260106,daily,2,emp-1
+```
+
+After:
+```csv
+date,service_id,run_id,employee_id
+20260106,daily,1,emp-1
+```
+
+run_id 2 has no run_events.txt rows under service_id daily; point at a run that actually exists (here, 1).
+
 Spec reference: <https://tods-transit.org/spec/#employee_run_datestxt>
 
 ### TODS-W302: Referenced file is missing, references not checked
@@ -154,6 +390,21 @@ Spec reference: <https://tods-transit.org/spec/#employee_run_datestxt>
 Severity: WARNING.
 
 A file references another file that is not in the package (or, for GTFS targets, not in the companion feed), so those references could not be validated.
+
+Example (`employee_run_dates.txt`):
+
+Before:
+```csv
+date,service_id,run_id,employee_id
+20260106,daily,1,emp-1  # run_events.txt is not in this package
+```
+
+After:
+```csv
+(add run_events.txt to the package, or pass the correct --gtfs/path)
+```
+
+Without run_events.txt, run_id references cannot be checked at all; this is a warning because the file may simply be outside the current validation pass, not necessarily missing from the real feed.
 
 Spec reference: <https://tods-transit.org/spec/>
 
@@ -163,6 +414,22 @@ Severity: ERROR.
 
 A row in vehicle_assignments.txt names a vehicle_id that is not defined in vehicles.txt.
 
+Example (`vehicle_assignments.txt`):
+
+Before:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,daily,B1,bus-9
+```
+
+After:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,daily,B1,bus-1
+```
+
+vehicle_id bus-9 is not defined in vehicles.txt; assign an existing vehicle.
+
 Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 
 ### TODS-E304: Supplement both deletes and redefines the same row
@@ -170,6 +437,23 @@ Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 Severity: ERROR.
 
 A supplement file contains a delete (TODS_delete=1) and another row with the same primary key. The spec prohibits this because supplement rows are not processed in order, so the result is undefined.
+
+Example (`stops_supplement.txt`):
+
+Before:
+```csv
+stop_id,stop_name,TODS_delete
+s1,,1
+s1,Replacement Name,
+```
+
+After:
+```csv
+stop_id,stop_name,TODS_delete
+s1,Replacement Name,
+```
+
+s1 appears twice: once deleted, once redefined, which is contradictory. Keep a single row per stop_id.
 
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
@@ -179,6 +463,23 @@ Severity: WARNING.
 
 A supplement file contains multiple non-delete rows with the same primary key. Supplement rows are not processed in order, so which values win is undefined.
 
+Example (`stops_supplement.txt`):
+
+Before:
+```csv
+stop_id,stop_name,TODS_delete
+s1,Name A,
+s1,Name B,
+```
+
+After:
+```csv
+stop_id,stop_name,TODS_delete
+s1,Name B,
+```
+
+Two rows update the same stop_id; the merge applies them in file order, so the first update is silently overwritten. Keep one row per primary key.
+
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
 ### TODS-W306: Deleted supplement row carries values that will be ignored
@@ -186,6 +487,22 @@ Spec reference: <https://tods-transit.org/spec/#supplement-files>
 Severity: WARNING.
 
 A supplement row sets TODS_delete=1 and also fills in other fields. The spec says the row is removed and the other values are ignored.
+
+Example (`stops_supplement.txt`):
+
+Before:
+```csv
+stop_id,stop_name,TODS_delete
+s1,New Name,1
+```
+
+After:
+```csv
+stop_id,stop_name,TODS_delete
+s1,,1
+```
+
+A deleted row's other columns are never applied; clear them so the file doesn't imply the rename survives.
 
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
@@ -195,7 +512,21 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 A run event names a trip_id that is not in the companion GTFS trips.txt after supplements are applied.
 
-Example: Before: `run_events.txt` row has `trip_id=T-1042`, but the companion `trips.txt` was re-exported without `T-1042`. After: re-export the companion GTFS alongside the TODS feed, or update `trip_id` to the current trips.txt value.
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+daily,1,1,Operator,ghost-trip,s1,08:00:00,s2,09:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+daily,1,1,Operator,t1,s1,08:00:00,s2,09:00:00
+```
+
+trip_id ghost-trip is not defined in trips.txt; point at a real trip (here, t1).
 
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
@@ -205,7 +536,21 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 A run event names a service_id that is not defined in the companion GTFS calendar.txt or calendar_dates.txt after supplements are applied.
 
-Example: Before: `run_events.txt` uses `service_id=WKDY-OLD`, but calendars were regenerated with `service_id=WKDY-2026`. After: update the run event's service_id, or define `WKDY-OLD` in `calendar_supplement.txt`.
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+ghost,1,1,Report,garage,08:00:00,garage,08:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,garage,08:00:00,garage,08:00:00
+```
+
+service_id ghost is not defined in calendar.txt/calendar_dates.txt; use a service that exists (here, daily).
 
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
@@ -215,7 +560,21 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 A run event's start_location or end_location is not in the companion GTFS stops.txt after supplements are applied.
 
-Example: Before: `run_events.txt` row has `start_location=STOP-99`, but `stops.txt` renumbered it to `STOP-0099`. After: update start_location/end_location to the current stop_ids, or add the stop via `stops_supplement.txt`.
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,ghost-stop,08:00:00,s1,08:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,s1,08:00:00,s1,08:00:00
+```
+
+ghost-stop is not defined in stops.txt; use a stop_id that exists.
 
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
@@ -225,6 +584,22 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 A run event sets both block_id and trip_id, and the trip's block_id in the supplemented GTFS feed is different. The spec requires the two to match when both are set.
 
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,block_id,start_location,start_time,end_location,end_time
+daily,1,1,Operator,t1,B2,s1,08:00:00,s2,09:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,block_id,start_location,start_time,end_location,end_time
+daily,1,1,Operator,t1,B1,s1,08:00:00,s2,09:00:00
+```
+
+trips.txt says trip t1 belongs to block B1, but this event claims block_id B2; the two must agree.
+
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
 ### TODS-E311: Vehicle assignment points to a block that does not exist
@@ -232,6 +607,22 @@ Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 Severity: ERROR. Needs a companion GTFS feed.
 
 A vehicle assignment names a block_id that no trip uses in the companion GTFS feed after supplements are applied.
+
+Example (`vehicle_assignments.txt`):
+
+Before:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,daily,B9,bus-1
+```
+
+After:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,daily,B1,bus-1
+```
+
+block_id B9 is not used by any trip in trips.txt; assign a block that is actually scheduled.
 
 Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 
@@ -241,6 +632,22 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 A vehicle assignment names a service_id that is not defined in the companion GTFS calendars after supplements are applied.
 
+Example (`vehicle_assignments.txt`):
+
+Before:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,ghost,B1,bus-1
+```
+
+After:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,daily,B1,bus-1
+```
+
+service_id ghost does not exist; use a defined service.
+
 Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 
 ### TODS-W313: Supplement deletes a row that is not in GTFS
@@ -248,6 +655,22 @@ Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 Severity: WARNING. Needs a companion GTFS feed.
 
 A supplement row sets TODS_delete=1 but no row with that primary key exists in the companion GTFS file. Nothing is deleted; this usually means the ID is wrong or the GTFS feed changed.
+
+Example (`stops_supplement.txt`):
+
+Before:
+```csv
+stop_id,TODS_delete
+s2,1
+```
+
+After:
+```csv
+stop_id,TODS_delete
+s1,1
+```
+
+s2 is not in the companion GTFS stops.txt, so there is nothing for this delete to remove; check for a typo against the stop_id it should target (here, s1).
 
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
@@ -257,7 +680,21 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 A supplement row names a route, service, trip, or stop that is not in the supplemented GTFS feed (for example, a trip added by trips_supplement.txt with a route_id that exists nowhere). The merged feed would not form valid GTFS.
 
-Example: Before: `trips_supplement.txt` adds a trip with `route_id=RT-77`, but no such route exists in `routes.txt` or `routes_supplement.txt`. After: use an existing route_id, or add `RT-77` to `routes_supplement.txt`.
+Example (`trips_supplement.txt`):
+
+Before:
+```csv
+route_id,service_id,trip_id
+ghost,daily,t9
+```
+
+After:
+```csv
+route_id,service_id,trip_id
+r1,daily,t9
+```
+
+route_id ghost is not defined in the companion GTFS routes.txt; reference a route that exists.
 
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
@@ -269,6 +706,22 @@ A run event works a trip end to end (trip_id set, the matching mid_trip flag not
 
 Interpretation: the spec says these locations 'should' be the trip endpoints, so a mismatch is a warning; skipped for mid-trip events and for trips with no stop_times.
 
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+weekday,1,10,Operator,T1,S3,09:00:00,S2,10:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+weekday,1,10,Operator,T1,S1,09:00:00,S2,10:00:00
+```
+
+stop_times.txt says trip T1's first stop is S1, not S3; the run event's start_location should match.
+
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
 ### TODS-W316: Run event time does not match the trip's scheduled time
@@ -278,6 +731,22 @@ Severity: WARNING. Needs a companion GTFS feed.
 A run event works a trip end to end (trip_id set, the matching mid_trip flag not 1), but its start_time is not the trip's first scheduled departure, or its end_time is not the trip's last scheduled arrival, in the supplemented stop_times.txt.
 
 Interpretation: the companion of TODS-W315 for time: a run event claiming to work a whole trip should span the trip's scheduled times, so a mismatch is a warning; skipped for mid-trip events, for trips with no stop_times, and when either time is unparseable.
+
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+weekday,1,10,Operator,T1,S1,08:30:00,S2,10:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+weekday,1,10,Operator,T1,S1,09:00:00,S2,10:00:00
+```
+
+stop_times.txt schedules trip T1 to depart S1 at 09:00:00; the run event's start_time should match within tolerance.
 
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
@@ -291,6 +760,22 @@ A run event's end_time is earlier than its start_time. Equal times are fine (the
 
 Interpretation: the spec is silent on end<start; this treats it as an error and equal times as valid (spec-questions #5).
 
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,garage,10:00:00,garage,09:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Report,garage,09:00:00,garage,10:00:00
+```
+
+end_time (09:00:00) is before start_time (10:00:00); an event cannot end before it starts.
+
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
 ### TODS-E402: Two trip events in one run overlap in time
@@ -298,6 +783,24 @@ Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 Severity: ERROR.
 
 Within one run, two events that both reference trips overlap in time. The spec prohibits this: an employee cannot be on two trips at once. Touching end-to-start (zero-minute overlap) is allowed.
+
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+daily,1,1,Operator,t1,s1,10:00:00,s2,11:00:00
+daily,1,2,Operator,t2,s2,10:30:00,s3,11:30:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+daily,1,1,Operator,t1,s1,10:00:00,s2,11:00:00
+daily,1,2,Operator,t2,s2,11:00:00,s3,12:00:00
+```
+
+Event 2 starts (10:30:00) before event 1 ends (11:00:00); one run cannot be in two trips at once, so shift event 2 to start after event 1 ends.
 
 Spec reference: <https://tods-transit.org/spec/#event_sequence-and-event-times>
 
@@ -307,6 +810,24 @@ Severity: WARNING.
 
 Within one run, event_sequence does not increase with start_time. The spec says sequence values should increase throughout the day; out-of-order values usually mean the sequence or a time is wrong.
 
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,10,Report,garage,10:00:00,garage,10:05:00
+daily,1,20,Report,garage,09:00:00,garage,09:05:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,10,Report,garage,09:00:00,garage,09:05:00
+daily,1,20,Report,garage,10:00:00,garage,10:05:00
+```
+
+event_sequence 10 then 20 implies chronological order, but the times run backwards; reorder the rows (or the sequence numbers) to match the times.
+
 Spec reference: <https://tods-transit.org/spec/#event_sequence-and-event-times>
 
 ### TODS-W404: Employee is assigned to overlapping runs on the same date
@@ -314,6 +835,24 @@ Spec reference: <https://tods-transit.org/spec/#event_sequence-and-event-times>
 Severity: WARNING.
 
 An employee is assigned to two runs on the same date whose events overlap in time. Real schedules have legitimate exceptions, so this is a warning, not an error.
+
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Work,s1,08:00:00,s1,12:00:00
+daily,2,1,Work,s1,10:00:00,s1,14:00:00  # employee_run_dates.txt assigns emp-1 to both run 1 and run 2 on 20260106
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Work,s1,08:00:00,s1,12:00:00
+daily,2,1,Work,s1,10:00:00,s1,14:00:00  # employee_run_dates.txt assigns emp-1 to only one of run 1 / run 2 on 20260106
+```
+
+Run 1 (08:00-12:00) and run 2 (10:00-14:00) overlap; the same employee cannot work both on the same date.
 
 Spec reference: <https://tods-transit.org/spec/#employee_run_datestxt>
 
@@ -323,6 +862,22 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 A run event works a trip whose service is different from the run's service, and the run's service operates on dates the trip's service does not. The spec requires the run's dates to be a subset of the trip's dates.
 
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+weekday,1,1,Operator,t1,s1,08:00:00,s2,09:00:00  # trips.txt: t1 belongs to service_id weekend
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+weekday,1,1,Operator,t1,s1,08:00:00,s2,09:00:00  # trips.txt: t1 belongs to service_id weekday
+```
+
+This run's service_id (weekday) does not match the service_id of the trip (t1) it references in trips.txt; a run and the trips it runs must share a service.
+
 Spec reference: <https://tods-transit.org/spec/#service_id-crew-schedules-and-trip-schedules>
 
 ### TODS-W406: Employee assignment date is outside the run's service days
@@ -331,6 +886,22 @@ Severity: WARNING. Needs a companion GTFS feed.
 
 An employee_run_dates.txt row assigns a run on a date when the run's service_id does not operate, according to the supplemented calendars.
 
+Example (`employee_run_dates.txt`):
+
+Before:
+```csv
+date,service_id,run_id,employee_id
+20260110,weekday,1,emp-1  # calendar.txt: weekday does not operate 2026-01-10 (Saturday)
+```
+
+After:
+```csv
+date,service_id,run_id,employee_id
+20260112,weekday,1,emp-1  # 2026-01-12 is a Monday, when weekday service runs
+```
+
+The assignment date must be a date the run's service actually operates, per calendar.txt/calendar_dates.txt.
+
 Spec reference: <https://tods-transit.org/spec/#employee_run_datestxt>
 
 ### TODS-W407: Vehicle assignment date is outside the service days
@@ -338,6 +909,22 @@ Spec reference: <https://tods-transit.org/spec/#employee_run_datestxt>
 Severity: WARNING. Needs a companion GTFS feed.
 
 A vehicle_assignments.txt row names a service_id and a date when that service does not operate, according to the supplemented calendars.
+
+Example (`vehicle_assignments.txt`):
+
+Before:
+```csv
+date,service_id,block_id,vehicle_id
+20260110,weekday,B1,bus-1  # weekday service does not operate 2026-01-10 (Saturday)
+```
+
+After:
+```csv
+date,service_id,block_id,vehicle_id
+20260112,weekday,B1,bus-1  # 2026-01-12 is a Monday, when weekday service runs
+```
+
+Same idea as TODS-W406, for vehicle assignments: the date must fall within the service's operating days.
 
 Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 
@@ -349,6 +936,23 @@ Two rows in employee_run_dates.txt are exactly identical (same date, service, ru
 
 Interpretation: permissive: the spec's 'Primary Key: *' is read as not forbidding an exact duplicate row, so this is a warning rather than an error (spec-questions #6).
 
+Example (`employee_run_dates.txt`):
+
+Before:
+```csv
+date,service_id,run_id,employee_id
+20260106,daily,1,emp-1
+20260106,daily,1,emp-1
+```
+
+After:
+```csv
+date,service_id,run_id,employee_id
+20260106,daily,1,emp-1
+```
+
+The two rows are identical; drop the duplicate (`tods-validate fix` does this automatically).
+
 Spec reference: <https://tods-transit.org/spec/#employee_run_datestxt>
 
 ### TODS-W409: Consecutive run events do not connect in space
@@ -358,6 +962,24 @@ Severity: WARNING.
 Within one run, an event ends at one location but the next event in event_sequence order starts somewhere else. An operator is one person who cannot teleport, so a gap usually means a missing deadhead event or a wrong location. Events with a blank endpoint are skipped.
 
 Interpretation: the spec does not state this explicitly, but a run is a continuous tour of duty; legitimate exceptions exist (so a warning), and adjacencies with a blank location are not flagged.
+
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Pullout,garage,08:00:00,stopA,08:30:00
+daily,1,2,Operate,stopB,08:30:00,garage,09:30:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,1,Pullout,garage,08:00:00,stopA,08:30:00
+daily,1,2,Operate,stopA,08:30:00,garage,09:30:00
+```
+
+Event 1 ends at stopA but event 2 starts at stopB; consecutive events in a run should connect at the same location unless a mid-trip flag explains the gap.
 
 Spec reference: <https://tods-transit.org/spec/#event_sequence-and-event-times>
 
@@ -369,6 +991,23 @@ Severity: INFO. Needs a companion GTFS feed. Opt-in: off by default, enable with
 
 Some trips in the companion GTFS feed are never referenced by a run event, so no crew work is described for them. This is informational: not every trip must appear in run_events.txt, but wide gaps can mean an incomplete export.
 
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+daily,1,10,Operator,t1,s1,10:00:00,s2,10:30:00  # trips.txt also defines trip t2, with no run event referencing it
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,end_location,end_time
+daily,1,10,Operator,t1,s1,10:00:00,s2,10:30:00
+daily,1,20,Operator,t2,s2,10:30:00,s3,11:00:00
+```
+
+t2 has no run event at all. Informational coverage check; opt in with --enable coverage or --enable TODS-I501.
+
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
 ### TODS-I502: Blocks have no vehicle assignment
@@ -376,6 +1015,23 @@ Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 Severity: INFO. Needs a companion GTFS feed. Opt-in: off by default, enable with `--enable coverage` or `--enable TODS-I502`.
 
 Some blocks in the companion GTFS feed have no row in vehicle_assignments.txt, so no vehicle is assigned to operate them. Informational: vehicle assignments are optional, but unassigned blocks may signal an incomplete export.
+
+Example (`vehicle_assignments.txt`):
+
+Before:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,daily,B1,bus-1  # trips.txt also defines block B2, with no vehicle_assignments row
+```
+
+After:
+```csv
+date,service_id,block_id,vehicle_id
+20260106,daily,B1,bus-1
+20260106,daily,B2,bus-2
+```
+
+Block B2 has no vehicle assignment. Informational coverage check; opt in with --enable coverage or --enable TODS-I502.
 
 Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 
@@ -388,5 +1044,25 @@ Severity: INFO. Opt-in: off by default, enable with `--enable advisory` or `--en
 A run is on duty for a long continuous span with no event whose type names a break, lunch, or meal. Advisory only: break modelling varies by agency and labor agreement, so this is never an error.
 
 Interpretation: advisory: 'break' detected by event_type containing break/lunch/meal
+
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,10,Operator,s1,06:00:00,s1,06:10:00
+daily,1,20,Operator,s1,06:10:00,s1,14:00:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,10,Operator,s1,06:00:00,s1,06:10:00
+daily,1,20,Operator,s1,06:10:00,s1,10:00:00
+daily,1,25,Break,s1,10:00:00,s1,10:30:00
+daily,1,30,Operator,s1,10:30:00,s1,14:00:00
+```
+
+Nearly 8 hours pass with no Break event. Advisory check; opt in with --enable advisory or --enable TODS-I601.
 
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>

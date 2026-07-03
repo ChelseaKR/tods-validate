@@ -44,7 +44,7 @@ from .report import (
     render_text,
     summarize,
 )
-from .rules import CATEGORIES, RunCoverage, all_rules
+from .rules import CATEGORIES, RunCoverage, all_rules, render_rule_detail
 from .runner import run, run_with_coverage
 from .schema import SPEC_VERSION, SUPPORTED_SPEC_VERSIONS
 from .stats import (
@@ -914,6 +914,34 @@ def rules_command(output_format: str) -> None:
         needs = " (needs companion GTFS)" if r.needs_gtfs else ""
         optin = "" if r.default_enabled else f" (opt-in: --enable {r.category})"
         click.echo(f"{r.id}  {r.severity.name:7}  {r.title}{needs}{optin}")
+
+
+@main.command(name="explain")
+@click.argument("rule_id", metavar="RULE_ID")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "markdown"]),
+    default="text",
+    show_default=True,
+    help="Plain text for the terminal, or paste-ready Markdown.",
+)
+def explain(rule_id: str, output_format: str) -> None:
+    """Show RULE_ID's full detail: description, spec citation, and a worked example.
+
+    Offline - reads only the rule registry, no feed required. Rendering is
+    shared with docs/rules.md and editor hovers (see `tods-validate lsp`), so
+    the rule catalog, the terminal, and the editor cannot describe a rule
+    differently.
+    """
+    known = {r.id: r for r in all_rules()}
+    rule_def = known.get(rule_id)
+    if rule_def is None:
+        _fail(
+            f"unknown rule ID {rule_id!r}. Run `tods-validate rules` or see "
+            "docs/rules.md for the rule catalog."
+        )
+    click.echo(render_rule_detail(rule_def, output_format))
 
 
 @main.command(name="init")

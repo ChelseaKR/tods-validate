@@ -69,6 +69,13 @@ Added:
   — and the SARIF output is enriched from the rule registry: each descriptor
   gains the rule's title, description, and spec link (`helpUri`), and each
   result carries its finding's structured data in `properties`.
+- `tods-validate explain RULE_ID`: an offline command that prints a rule's full
+  detail — description, spec citation, and a worked before/after example — with
+  `--format markdown` for pasting into an issue. Every core rule (and the
+  opt-in coverage/advisory rules) now ships a worked example, sourced from one
+  registry (`tods_validate.rules.EXAMPLES`) that `explain`, `docs/rules.md`,
+  and LSP hovers all render through the same `render_rule_detail()`, so the
+  three cannot drift from each other.
 
 Changed:
 
