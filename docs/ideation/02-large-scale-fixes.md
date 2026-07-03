@@ -325,6 +325,15 @@ unpinned network installs and starts ≥2× faster on a warm cache.
 
 ## FIX-12 — Anonymize: close the identifier gaps and report residual risk
 
+**Status: Done.** Implemented on branch
+`roadmap/fix-12-close-anonymize-identifier-gaps-a`: `vehicle_label` is now
+pseudonymized by default (`anonymize.py`), `--also FILE:FIELD` pseudonymizes
+caller-supplied extension columns, every `anonymize` run prints a "Carried
+through unprotected" table of remaining non-enum free-text columns (`cli.py`),
+and `SECURITY.md`'s personal-data section reflects the closed `vehicle_label`
+channel. The `--salt`-less-write-into-existing-export refusal described below
+was treated as a nice-to-have and was not implemented in this pass.
+
 **Pitch:** pseudonymize the fields that are still identifying, and make
 `anonymize` report what it could *not* protect.
 
