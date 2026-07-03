@@ -25,6 +25,7 @@ from .loader import PackageNotFoundError
 from .merge import merge_feeds
 from .report import (
     RENDERERS,
+    render_batch_markdown,
     render_markdown,
     render_text,
     summarize,
@@ -387,7 +388,7 @@ def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
 @click.option(
     "--format",
     "output_format",
-    type=click.Choice(["text", "json"]),
+    type=click.Choice(["text", "json", "markdown"]),
     default="text",
     show_default=True,
 )
@@ -397,11 +398,27 @@ def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
     default="error",
     show_default=True,
 )
-def batch(paths: tuple[str, ...], gtfs_path: str | None, output_format: str, fail_on: str) -> None:
+@click.option(
+    "--stamp",
+    is_flag=True,
+    help=(
+        "Add a provenance footer (version, timestamp) to Markdown, for a citable "
+        "fleet/portfolio compliance artifact."
+    ),
+)
+def batch(
+    paths: tuple[str, ...],
+    gtfs_path: str | None,
+    output_format: str,
+    fail_on: str,
+    stamp: bool,
+) -> None:
     """Validate several feeds and print a roll-up table.
 
     Each PATH is validated independently; the shared --gtfs companion, if given,
-    is used for all of them.
+    is used for all of them. ``--format markdown`` produces a single stamped
+    multi-agency compliance report suitable for an issue or working-group
+    thread, rather than one report per feed.
     """
     rows: list[dict[str, object]] = []
     any_failed = False
@@ -413,19 +430,25 @@ def batch(paths: tuple[str, ...], gtfs_path: str | None, output_format: str, fai
             any_failed = True
             continue
         counts = summarize(findings)
+        failed = counts[Severity.ERROR] > 0 or (
+            fail_on == "warning" and counts[Severity.WARNING] > 0
+        )
         rows.append(
             {
                 "source": package.source,
                 "errors": counts[Severity.ERROR],
                 "warnings": counts[Severity.WARNING],
                 "infos": counts[Severity.INFO],
+                "status": "fail" if failed else "pass",
             }
         )
-        if counts[Severity.ERROR] > 0 or (fail_on == "warning" and counts[Severity.WARNING] > 0):
+        if failed:
             any_failed = True
 
     if output_format == "json":
         click.echo(json.dumps({"feeds": rows}, indent=2))
+    elif output_format == "markdown":
+        click.echo(render_batch_markdown(rows, stamp=stamp))
     else:
         click.echo(f"{'errors':>7} {'warnings':>9} {'infos':>6}  source")
         for row in rows:
