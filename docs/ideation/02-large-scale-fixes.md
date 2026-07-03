@@ -207,6 +207,32 @@ must state that renumbered *and* revalued rows still churn. **Excellent looks
 like:** a test where 500 rows shift by one line and zero findings change
 identity.
 
+**Status (2026-07-03):** done. `Finding.fingerprint()` (`findings.py`)
+SHA-256-hashes a canonical JSON payload of `rule_id`, `file`, `field`, the
+sorted `data` items, and the offending value, deliberately excluding `row`
+and `message`; it is emitted as `fingerprint` in `to_dict()` alongside `data`
+(report schema bumped to 1.3.0, `docs/report.schema.json` updated).
+`baseline.finding_identity()` now returns the fingerprint; the previous
+(rule_id, pointer, message) tuple survives as `_legacy_identity()`, and
+`load_baseline_identities()` prefers a stored `fingerprint`, falls back to
+recomputing one from a dict's `data`/`file`/`field`/`rule_id`, and falls back
+further to the legacy tuple for reports that predate structured data
+entirely — old and new baselines both stay usable. `Diff` gained a `moved`
+category (fingerprint matches an old finding, pointer/row differs), reported
+separately from `persisting`/`introduced` by `diff_findings()` and by
+`tods-validate diff`'s CLI output. Honesty note added to `baseline.py`'s
+module docstring: a rule that has not been migrated to populate `data` still
+fingerprints on (rule_id, file, field) alone and can collide across rows in
+the same file, and a row whose *content* changes still churns identity even
+when its row number does not — this land ahead of FIX-05 landing on `main`,
+so `data` scaffolding (`Finding.data`, additive and optional) was added here
+too, matching the shape already implemented on the `roadmap/fix-05-*`
+branch. Tests in `tests/test_baseline_fingerprint.py` cover fingerprint
+stability and uniqueness, the legacy-baseline fallback, the `moved` category,
+and the roadmap's bar: 500 findings each shifted by one row report zero
+introduced and zero fixed. `pytest -q`, `mypy`, and `ruff check`/`ruff
+format --check` all green.
+
 ---
 
 ## FIX-08 — Finding causality and cascade suppression
@@ -267,6 +293,24 @@ severity contract — the disclosure block and the acknowledgment flag are the
 mitigation, and profiles (E6) become expressible *as* shipped remap sets.
 **Excellent looks like:** no output format can contain a remapped finding
 without the disclosure.
+
+**Status (2026-07-03):** done. `config.py` parses an optional `[severity]`
+table (rule ID key -> a severity string or `{level=..., acknowledged=...}`)
+against the rule registry, rejecting unknown rule IDs and requiring
+`acknowledged = true` to downgrade a spec-ERROR rule; `_merge` resolves
+layered configs override-wins per rule_id. `runner.run()` applies the remap
+in one place after `rules.validate()` so every caller (CLI, tests, the
+public API's callers of `run()`) inherits it; `Finding` gained
+`severity_original` (None unless remapped). Every renderer in `report.py`
+(text, Markdown/`--stamp`, JSON `to_dict()`, GitHub annotations, SARIF,
+HTML) discloses remapped findings — a "Local policy: N severit(y/ies)
+remapped" block (or SARIF `run.properties`/per-result `properties`, or a
+per-finding "(spec: ORIGINAL)" note) — so no format can carry a remapped
+finding silently. `docs/report.schema.json` documents
+`findings[].severity_original` (schema 1.2.0). Tests in
+`tests/test_severity_remap.py` cover the upgrade/downgrade/acknowledgment
+paths, unknown-rule-ID rejection, override-wins merging, and disclosure
+presence in every output format; full suite green.
 
 ---
 

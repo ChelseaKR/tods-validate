@@ -70,8 +70,15 @@ def test_clean_findings_never_fail() -> None:
 
 
 def test_baseline_narrows_gating_but_never_kept() -> None:
-    old = Finding("TODS-E100", Severity.ERROR, "boom", file="a.txt", row=2)
-    new = Finding("TODS-E100", Severity.ERROR, "boom two", file="a.txt", row=3)
+    old = Finding("TODS-E100", Severity.ERROR, "boom", file="a.txt", row=2, data={"value": "old"})
+    new = Finding(
+        "TODS-E100",
+        Severity.ERROR,
+        "boom two",
+        file="a.txt",
+        row=3,
+        data={"value": "new"},
+    )
     baseline = {finding_identity(old)}
     policy = GatingPolicy(fail_on="error", ignore=frozenset(), baseline_identities=baseline)
     gate = policy.apply([old, new])

@@ -437,7 +437,7 @@ def diff(
     click.echo(f"tods-validate diff: {old} -> {new}")
     click.echo(
         f"  fixed: {len(result.fixed)}, introduced: {len(result.introduced)}, "
-        f"persisting: {len(result.persisting)}"
+        f"persisting: {len(result.persisting)}, moved: {len(result.moved)}"
     )
     for finding in result.introduced:
         loc = finding.location()
@@ -446,8 +446,20 @@ def diff(
             if loc
             else f"  + {finding.rule_id} {finding.message}"
         )
-    for rule_id, pointer, message in result.fixed:
-        click.echo(f"  - {rule_id} [{pointer}] {message}")
+    for finding in result.fixed:
+        loc = finding.location()
+        click.echo(
+            f"  - {finding.rule_id} [{loc}] {finding.message}"
+            if loc
+            else f"  - {finding.rule_id} {finding.message}"
+        )
+    for finding in result.moved:
+        loc = finding.location()
+        click.echo(
+            f"  ~ {finding.rule_id} [{loc}] {finding.message}"
+            if loc
+            else f"  ~ {finding.rule_id} {finding.message}"
+        )
 
     gate = policy.apply(result.introduced)
     sys.exit(1 if gate.failed else 0)

@@ -27,9 +27,9 @@ from .schema import SPEC_VERSION
 # removed or renamed, within a major version; this lets consumers branch on
 # shape if they need to.
 #
-# 1.2.0 adds the additive ``coverage`` manifest (which rules ran vs. were
-# skipped and why) and per-finding ``data`` (structured parameters).
-REPORT_SCHEMA_VERSION = "1.2.0"
+# 1.3.0 keeps the additive ``coverage`` manifest and per-finding ``data``,
+# and adds ``fingerprint`` (content-anchored identity for --baseline).
+REPORT_SCHEMA_VERSION = "1.3.0"
 
 # When a single rule fires at least this many times, reports add a one-line
 # root-cause hint so a wall of identical findings reads as one likely cause.
