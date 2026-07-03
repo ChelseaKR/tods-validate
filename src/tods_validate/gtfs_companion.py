@@ -20,6 +20,7 @@ from datetime import date, timedelta
 
 from .loader import FeedFile, Package
 from .schema import GTFS_PRIMARY_KEYS
+from .supplement import apply_supplement
 
 _WEEKDAY_FIELDS = ("monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday")
 
@@ -43,31 +44,12 @@ def merge_supplement(
 
     Rows whose primary-key fields are blank or missing are skipped here; the
     field rules report those problems on the supplement file itself.
+
+    Delegates to the shared engine in ``supplement.py`` (also used by
+    ``merge._merge_file``) so the validation view and the materialized merge
+    can never disagree about which keys survive and their values.
     """
-    effective: dict[tuple[str, ...], dict[str, str]] = {}
-    if base is not None:
-        for row in base.rows:
-            key = tuple(row.values.get(f, "") for f in primary_key)
-            if any(v == "" for v in key):
-                continue
-            effective[key] = dict(row.values)
-    if supplement is not None:
-        for row in supplement.rows:
-            key = tuple(row.values.get(f, "") for f in primary_key)
-            if any(v == "" for v in key):
-                continue
-            if row.values.get("TODS_delete", "") == "1":
-                effective.pop(key, None)
-                continue
-            if key in effective:
-                target = effective[key]
-                for name, value in row.values.items():
-                    if name == "TODS_delete" or value == "":
-                        continue
-                    target[name] = value
-            else:
-                effective[key] = {k: v for k, v in row.values.items() if k != "TODS_delete"}
-    return effective
+    return apply_supplement(base, supplement, primary_key).rows
 
 
 @dataclass

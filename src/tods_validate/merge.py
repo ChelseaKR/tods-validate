@@ -23,6 +23,7 @@ from pathlib import Path
 
 from .loader import Package, PackageNotFoundError, load_package
 from .schema import GTFS_PRIMARY_KEYS, TABLES
+from .supplement import apply_supplement
 
 
 @dataclass
@@ -86,35 +87,19 @@ def _merge_file(
         return None
 
     # Keyed rows, base first (preserving order), then supplement evaluation.
-    rows: dict[tuple[str, ...], dict[str, str]] = {}
-    if base is not None:
-        for row in base.rows:
-            key = tuple(row.values.get(f, "") for f in pk)
-            if all(key):
-                rows[key] = dict(row.values)
-    for row in supplement.rows:
-        key = tuple(row.values.get(f, "") for f in pk)
-        if not all(key):
-            stats.skipped += 1
-            continue
-        if row.values.get("TODS_delete", "") == "1":
-            if rows.pop(key, None) is not None:
-                stats.deleted += 1
-            continue
-        if key in rows:
-            target = rows[key]
-            for name, value in row.values.items():
-                if name != "TODS_delete" and value != "":
-                    target[name] = value
-            stats.updated += 1
-        else:
-            rows[key] = {k: v for k, v in row.values.items() if k != "TODS_delete"}
-            stats.added += 1
+    # Delegates to the shared engine in supplement.py (also used by
+    # gtfs_companion.merge_supplement) so the materialized merge can never
+    # disagree with the validation view about which keys survive.
+    result = apply_supplement(base, supplement, pk)
+    stats.updated += result.updated
+    stats.added += result.added
+    stats.deleted += result.deleted
+    stats.skipped += result.skipped
 
     buffer = io.StringIO()
     writer = csv.writer(buffer, lineterminator="\n")
     writer.writerow(headers)
-    for values in rows.values():
+    for values in result.rows.values():
         writer.writerow([values.get(h, "") for h in headers])
     return buffer.getvalue().encode("utf-8")
 
