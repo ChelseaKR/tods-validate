@@ -261,6 +261,16 @@ jobs:
           gtfs: feed/gtfs        # omit if GTFS files sit next to the TODS files
 ```
 
+The action installs `tods-validate` from a hash-verified
+[`requirements-action.lock`](requirements-action.lock) (`pip install
+--require-hashes`) followed by a `--no-deps` install of the checked-out
+package itself, so no dependency is ever resolved unpinned from PyPI, and
+`actions/setup-python`'s `cache: pip` warms the wheel cache across runs. An
+alternative considered and dropped: run the published GHCR image pinned by
+digest. That needs registry credentials and a digest bump on every release,
+and only works on Linux runners, while the composite action above runs
+anywhere `actions/setup-python` does.
+
 ## Rules
 
 The full catalog of checks, with IDs, severities, and spec citations, is in

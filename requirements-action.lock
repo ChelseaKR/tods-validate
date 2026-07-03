@@ -1,0 +1,10 @@
+# Hash-pinned lock of tods-validate's runtime dependency tree, used by
+# action.yml to install the CLI without any floating/unpinned network
+# fetches. Regenerate when pyproject.toml's `dependencies` change:
+#
+#   pip download <dep> -d /tmp/w && pip hash /tmp/w/*.whl
+#
+# click has no transitive runtime dependencies on Linux (colorama is
+# pulled in only via a `sys_platform == "win32"` marker), which is the
+# only platform actions/setup-python runs this composite action on here.
+click==8.1.8 --hash=sha256:63c132bbbed01578a06712a2d1f497bb62d9c1c0d329b7903a866228027263b2
