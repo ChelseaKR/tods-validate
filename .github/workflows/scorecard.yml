@@ -1,0 +1,46 @@
+name: OpenSSF Scorecard
+
+# Supply-chain posture score (CICD-03, SEC-35-38), published to the repo's
+# code-scanning tab and, weekly, to the public Scorecard API. Depends on
+# real branch-protection/ruleset settings to score well on Branch-Protection
+# and Token-Permissions; see docs/CONFORMANCE-GAPS.md#ci-cd for the current
+# gap (P1-8, needs live GitHub settings this remediation pass intentionally
+# did not touch).
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "24 3 * * 2" # weekly, Tuesday 03:24 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  analyze:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write # upload SARIF to code scanning
+      id-token: write # publish results to the public Scorecard API
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+
+      - uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: true
+
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: scorecard-results
+          path: results.sarif
+          retention-days: 5
+
+      - uses: github/codeql-action/upload-sarif@54f647b7e1bb85c95cddabcd46b0c578ec92bc1a # v4.36.3
+        with:
+          sarif_file: results.sarif

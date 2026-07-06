@@ -62,3 +62,47 @@ Validating GTFS itself (use
 [gtfs-validator](https://github.com/MobilityData/gtfs-validator)),
 GTFS-realtime correlation, and feed editing or repair beyond the merge
 described above.
+
+## Metrics ledger
+
+Per `docs/standards/QUALITY-AND-METRICS-STANDARD.md`'s per-repo Metrics
+table: project-specific values here, rigor cited to the owning standard.
+Updated 2026-07-05.
+
+| Metric | Target | Measured by | Gate | Owner |
+|---|---|---|---|---|
+| Line + branch coverage | ≥ 90% (published library) | `pytest --cov --cov-branch` in CI | AUTO | Chelsea Kelly-Reif |
+| Cyclomatic complexity | ≤ 10 | `ruff` `C901`/mccabe | AUTO | Chelsea Kelly-Reif |
+| SHA-pinned `uses:` | 100% | manual + `zizmor` | AUTO | Chelsea Kelly-Reif |
+| Workflow SAST findings (High/Critical) | 0 | `zizmor --min-severity high` | AUTO | Chelsea Kelly-Reif |
+| SAST findings (blocking) | 0 | Semgrep `ci --config auto`, CodeQL | AUTO | Chelsea Kelly-Reif |
+| Dependency vulnerabilities (fixable) | 0 | `pip-audit --strict` | AUTO | Chelsea Kelly-Reif |
+| Secrets in tree/history | 0 | gitleaks (pre-commit + CI) | AUTO | Chelsea Kelly-Reif |
+| Container CVEs (CRITICAL/HIGH) | 0 | Trivy in `docker.yml` | AUTO | Chelsea Kelly-Reif |
+| Rule ↔ fixture parity | 1:1 | `tests/test_conformance.py` | AUTO | Chelsea Kelly-Reif |
+| Mutation kill-rate (rules engine) | ≥ 70% (ratchet; baseline ~65%) | `mutmut` (advisory, weekly) | REVIEW | Chelsea Kelly-Reif |
+| axe/pa11y violations (HTML report + playground) | 0 | not yet wired — see `docs/CONFORMANCE-GAPS.md#accessibility` | N/A-not-yet-built | Chelsea Kelly-Reif |
+| Perf regression budget | ≤ 2x baseline | `scripts/benchmark.py`, not yet a CI gate | N/A-not-yet-built | Chelsea Kelly-Reif |
+| Screen-reader walkthrough | per release | not yet committed as an artifact | REVIEW-not-yet-built | Chelsea Kelly-Reif |
+| Threat model | per new surface | `SECURITY.md`, updated ad hoc | REVIEW | Chelsea Kelly-Reif |
+
+Rows marked "not-yet-built" are honest gaps, not silent omissions; see
+`docs/CONFORMANCE-GAPS.md` for the open item each maps to.
+
+## Release checklist (QM-17)
+
+Run through before creating a GitHub release (tagging triggers
+`pypi-publish.yml`, `docker.yml`, `release-corpus.yml`, each of which
+independently re-runs `make verify` at the tagged commit before publishing):
+
+1. `CHANGELOG.md` has a dated section for the version being released
+   (`## vX.Y.Z - YYYY-MM-DD`), and `## Unreleased` items have moved into it.
+2. `pyproject.toml` `version` and `CITATION.cff` `version`/`date-released`
+   match the tag you are about to create.
+3. Tag it **annotated and signed**: `git tag -s vX.Y.Z -m "release: vX.Y.Z"`
+   (a lightweight or unsigned tag now fails `verify.yml`'s REL-08 check).
+4. Push the tag, then create the GitHub release from it. The three release
+   workflows run automatically; watch that `verify` (and, downstream,
+   `verify-published`) succeed before considering the release done.
+5. Confirm the SBOM, provenance attestation, and (for the image) cosign
+   signature are attached/verifiable, per `SECURITY.md` §Supply chain.

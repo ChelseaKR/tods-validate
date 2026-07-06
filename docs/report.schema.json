@@ -58,7 +58,12 @@
             "description": "Stable machine location identifier, e.g. 'run_events.txt#L4/end_time'."
           },
           "message": { "type": "string" },
-          "suggestion": { "type": ["string", "null"] }
+          "suggestion": { "type": ["string", "null"] },
+          "data": {
+            "type": ["object", "null"],
+            "description": "Structured, machine-readable context (offending value, referenced ID, etc.) so consumers need not parse the message. Added in report schema 1.2.0.",
+            "additionalProperties": { "type": "string" }
+          }
         },
         "additionalProperties": false
       }

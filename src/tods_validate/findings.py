@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import dataclasses
+from collections.abc import Mapping
 from dataclasses import dataclass
 from enum import IntEnum
 
@@ -33,6 +35,17 @@ class Finding:
     row: int | None = None
     field: str | None = None
     suggestion: str | None = None
+    # Machine-readable context for downstream consumers that should not have to
+    # parse the English message: the offending value, what was expected, the
+    # referenced ID, and so on. Keys are stable per rule; see docs/rules.md.
+    # Excluded from equality and hashing (it is derived from the other fields
+    # and a Mapping is not hashable), so Finding stays hashable and comparable.
+    #
+    # NOTE: called as ``dataclasses.field(...)`` rather than a bare ``field``
+    # import, because this dataclass already declares an attribute named
+    # ``field`` (the CSV column name, above) which shadows a plain ``field``
+    # name for the rest of this class body.
+    data: Mapping[str, str] | None = dataclasses.field(default=None, compare=False)
 
     def location(self) -> str:
         parts = []
@@ -70,4 +83,5 @@ class Finding:
             "location": self.pointer(),
             "message": self.message,
             "suggestion": self.suggestion,
+            "data": dict(self.data) if self.data is not None else None,
         }

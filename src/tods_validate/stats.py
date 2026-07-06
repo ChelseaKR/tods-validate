@@ -49,7 +49,7 @@ def _event_minutes(start: str, end: str) -> int:
     return (e - s) // 60
 
 
-def collect_stats(
+def collect_stats(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CONFORMANCE-GAPS.md#code-quality
     path: str | Path, gtfs_path: str | Path | None = None, encoding: str | None = None
 ) -> FeedStats:
     package = load_package(path, encoding=encoding)

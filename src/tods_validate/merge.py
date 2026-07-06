@@ -61,7 +61,7 @@ def _iter_raw_files(path: Path) -> list[tuple[str, bytes]]:
     raise PackageNotFoundError(f"{path} is not a directory or a .zip file.")
 
 
-def _merge_file(
+def _merge_file(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CONFORMANCE-GAPS.md#code-quality
     base_name: str,
     gtfs: Package,
     tods: Package,

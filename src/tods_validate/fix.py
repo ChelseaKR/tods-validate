@@ -54,7 +54,7 @@ class FixResult:
         return bool(self.trimmed or self.blank_rows_dropped or self.duplicate_rows_dropped)
 
 
-def fix_package(
+def fix_package(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CONFORMANCE-GAPS.md#code-quality
     path: str | Path, output: Path | None = None, encoding: str | None = None
 ) -> FixResult:
     """Apply the safe fixes across a package; write the result if ``output`` is set.

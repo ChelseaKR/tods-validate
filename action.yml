@@ -47,17 +47,29 @@ runs:
         python-version: "3.13"
     - name: Install tods-validate
       shell: bash
-      run: python3 -m pip install --quiet "${{ github.action_path }}"
+      env:
+        ACTION_PATH: ${{ github.action_path }}
+      run: python3 -m pip install --quiet "$ACTION_PATH"
 
     - name: Validate feed
       id: validate
       shell: bash
+      # Inputs are routed through env: rather than interpolated directly into
+      # this run: block (CICD-21 / zizmor+semgrep template-injection): a
+      # caller of this action fully controls `with:` values, so splicing them
+      # into the script text before the shell sees it would let a malicious
+      # caller inject arbitrary shell into this composite action's run.
+      env:
+        TODS_PATH: ${{ inputs.path }}
+        TODS_FAIL_ON: ${{ inputs['fail-on'] }}
+        TODS_GTFS: ${{ inputs.gtfs }}
+        TODS_ENABLE: ${{ inputs.enable }}
       run: |
-        args=("${{ inputs.path }}" --format github --fail-on "${{ inputs['fail-on'] }}")
-        if [ -n "${{ inputs.gtfs }}" ]; then
-          args+=(--gtfs "${{ inputs.gtfs }}")
+        args=("$TODS_PATH" --format github --fail-on "$TODS_FAIL_ON")
+        if [ -n "$TODS_GTFS" ]; then
+          args+=(--gtfs "$TODS_GTFS")
         fi
-        for token in ${{ inputs.enable }}; do
+        for token in $TODS_ENABLE; do
           args+=(--enable "$token")
         done
         tods-validate "${args[@]}"

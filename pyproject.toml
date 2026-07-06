@@ -37,11 +37,12 @@ lsp = ["pygls>=2"]
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
-    "mypy>=1.10",
-    "ruff>=0.5",
+    "mypy>=1.18",
+    "ruff>=0.15",
     "pre-commit>=3.7",
     "jsonschema>=4.21",
     "pygls>=2",
+    "pip-audit>=2.7",
 ]
 # Advisory mutation testing (not part of the gate). Kept out of `dev` so the CI
 # gate install stays lean; installed only where mutation runs. See
@@ -54,7 +55,29 @@ target-version = "py311"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
-select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RET", "PT"]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "C4", "RET", "PT", "S", "C901"]
+# S101 (assert-use) is allowed only where justified per call site with a coded
+# `# noqa: S101` comment (see rules/references.py, rules/semantics.py: these
+# asserts type-narrow `context.gtfs` immediately after the rule engine's
+# `needs_gtfs` gate has already guaranteed it is not None -- not a stripped
+# security control on untrusted input). `assert` in tests is fine; test files
+# are excluded below.
+
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.ruff.lint.per-file-ignores]
+# pytest's `assert` idiom is not the security-sensitive pattern S101 targets.
+"tests/**" = ["S101"]
+# Each `assert context.gtfs is not None` here type-narrows immediately after
+# the rule engine's `needs_gtfs` gate (rules/__init__.py `_rule_status`) has
+# already guaranteed gtfs is present for any rule that reaches this point --
+# an internal invariant, not a security control over untrusted input that
+# `python -O` could silently disable. Justified per CQ-04/CODE-QUALITY-STANDARD;
+# tracked in docs/CONFORMANCE-GAPS.md#code-quality.
+"src/tods_validate/rules/references.py" = ["S101"]
+"src/tods_validate/rules/semantics.py" = ["S101"]
+"src/tods_validate/rules/coverage.py" = ["S101"]
 
 [tool.mypy]
 strict = true
@@ -62,10 +85,15 @@ files = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-addopts = "-q"
+addopts = "-q --strict-markers --strict-config --import-mode=importlib"
+pythonpath = ["tests"]
 
 [tool.coverage.run]
 source = ["tods_validate"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 90
 
 [tool.mutmut]
 # Advisory mutation testing, scoped to the validation rules engine (the checks

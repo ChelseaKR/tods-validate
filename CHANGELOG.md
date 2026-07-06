@@ -69,6 +69,27 @@ Fixed:
 - The README and `merge`-recipe GitHub Action snippets now reference the current
   `@v0.6.0` instead of the stale `@v0.4.0` they were pinned at.
 
+Security / process (2026-07-05 standards-conformance remediation):
+
+- The release pipeline (`pypi-publish.yml`, `docker.yml`, `release-corpus.yml`)
+  no longer publishes anything without first re-running the full gate set
+  (`make verify`, new) at the tagged commit, plus a version-consistency check
+  and an annotated/signed-tag check; a `verify-published` job now re-checks
+  the published artifact's provenance/signature after publish.
+- Fixed template-injection-shaped patterns in `action.yml` and the release
+  workflows (`${{ }}` no longer interpolated directly into `run:` shells).
+- Added Semgrep, CodeQL (`python` + `actions`), zizmor, gitleaks (pre-commit
+  + CI), and a blocking `pip-audit` gate; adopted `uv` with a committed
+  `uv.lock`; added a Trivy CVE scan and a digest-pinned base image to the
+  Docker build; the Dockerfile now runs as a non-root user.
+- Added a `README.md` Standards Conformance table, `docs/CONFORMANCE-GAPS.md`,
+  `docs/RESPONSIBLE-TECH-AUDITS.md`, `DEFINITION_OF_DONE.md`,
+  `.github/PULL_REQUEST_TEMPLATE.md`, `.github/CODEOWNERS`, and a vendored
+  copy of the engineering standards this project is held to
+  (`docs/standards/`).
+- No user-facing behavior changed in this entry; see `docs/CONFORMANCE-GAPS.md`
+  for the full list of what closed and what remains open.
+
 ## v0.6.0 - 2026-06-29
 
 New surfaces for working with a feed live (`--watch`, browser playground),

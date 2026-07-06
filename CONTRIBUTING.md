@@ -7,33 +7,53 @@ count.
 
 ## Setup
 
-Requires Python 3.11 or newer.
+Requires Python 3.11 or newer. Dependencies are locked with
+[uv](https://docs.astral.sh/uv/); CI installs from `uv.lock` with
+`uv sync --frozen`, which also fails the build if the lockfile has drifted
+from `pyproject.toml` (CQ-09). Using uv locally keeps your environment
+identical to CI's:
 
 ```sh
 git clone https://github.com/ChelseaKR/tods-validate
 cd tods-validate
-python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
+uv sync --extra dev
+. .venv/bin/activate
 pre-commit install
 ```
 
+`pip install -e ".[dev]"` into your own venv still works if you would rather
+not install uv; just regenerate `uv.lock` (`uv lock`) and commit it in the
+same PR if you touch dependencies, so CI's lockfile-drift check stays green.
+
 ## The local gate
 
-Before opening a PR, run the same checks CI enforces. If they pass locally they
-should pass in CI:
+Before opening a PR, run the same checks CI enforces:
 
 ```sh
-ruff check src tests scripts            # lint
-ruff format --check src tests scripts   # formatting
-mypy                                    # strict type-check on src/
-pytest --cov --cov-report=term-missing --cov-fail-under=90   # tests, 90% floor
-python scripts/generate_rules_doc.py --check                 # docs/rules.md is in sync
+make verify
 ```
 
-`pre-commit` runs ruff, ruff-format, and mypy on staged files, so most of this
-is caught before you commit. Coverage is a merge-blocking floor at 90%, and the
-docs-drift check fails CI if `docs/rules.md` no longer matches the rule
-registry.
+This reproduces, byte-for-byte, everything CI gates on: `ruff check`,
+`ruff format --check`, `mypy`, `pytest --cov --cov-fail-under=90` (branch
+coverage included), the `docs/rules.md` drift check, the i18n N/A
+declaration check, `pip-audit --strict`, and a `gitleaks` secret scan. Run a
+single stage with its own target (`make lint`, `make test`, `make audit`,
+`make secrets`, ...); see the [Makefile](Makefile). Requires `pip-audit` and
+`gitleaks` on `PATH` in addition to the `dev` extra
+(`pip install -e ".[dev]"`; `gitleaks` is a Go binary, see
+[github.com/gitleaks/gitleaks#installing](https://github.com/gitleaks/gitleaks#installing)).
+
+`pre-commit` runs ruff, ruff-format, mypy, and gitleaks on staged files, so
+most of this is caught before you commit. Coverage (line and branch) is a
+merge-blocking floor at 90%, and the docs-drift check fails CI if
+`docs/rules.md` no longer matches the rule registry. The release workflows
+re-run `make verify` at the tagged commit before anything publishes to PyPI,
+GHCR, or GitHub Releases (see `.github/workflows/verify.yml`).
+
+This repo also tracks the portfolio-wide engineering standards vendored at
+[`docs/standards/`](docs/standards/); see the README's Standards Conformance
+table and [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md) for open
+gaps against them.
 
 ## Rules and fixtures
 

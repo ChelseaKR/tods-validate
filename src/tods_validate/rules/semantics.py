@@ -197,7 +197,7 @@ def sequence_disagrees_with_time(context: ValidationContext) -> Iterator[Finding
     ),
     spec_section=f"{SPEC_URL}#employee_run_datestxt",
 )
-def employee_double_booked(context: ValidationContext) -> Iterator[Finding]:
+def employee_double_booked(context: ValidationContext) -> Iterator[Finding]:  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CONFORMANCE-GAPS.md#code-quality
     assignments = context.package.get("employee_run_dates.txt")
     if assignments is None:
         return
