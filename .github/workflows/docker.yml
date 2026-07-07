@@ -5,14 +5,32 @@ on:
     types: [published]
   workflow_dispatch:
 
+# Least-privilege default; the build-push job escalates only what it needs
+# (CICD-04: write scopes job-level only).
 permissions:
   contents: read
-  packages: write
-  id-token: write # for keyless cosign signing
+
+# Never run two image builds/pushes of the same ref at once (CICD-23).
+concurrency:
+  group: docker-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  # Re-run the full gate set at the tagged commit before anything is pushed
+  # (REL-14/15, added after the 2026-07-05 conformance audit).
+  verify:
+    uses: ./.github/workflows/verify.yml
+    with:
+      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+
   build-push:
+    needs: [verify]
     runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      id-token: write # for keyless cosign signing
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -30,6 +48,27 @@ jobs:
           tags: |
             type=semver,pattern={{version}}
             type=raw,value=latest
+
+      # Build once, locally (push: false), so Trivy can scan the image before
+      # it ever reaches the registry (SEC-28 / REL-18). Only pushed below if
+      # the scan is clean.
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        id: build-local
+        with:
+          context: .
+          push: false
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Scan the image for CRITICAL/HIGH CVEs (blocking)
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}
+          severity: "CRITICAL,HIGH"
+          exit-code: "1"
+          ignore-unfixed: true
+
       - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
         id: build
         with:
@@ -48,3 +87,24 @@ jobs:
         run: |
           IMAGE="ghcr.io/${REPO,,}"
           cosign sign --yes "${IMAGE}@${DIGEST}"
+
+  verify-published:
+    # Re-verify the signature on the pushed digest rather than trusting that
+    # `cosign sign` exiting 0 means a verifier will accept it later (REL-16).
+    needs: [build-push]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Install cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+      - name: Verify the keyless signature by digest
+        env:
+          DIGEST: ${{ needs.build-push.outputs.digest }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -eu
+          IMAGE="ghcr.io/${REPO,,}"
+          cosign verify "${IMAGE}@${DIGEST}" \
+            --certificate-identity-regexp "^https://github.com/${REPO}/.github/workflows/docker.yml@.*$" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com"

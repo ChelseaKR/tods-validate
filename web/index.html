@@ -59,8 +59,15 @@
 
     <iframe id="report" title="Validation report" sandbox="allow-same-origin"></iframe>
 
-    <!-- Pyodide runtime. Update the version to the current Pyodide release. -->
-    <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
+    <!-- Pyodide runtime. Update the version to the current Pyodide release,
+         and regenerate the integrity hash to match (SEC-20 / A11Y-17 note in
+         the standards audit): `curl -sSL <url> | openssl dgst -sha384 -binary
+         | openssl base64 -A`, prefixed with `sha384-`. -->
+    <script
+      src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"
+      integrity="sha384-i3R37b3tF+HWudsUf1VSEOY2YxwSNMqY8DQa9Z0O3xh+NkJ9o+yjcGyIi5huj+nB"
+      crossorigin="anonymous"
+    ></script>
     <script>
       const status = document.getElementById("status");
       const runBtn = document.getElementById("run");

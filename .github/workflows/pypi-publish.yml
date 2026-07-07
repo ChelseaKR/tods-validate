@@ -10,6 +10,14 @@ name: Publish to PyPI
 #   - CycloneDX 1.7 SBOM for the built wheel/sdist, blocking (Section 6.2).
 #   - SLSA build provenance attestation for dist/* (Section 6.4).
 # Caching is intentionally absent from this signing/publishing job (Section 6.4).
+#
+# Release-integrity hardening (REL-14/15/16, added after the 2026-07-05
+# conformance audit): `publish` no longer runs standalone. `verify` re-runs
+# the full gate set (make verify) at the tagged commit, plus version and
+# tag-signature checks, and `publish` will not run unless it is green.
+# `verify-published` then re-downloads what was actually published and
+# checks its provenance attestation, so a "succeeded" run means the artifact
+# on PyPI is the one that was verified, not merely that upload didn't error.
 
 on:
   release:
@@ -26,7 +34,13 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
+    with:
+      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+
   publish:
+    needs: [verify]
     runs-on: ubuntu-latest
     permissions:
       contents: write # attach the SBOM to the GitHub release
@@ -80,6 +94,37 @@ jobs:
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release upload "${{ github.event.release.tag_name }}"
-          tods-validate-sbom.cdx.json --clobber
+          # Routed through env: rather than interpolated into the run: shell
+          # (CICD-21): see the note in release-corpus.yml.
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" tods-validate-sbom.cdx.json --clobber
+
+  verify-published:
+    # Re-fetch what actually landed on PyPI and check its attestation, rather
+    # than trusting that `publish` exiting 0 means the right bits are public
+    # (REL-16). Only meaningful for a real release, not workflow_dispatch.
+    needs: [publish]
+    if: github.event_name == 'release'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      GH_TOKEN: ${{ github.token }}
+      TAG: ${{ github.event.release.tag_name }}
+    steps:
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.13"
+      - name: Wait for the index to pick up the new release
+        run: sleep 30
+      - name: Download the published distribution from PyPI
+        run: |
+          set -eu
+          VERSION="${TAG#v}"
+          python -m pip download "tods-validate==$VERSION" --no-deps -d dist-published
+      - name: Verify SLSA build provenance attestation
+        run: |
+          set -eu
+          for f in dist-published/*; do
+            gh attestation verify "$f" --owner ChelseaKR
+          done

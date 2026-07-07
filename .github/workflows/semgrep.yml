@@ -1,0 +1,26 @@
+name: Semgrep
+
+# Taint-style SAST rules CodeQL's query packs do not cover (SEC-20's AUTO
+# mechanism), plus IaC/Dockerfile/HTML checks that catch classes CodeQL
+# doesn't (e.g. the missing-USER and missing-SRI findings fixed in the
+# 2026-07-05 conformance remediation). Runs unauthenticated against the
+# public Semgrep Registry ruleset; no SEMGREP_APP_TOKEN required or used.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  semgrep:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep@sha256:59fbed6127ea7c5dde3ba6a85142733bb20ea9aaa36120c953904f1539aaf66e # 1.168.0
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - run: semgrep ci --config auto

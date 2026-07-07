@@ -9,12 +9,29 @@ on:
     types: [published]
   workflow_dispatch:
 
+# Least-privilege default; the corpus job escalates only what it needs
+# (CICD-04: write scopes job-level only).
 permissions:
-  contents: write # upload the asset to the release
+  contents: read
+
+# Never run two corpus builds/uploads of the same ref at once (CICD-23).
+concurrency:
+  group: release-corpus-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  # Re-run the full gate set at the tagged commit before anything is built
+  # for a release (REL-14/15, added after the 2026-07-05 conformance audit).
+  verify:
+    uses: ./.github/workflows/verify.yml
+    with:
+      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+
   corpus:
+    needs: [verify]
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload the asset to the release
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -28,6 +45,10 @@ jobs:
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: >-
-          gh release upload "${{ github.event.release.tag_name }}"
-          dist/tods-conformance-corpus.zip --clobber
+          # Routed through env rather than interpolated directly into the run:
+          # shell (CICD-21 / zizmor template-injection): the tag name is
+          # attacker-influenceable in principle (anyone who can create a
+          # release chooses it) and this avoids splicing it into the script
+          # text before the shell ever sees it.
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/tods-conformance-corpus.zip --clobber

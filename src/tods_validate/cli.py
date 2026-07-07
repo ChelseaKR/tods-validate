@@ -234,7 +234,7 @@ def main() -> None:
         "current directory is used if present."
     ),
 )
-def validate(
+def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CONFORMANCE-GAPS.md#code-quality
     path: str,
     gtfs_path: str | None,
     output_format: str,

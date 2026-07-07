@@ -307,7 +307,7 @@ def revalidate(server: TodsLanguageServer, doc_uri: str) -> None:
     _publish(server, root, by_file)
 
 
-def build_server() -> TodsLanguageServer:
+def build_server() -> TodsLanguageServer:  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CONFORMANCE-GAPS.md#code-quality
     """Construct the server and register its document handlers."""
     server = TodsLanguageServer()
 

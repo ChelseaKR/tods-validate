@@ -1,5 +1,7 @@
 # tods-validate
 
+Status: Beta
+
 A validator for [Transit Operational Data Standard (TODS)](https://tods-transit.org/)
 feeds, with a CLI and a GitHub Action.
 
@@ -177,7 +179,9 @@ A CI job that checks the merged feed with MobilityData's gtfs-validator:
     pipx install tods-validate
     tods-validate merge feed/tods --gtfs feed/gtfs -o supplemented.zip
 - run: |
-    curl -sSL -o gtfs-validator.jar https://github.com/MobilityData/gtfs-validator/releases/latest/download/gtfs-validator-cli.jar
+    curl -fsSL -o gtfs-validator.jar \
+      https://github.com/MobilityData/gtfs-validator/releases/download/v8.0.1/gtfs-validator-8.0.1-cli.jar
+    echo "19293ddd9b6f954f216d4f12054bd8a3232921751c4484339e339764a91000e2  gtfs-validator.jar" | sha256sum -c -
     java -jar gtfs-validator.jar -i supplemented.zip -o validator-report
 ```
 
@@ -284,6 +288,38 @@ non-color users.
 
 If you hit an output that is hard to read with assistive technology, that is a
 bug — please report it.
+
+## Observability
+
+Observability: Tier C — OTel tracing out-of-scope (no network surface). Opt-in
+--log-format json only.
+
+## Standards Conformance
+
+`tods-validate` is developed against a shared set of engineering standards
+(code quality, security & supply chain, CI/CD, release & versioning,
+accessibility, observability, documentation, quality & metrics,
+responsible-tech, internationalization, AI-evaluation). Applicability and
+current state:
+
+| Standard | Applies? | State |
+|---|---|---|
+| CODE-QUALITY | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#code-quality) |
+| SECURITY-AND-SUPPLY-CHAIN | Applies (ships code, parses untrusted input) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#security-and-supply-chain) |
+| CI-CD | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#ci-cd) |
+| RELEASE-AND-VERSIONING | Applies (PyPI + GHCR + GitHub Releases + Action) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#release-and-versioning) |
+| ACCESSIBILITY | Applies, scoped to `--format html` report + `web/` playground | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#accessibility) |
+| OBSERVABILITY | Applies at Tier C (see `## Observability` above) | Applies — Tier C, N/A tracing declared above |
+| INTERNATIONALIZATION | N/A — no user-facing strings requiring translation | N/A — see [docs/I18N.md](docs/I18N.md) |
+| AI-EVALUATION | N/A — no LLM/AI runtime | N/A — no LLM SDK or generative/agentic component anywhere in `src/` or `scripts/`; deterministic rule engine only |
+| DOCUMENTATION | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#documentation) |
+| QUALITY-AND-METRICS | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#quality-and-metrics) |
+| RESPONSIBLE-TECH | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#responsible-tech) |
+
+Gaps are tracked in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md), a
+dated ledger of open items per standard (this substitutes for individual
+GitHub issues for now — converting a row to a real issue is a `gh issue
+create` away; see that file's header).
 
 ## Development
 

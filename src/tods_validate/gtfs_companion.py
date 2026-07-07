@@ -34,7 +34,7 @@ def parse_gtfs_date(value: str) -> date | None:
         return None
 
 
-def merge_supplement(
+def merge_supplement(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CONFORMANCE-GAPS.md#code-quality
     base: FeedFile | None,
     supplement: FeedFile | None,
     primary_key: tuple[str, ...],

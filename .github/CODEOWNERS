@@ -1,0 +1,19 @@
+# Code owners for the security- and release-sensitive surfaces of this repo
+# (CQ-39, CICD-17/18). A PR touching any of these paths requests review from
+# the listed owner(s) if the "Require review from Code Owners" branch
+# ruleset option is enabled (see docs/CONFORMANCE-GAPS.md#ci-cd for the
+# current status of that ruleset).
+#
+# Honest limitation: tods-validate is currently solo-maintained. Naming the
+# sole maintainer here does not create independent review; it documents
+# intent and is ready to route to a second owner the moment one joins.
+
+# Workflows, the composite Action, and the container: where a bad change has
+# supply-chain or CI-trust consequences.
+/.github/workflows/  @ChelseaKR
+/action.yml          @ChelseaKR
+/Dockerfile          @ChelseaKR
+
+# Security policy and the untrusted-input-handling code path.
+/SECURITY.md                    @ChelseaKR
+/src/tods_validate/loader.py    @ChelseaKR

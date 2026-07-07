@@ -1,10 +1,28 @@
 # Security policy
 
+## Supported versions
+
+Pre-1.0, only the **latest minor release** is supported. There is no long-term
+support branch; upgrade to the latest release to get a fix. This will be
+revisited (a supported-versions table with more than one line) at the 1.0
+stability commitment described in [docs/roadmap.md](docs/roadmap.md).
+
+| Version | Supported |
+|---|---|
+| latest (0.x) | ✅ |
+| older 0.x | ❌ |
+
 ## Reporting a vulnerability
 
 Please report suspected vulnerabilities privately by opening a
 [GitHub security advisory](https://github.com/ChelseaKR/tods-validate/security/advisories/new)
-rather than a public issue. We aim to acknowledge reports within a few days.
+rather than a public issue.
+
+**Response SLA:** acknowledgment within 3 business days of the report; a
+fix or documented mitigation, then a published release, within 30 days for
+high/critical severity and 90 days for medium/low, tracked from
+acknowledgment. If a fix will take longer, we say so in the advisory thread
+with a revised date rather than going silent.
 
 ## Threat model
 
