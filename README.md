@@ -179,7 +179,9 @@ A CI job that checks the merged feed with MobilityData's gtfs-validator:
     pipx install tods-validate
     tods-validate merge feed/tods --gtfs feed/gtfs -o supplemented.zip
 - run: |
-    curl -sSL -o gtfs-validator.jar https://github.com/MobilityData/gtfs-validator/releases/latest/download/gtfs-validator-cli.jar
+    curl -fsSL -o gtfs-validator.jar \
+      https://github.com/MobilityData/gtfs-validator/releases/download/v8.0.1/gtfs-validator-8.0.1-cli.jar
+    echo "19293ddd9b6f954f216d4f12054bd8a3232921751c4484339e339764a91000e2  gtfs-validator.jar" | sha256sum -c -
     java -jar gtfs-validator.jar -i supplemented.zip -o validator-report
 ```
 
