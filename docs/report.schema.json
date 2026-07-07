@@ -67,6 +67,41 @@
         },
         "additionalProperties": false
       }
+    },
+    "coverage": {
+      "type": "object",
+      "description": "Validation-assurance manifest: which rules ran versus were skipped and why. Added in report schema 1.2.0.",
+      "required": ["total", "ran", "skipped", "skippedByReason", "rules"],
+      "properties": {
+        "total": { "type": "integer", "minimum": 0 },
+        "ran": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "skippedByReason": {
+          "type": "object",
+          "description": "Rule IDs skipped, keyed by status (e.g. 'skipped:needs_gtfs').",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["id", "severity", "category", "status"],
+            "properties": {
+              "id": { "type": "string" },
+              "severity": { "enum": ["ERROR", "WARNING", "INFO"] },
+              "category": { "type": "string" },
+              "status": {
+                "enum": ["ran", "skipped:needs_gtfs", "skipped:disabled", "skipped:ignored"]
+              }
+            },
+            "additionalProperties": false
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "additionalProperties": false

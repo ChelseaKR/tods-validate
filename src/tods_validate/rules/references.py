@@ -106,6 +106,11 @@ def employee_run_missing(context: ValidationContext) -> Iterator[Finding]:
                     "Check both IDs against run_events.txt; a run_id that exists under "
                     "a different service_id is a different run."
                 ),
+                data={
+                    "service_id": service_id,
+                    "run_id": run_id,
+                    "referenced": "run_events.(service_id,run_id)",
+                },
             )
 
 
@@ -141,13 +146,28 @@ def referenced_file_missing(context: ValidationContext) -> Iterator[Finding]:
         gtfs_needs: list[tuple[str, bool, str]] = [
             (
                 "run_events.txt",
-                _trips_available(context) or not _uses_trip_ids(package),
+                _trips_available(context) or not _uses_column(package, "run_events.txt", "trip_id"),
                 "trips.txt",
             ),
             ("run_events.txt", _stops_available(context), "stops.txt"),
             (
                 "run_events.txt",
                 _calendar_available(context),
+                "calendar.txt or calendar_dates.txt",
+            ),
+            # vehicle_assignments.txt resolves block_id into trips and service_id
+            # into the calendars (rules E311/E312). Without those companion files
+            # the checks quietly no-op, so disclose the gap here too.
+            (
+                "vehicle_assignments.txt",
+                _trips_available(context)
+                or not _uses_column(package, "vehicle_assignments.txt", "block_id"),
+                "trips.txt",
+            ),
+            (
+                "vehicle_assignments.txt",
+                _calendar_available(context)
+                or not _uses_column(package, "vehicle_assignments.txt", "service_id"),
                 "calendar.txt or calendar_dates.txt",
             ),
         ]
@@ -164,9 +184,9 @@ def referenced_file_missing(context: ValidationContext) -> Iterator[Finding]:
                 )
 
 
-def _uses_trip_ids(package: Package) -> bool:
-    feed = package.get("run_events.txt")
-    return feed is not None and any(row.values.get("trip_id", "") for row in feed.rows)
+def _uses_column(package: Package, filename: str, column: str) -> bool:
+    feed = package.get(filename)
+    return feed is not None and any(row.values.get(column, "") for row in feed.rows)
 
 
 @rule(
@@ -198,6 +218,7 @@ def vehicle_missing(context: ValidationContext) -> Iterator[Finding]:
                     f"{vehicle_id!r} is not defined in vehicles.txt."
                 ),
                 suggestion="Add the vehicle to vehicles.txt or correct the ID.",
+                data={"value": vehicle_id, "referenced": "vehicles.vehicle_id"},
             )
 
 
@@ -372,6 +393,7 @@ def run_event_trip_missing(context: ValidationContext) -> Iterator[Finding]:
                     "Correct the trip_id, or add the trip via trips_supplement.txt if "
                     "it is non-revenue service."
                 ),
+                data={"value": trip_id, "referenced": "trips.trip_id"},
             )
 
 
@@ -413,6 +435,7 @@ def run_event_service_missing(context: ValidationContext) -> Iterator[Finding]:
                     "calendar_dates_supplement.txt if the crew schedule uses its own "
                     "service days."
                 ),
+                data={"value": service_id, "referenced": "calendar.service_id"},
             )
 
 
@@ -449,6 +472,11 @@ def run_event_stop_missing(context: ValidationContext) -> Iterator[Finding]:
                     suggestion=(
                         "Add non-public locations such as garages via stops_supplement.txt."
                     ),
+                    data={
+                        "value": stop_id,
+                        "field": field_name,
+                        "referenced": "stops.stop_id",
+                    },
                 )
 
 
@@ -486,6 +514,12 @@ def run_event_block_mismatch(context: ValidationContext) -> Iterator[Finding]:
                     f"{trip_id!r} belongs to block {trip_block!r} in the supplemented "
                     "GTFS feed. When both are set they must not be different."
                 ),
+                data={
+                    "value": block_id,
+                    "expected": trip_block,
+                    "trip_id": trip_id,
+                    "referenced": "trips.block_id",
+                },
             )
 
 
@@ -635,6 +669,7 @@ def vehicle_block_missing(context: ValidationContext) -> Iterator[Finding]:
                     "not used by any trip in the companion GTFS feed (after applying "
                     "trips_supplement.txt)."
                 ),
+                data={"value": block_id, "referenced": "trips.block_id"},
             )
 
 
@@ -667,6 +702,7 @@ def vehicle_service_missing(context: ValidationContext) -> Iterator[Finding]:
                     f"{service_id!r} is not defined in calendar.txt or "
                     "calendar_dates.txt (after applying supplements)."
                 ),
+                data={"value": service_id, "referenced": "calendar.service_id"},
             )
 
 
@@ -802,4 +838,5 @@ def supplement_reference_missing(context: ValidationContext) -> Iterator[Finding
                         f"Correct the {field_name}, or add the missing record via the "
                         "matching supplement file."
                     ),
+                    data={"value": value, "field": field_name},
                 )
