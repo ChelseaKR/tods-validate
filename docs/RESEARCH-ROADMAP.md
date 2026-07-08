@@ -77,7 +77,7 @@ Effort: **S** ≈ an afternoon · **M** ≈ a day or two · **L** ≈ a week or 
 | R6 | **Deepen "what good looks like"**: worked before/after examples for the highest-frequency rules, in `rules.md` and report hints | P1,P10 | P2 | M | Builds on by-rule grouping, root-cause hints, and path-to-green that already ship. **[corroborates existing report UX · NET-NEW examples]** ✅ Implemented 2026-07-03 (branch `roadmap/r6-worked-before-after-examples-for-high`) — `Rule.example` field on TODS-E104, E106, E307, E308, E309, E314, W206; surfaced in `docs/rules.md` (regenerated) and appended to cluster hints in `report.py` |
 | R7 | **Ship and link the browser playground** (built in `web/`, runs via Pyodide, no upload) from the README | P1,P7 | P2 | S | `web/README.md` describes the deploy step; it is not yet linked. **[corroborates `web/` · NET-NEW: finish it]** |
 | R8 | **"Your GTFS moved under your TODS" root-cause hint** when `TODS-W302`/`W313` cluster | P2,P10 | P2 | S | Extends the existing root-cause-hint mechanism to a known cluster. **[corroborates report hints · NET-NEW hint]** |
-| R9 | **Validate throughput on real large feeds** with `scripts/benchmark.py` and document it | P8,P6 | P3 | S | The benchmark harness already exists; results are not published. **[corroborates `benchmark.py`]** |
+| R9 | **Validate throughput on real large feeds** with `scripts/benchmark.py` and document it | P8,P6 | P3 | S | The benchmark harness already exists; results are published in [`docs/BENCHMARKS.md`](BENCHMARKS.md). **[corroborates `benchmark.py`]** ✅ Implemented 2026-07-02 — `docs/BENCHMARKS.md` documents methodology and results at 1k/10k/50k/100k trips |
 
 ## Expansion backlog (new capability)
 
@@ -103,8 +103,8 @@ Effort: **S** ≈ an afternoon · **M** ≈ a day or two · **L** ≈ a week or 
 - **Next (P1–P2).** E1 (validate rosters/runtimes/chargers behind experimental) as
   those proposals advance upstream; R6 + R7 (worked examples + linked playground);
   E4 (`--spec-version` maturity); E6 (ingest-ready profile for P10).
-- **Soon (P2–P3).** E5 (fleet compliance artifact), R8 (drift hint), R9 (published
-  throughput), E8 (comparative stats).
+- **Soon (P2–P3).** E5 (fleet compliance artifact), R8 (drift hint), R9 (done —
+  throughput published in `docs/BENCHMARKS.md`), E8 (comparative stats).
 - **Opportunistic (P3).** E7 (conformance level), E9 (packaging convention upstream).
 - **v1.0 cut** stays gated, per `docs/roadmap.md`, on R1 succeeding (multiple
   production feeds) and no rule-ID churn for two releases.
