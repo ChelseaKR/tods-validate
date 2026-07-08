@@ -44,7 +44,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TITLE: "Spec drift detected"
         run: |
-          existing="$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number')"
+          existing="$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')"
           if [ -n "$existing" ]; then
             gh issue comment "$existing" --body-file drift.md
           else

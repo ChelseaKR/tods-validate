@@ -154,6 +154,11 @@ def test_main_exits_advisory_code_when_spec_file_missing(spec_watch, capsys, tmp
     assert "could not" in err.lower()
 
 
+def test_fetch_rejects_non_upstream_urls(spec_watch) -> None:
+    with pytest.raises(spec_watch.SpecFetchError):
+        spec_watch.fetch_spec_text(None, "file:///etc/passwd")
+
+
 def test_normalize_type_handles_prose_and_annotations(spec_watch) -> None:
     assert spec_watch._normalize_type("ID referencing `calendar.service_id`") is FieldType.ID
     assert spec_watch._normalize_type("ID, primary key") is FieldType.ID

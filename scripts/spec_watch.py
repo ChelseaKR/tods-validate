@@ -39,6 +39,7 @@ import argparse
 import re
 import sys
 import urllib.error
+import urllib.parse
 import urllib.request
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +50,8 @@ DEFAULT_SPEC_URL = (
     "https://raw.githubusercontent.com/MobilityData/"
     "transit-operational-data-standard/main/docs/en/spec/index.md"
 )
+_ALLOWED_SPEC_URL_NETLOC = "raw.githubusercontent.com"
+_ALLOWED_SPEC_URL_PREFIX = "/MobilityData/transit-operational-data-standard/"
 
 EXIT_OK = 0
 EXIT_DRIFT = 1
@@ -104,11 +107,29 @@ def fetch_spec_text(spec_file: str | None, spec_url: str) -> str:
             return Path(spec_file).read_text(encoding="utf-8")
         except OSError as exc:
             raise SpecFetchError(f"could not read spec file {spec_file!r}: {exc}") from exc
+    safe_spec_url = _validate_spec_url(spec_url)
     try:
-        with urllib.request.urlopen(spec_url, timeout=20) as resp:  # noqa: S310
+        with urllib.request.urlopen(  # noqa: S310  # nosemgrep
+            safe_spec_url, timeout=20
+        ) as resp:
             return resp.read().decode("utf-8")
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
         raise SpecFetchError(f"could not fetch spec from {spec_url!r}: {exc}") from exc
+
+
+def _validate_spec_url(spec_url: str) -> str:
+    """Limit network fetches to the upstream TODS spec markdown on GitHub."""
+    parsed = urllib.parse.urlparse(spec_url)
+    if (
+        parsed.scheme != "https"
+        or parsed.netloc != _ALLOWED_SPEC_URL_NETLOC
+        or not parsed.path.startswith(_ALLOWED_SPEC_URL_PREFIX)
+    ):
+        raise SpecFetchError(
+            "spec URL must be an HTTPS raw.githubusercontent.com URL under "
+            "MobilityData/transit-operational-data-standard"
+        )
+    return spec_url
 
 
 # ---------------------------------------------------------------------------
