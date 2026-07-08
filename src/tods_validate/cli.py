@@ -33,7 +33,16 @@ from .report import (
 from .rules import CATEGORIES, all_rules
 from .runner import run
 from .schema import SPEC_VERSION, SUPPORTED_SPEC_VERSIONS
-from .stats import collect_stats, render_stats_markdown, render_stats_text, stats_to_dict
+from .stats import (
+    collect_cross_stats,
+    collect_stats,
+    comparison_to_dict,
+    render_comparison_markdown,
+    render_comparison_text,
+    render_stats_markdown,
+    render_stats_text,
+    stats_to_dict,
+)
 
 
 def _fail(message: str) -> NoReturn:
@@ -462,7 +471,7 @@ def batch(
 
 
 @main.command()
-@click.argument("path", type=click.Path(exists=False))
+@click.argument("paths", nargs=-1, required=True, type=click.Path(exists=False))
 @click.option("--gtfs", "gtfs_path", type=click.Path(exists=False), default=None)
 @click.option(
     "--format",
@@ -472,18 +481,35 @@ def batch(
     show_default=True,
 )
 @click.option("--encoding", default=None)
-def stats(path: str, gtfs_path: str | None, output_format: str, encoding: str | None) -> None:
-    """Print descriptive statistics about a TODS feed (counts, not a score)."""
-    try:
-        feed_stats = collect_stats(path, gtfs_path, encoding)
-    except PackageNotFoundError as exc:
-        _fail(str(exc))
+def stats(
+    paths: tuple[str, ...], gtfs_path: str | None, output_format: str, encoding: str | None
+) -> None:
+    """Print descriptive statistics about one or more TODS feeds (counts, not a score).
+
+    A single PATH prints that feed's profile. Multiple PATHs print a
+    cross-feed comparison table plus an aggregate (totals/means/min/max)
+    summary; the shared --gtfs companion, if given, is used for all of them.
+    """
+    if len(paths) == 1:
+        try:
+            feed_stats = collect_stats(paths[0], gtfs_path, encoding)
+        except PackageNotFoundError as exc:
+            _fail(str(exc))
+        if output_format == "json":
+            click.echo(json.dumps(stats_to_dict(feed_stats), indent=2))
+        elif output_format == "markdown":
+            click.echo(render_stats_markdown(feed_stats))
+        else:
+            click.echo(render_stats_text(feed_stats))
+        return
+
+    feeds = collect_cross_stats(paths, gtfs_path, encoding)
     if output_format == "json":
-        click.echo(json.dumps(stats_to_dict(feed_stats), indent=2))
+        click.echo(json.dumps(comparison_to_dict(feeds), indent=2))
     elif output_format == "markdown":
-        click.echo(render_stats_markdown(feed_stats))
+        click.echo(render_comparison_markdown(feeds))
     else:
-        click.echo(render_stats_text(feed_stats))
+        click.echo(render_comparison_text(feeds))
 
 
 @main.command()
