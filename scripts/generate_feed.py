@@ -373,7 +373,9 @@ def build_feed(
         raise ValueError("inject_errors must be between 0 and 1")
 
     directory.mkdir(parents=True, exist_ok=True)
-    rng = random.Random(seed)
+    # random.Random(seed) here is for deterministic synthetic-data generation,
+    # not a security-sensitive use of randomness (no secrets/tokens involved).
+    rng = random.Random(seed)  # noqa: S311
 
     n_blocks = max(1, math.ceil(trips / TRIPS_PER_BLOCK))
     n_stops = max(10, min(2000, trips // 20 + 10))
