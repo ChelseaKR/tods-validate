@@ -103,6 +103,11 @@ def file_unreadable(context: ValidationContext) -> Iterator[Finding]:
         "Values after the mismatch may be attributed to the wrong field."
     ),
     spec_section=_FILES_SECTION,
+    example=(
+        "Before: header is `trip_id,stop_sequence,arrival_time` but a data row is "
+        "`T-1,1,08:00,extra`. After: quote fields containing commas, or remove the "
+        "stray trailing value so the row has exactly 3 fields."
+    ),
 )
 def ragged_row(context: ValidationContext) -> Iterator[Finding]:
     for name, feed in context.package.files.items():
@@ -155,6 +160,10 @@ def duplicate_column(context: ValidationContext) -> Iterator[Finding]:
         "be interpreted without it."
     ),
     spec_section=SPEC_URL,
+    example=(
+        "Before: `stop_time_overrides.txt` header is `trip_id,stop_sequence`. After: "
+        "add the required key column — `trip_id,stop_id,stop_sequence`."
+    ),
 )
 def missing_required_column(context: ValidationContext) -> Iterator[Finding]:
     for name, table in TABLES.items():

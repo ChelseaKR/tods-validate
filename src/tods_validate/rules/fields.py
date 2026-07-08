@@ -288,6 +288,7 @@ def vehicle_assignment_ambiguous(context: ValidationContext) -> Iterator[Finding
         "strict: values are compared exactly; the spec defines no trimming rule, so "
         "padded example values are flagged rather than silently trimmed (spec-questions #3)."
     ),
+    example=('Before: `stop_id` value is `"  1234  "`. After: trim on export — `1234`.'),
 )
 def padded_value(context: ValidationContext) -> Iterator[Finding]:
     for table, feed in _tods_tables(context):

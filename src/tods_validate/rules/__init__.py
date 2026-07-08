@@ -64,6 +64,9 @@ class Rule:
     # accepts GTFS times beyond 24:00:00"). Surfaced in `rules --format json`
     # so consumers can audit interpretation choices. None when unambiguous.
     interpretation: str | None = None
+    # A short "Before: ... / After: ..." worked fix example, written for feed
+    # producers. Set on the highest-frequency rules; None elsewhere.
+    example: str | None = None
 
 
 REGISTRY: list[Rule] = []
@@ -79,6 +82,7 @@ def rule(
     category: str = "core",
     default_enabled: bool = True,
     interpretation: str | None = None,
+    example: str | None = None,
 ) -> Callable[[CheckFunction], CheckFunction]:
     """Register a check function. Used as a decorator in the rule modules."""
     if category not in CATEGORIES:
@@ -99,6 +103,7 @@ def rule(
                 category=category,
                 default_enabled=default_enabled,
                 interpretation=interpretation,
+                example=example,
             )
         )
         return check

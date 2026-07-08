@@ -20,6 +20,7 @@ from typing import cast
 
 from . import __version__
 from .findings import Finding, Severity
+from .rules import all_rules
 from .schema import SPEC_VERSION
 
 # Bumped when the JSON report shape changes. Fields are only ever added, never
@@ -53,6 +54,10 @@ _ROOT_CAUSE_HINTS = {
     ),
 }
 
+# Rule ID -> Rule, used to surface each rule's worked example alongside its
+# root-cause hint when a rule clusters.
+_REGISTRY_BY_ID = {r.id: r for r in all_rules()}
+
 
 def summarize(findings: list[Finding]) -> Counter[Severity]:
     return Counter(f.severity for f in findings)
@@ -83,7 +88,11 @@ def _cluster_hints(findings: list[Finding]) -> list[str]:
     hints = []
     for rule_id, count in counts.most_common():
         if count >= _CLUSTER_THRESHOLD and rule_id in _ROOT_CAUSE_HINTS:
-            hints.append(f"{rule_id} ({count}×): {_ROOT_CAUSE_HINTS[rule_id]}")
+            hint = f"{rule_id} ({count}×): {_ROOT_CAUSE_HINTS[rule_id]}"
+            rule_def = _REGISTRY_BY_ID.get(rule_id)
+            if rule_def is not None and rule_def.example:
+                hint = f"{hint} {rule_def.example}"
+            hints.append(hint)
     return hints
 
 
