@@ -33,6 +33,17 @@ def _feed(tmp_path: Path, name: str, body: str) -> Path:
     return src
 
 
+def _vehicle_feed(tmp_path: Path, vehicle_ids: str, assigned_vehicle_id: str) -> Path:
+    src = tmp_path / "feed"
+    src.mkdir(parents=True, exist_ok=True)
+    (src / "vehicles.txt").write_text("vehicle_id\n" + vehicle_ids)
+    (src / "vehicle_assignments.txt").write_text(
+        "date,service_id,block_id,vehicle_id\n"
+        f"20260106,weekday,B1,{assigned_vehicle_id}\n"
+    )
+    return src
+
+
 def _suggestions(path: Path) -> list[Suggestion]:
     package, findings = run(path)
     return suggest_for_findings(findings, package)
@@ -121,6 +132,46 @@ def test_duplicate_employee_row_is_an_auto_delete_suggestion(tmp_path: Path) -> 
     assert dups[0].proposed is None  # a structural fix, not a value change
     # The auto suggestions line up with what `fix` would actually do.
     assert fix_package(src).total_duplicates_dropped == 1
+
+
+def test_broken_vehicle_id_typo_is_a_review_suggestion(tmp_path: Path) -> None:
+    # "bus-2" is a single substitution away from the one defined vehicle, "bus-9".
+    src = _vehicle_feed(tmp_path, "bus-9\n", "bus-2")
+    fixes = [s for s in _suggestions(src) if s.rule_id == "TODS-E303"]
+    assert len(fixes) == 1
+    assert fixes[0].kind == REVIEW
+    assert fixes[0].field == "vehicle_id"
+    assert fixes[0].current == "bus-2"
+    assert fixes[0].proposed == "bus-9"
+    assert "one character off" in fixes[0].description
+
+
+def test_broken_vehicle_id_case_variant_is_a_review_suggestion(tmp_path: Path) -> None:
+    src = _vehicle_feed(tmp_path, "BUS-9\n", "bus-9")
+    fixes = [s for s in _suggestions(src) if s.rule_id == "TODS-E303"]
+    assert len(fixes) == 1
+    assert fixes[0].proposed == "BUS-9"
+    assert "case" in fixes[0].description
+
+
+def test_broken_vehicle_id_zero_padding_variant_is_a_review_suggestion(tmp_path: Path) -> None:
+    src = _vehicle_feed(tmp_path, "bus-01\n", "bus-1")
+    fixes = [s for s in _suggestions(src) if s.rule_id == "TODS-E303"]
+    assert len(fixes) == 1
+    assert fixes[0].proposed == "bus-01"
+    assert "zero-padding" in fixes[0].description
+
+
+def test_two_equally_close_vehicle_ids_gets_no_suggestion(tmp_path: Path) -> None:
+    # Both "bus-1" and "bus-3" are a single substitution away from "bus-2":
+    # picking either would be a guess, so no suggestion is made.
+    src = _vehicle_feed(tmp_path, "bus-1\nbus-3\n", "bus-2")
+    assert [s for s in _suggestions(src) if s.rule_id == "TODS-E303"] == []
+
+
+def test_no_close_vehicle_id_gets_no_suggestion(tmp_path: Path) -> None:
+    src = _vehicle_feed(tmp_path, "bus-9\n", "vehicle-completely-different")
+    assert [s for s in _suggestions(src) if s.rule_id == "TODS-E303"] == []
 
 
 def test_render_text_groups_and_counts() -> None:
