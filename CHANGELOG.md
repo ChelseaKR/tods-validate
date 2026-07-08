@@ -54,6 +54,13 @@ Added:
 - A contributor guide for authoring rules (docs/authoring-rules.md): how to pick
   a severity and allocate an ID, the scheduler-grade message style, and the
   fixture/conformance contract CI enforces.
+- A curated read namespace, `tods_validate.read`, re-exporting `load_package`,
+  `Package`, `FeedFile`, `Row`, `PackageNotFoundError`, `CompanionGTFS`,
+  `build_companion`, and `merge_supplement`, plus a new pandas-free `to_rows`
+  helper (and `to_dataframe`, gated on the new `dataframe` extra) for callers
+  who want parsed feed data rather than validation findings. Kept as its own
+  submodule, not flattened into the top-level namespace, so the stability
+  promise stays bounded to what is re-exported. See docs/read-api.md.
 
 Changed:
 
