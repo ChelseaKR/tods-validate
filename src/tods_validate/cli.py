@@ -16,7 +16,7 @@ from typing import NoReturn
 import click
 
 from . import __version__
-from .anonymize import anonymize_package
+from .anonymize import AlreadyProtectedError, anonymize_package
 from .baseline import diff_findings, load_baseline_identities
 from .config import Config, ConfigError, load_config
 from .findings import Finding, Severity
@@ -600,10 +600,11 @@ def anonymize(
 
     employee_id, license_plate, vehicle_label, and vehicle_id are replaced
     with stable pseudonyms. Use --also FILE:FIELD to pseudonymize additional
-    extension columns. This is pseudonymization, not guaranteed anonymity:
-    after each run, a "Carried through unprotected" table lists every
-    remaining column that still holds non-enum free text, so the residual
-    risk is disclosed rather than silently passed through.
+    extension columns (fails if FIELD is already protected by default).
+    This is pseudonymization, not guaranteed anonymity: after each run, a
+    "Carried through unprotected" table lists every remaining column that
+    still holds non-enum data, numeric or not, so the residual risk is
+    disclosed rather than silently passed through.
     """
     also: list[tuple[str, str]] = []
     for entry in also_fields:
@@ -614,6 +615,8 @@ def anonymize(
     try:
         result = anonymize_package(path, Path(output_path), salt=salt, encoding=encoding, also=also)
     except PackageNotFoundError as exc:
+        _fail(str(exc))
+    except AlreadyProtectedError as exc:
         _fail(str(exc))
     for target, count in sorted(result.replacements.items()):
         click.echo(f"{target}: {count} value(s) pseudonymized")

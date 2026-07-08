@@ -235,7 +235,8 @@ def test_anonymize_also_pseudonymizes_extension_field(tmp_path: Path) -> None:
     header, *rows = run_events.splitlines()
     job_type_col = header.split(",").index("job_type")
     job_types = {row.split(",")[job_type_col] for row in rows if row}
-    assert job_types and all(v.startswith("job_type_") for v in job_types)
+    assert job_types
+    assert all(v.startswith("job_type_") for v in job_types)
     assert "run_events.txt:job_type: " in result.output  # replacement count line
     # A pseudonymized column is no longer reported as carried through.
     carried_through = result.output.split("Carried through unprotected", 1)[1]
@@ -247,6 +248,44 @@ def test_anonymize_rejects_malformed_also(tmp_path: Path) -> None:
     result = invoke("anonymize", str(VALID_TODS), "-o", str(out), "--also", "not-a-pair")
     assert result.exit_code == 2
     assert "invalid --also value" in result.output
+
+
+def test_anonymize_also_rejects_default_protected_field(tmp_path: Path) -> None:
+    # --also must not be able to silently overwrite (and de-correlate or
+    # weaken) a field already protected by default, e.g. vehicle_id, whose
+    # pseudonym prefix must match across vehicles.txt and
+    # vehicle_assignments.txt for the assignment to still resolve.
+    out = tmp_path / "anon"
+    result = invoke(
+        "anonymize",
+        str(VALID_TODS),
+        "-o",
+        str(out),
+        "--salt",
+        "fixed",
+        "--also",
+        "vehicles.txt:vehicle_label",
+    )
+    assert result.exit_code == 2
+    assert "already pseudonymized by default" in result.output
+    assert not out.exists()
+
+
+def test_anonymize_carried_through_reports_numeric_identifier(tmp_path: Path) -> None:
+    # A numeric-looking extension identifier (a badge number) is exactly the
+    # kind of re-identifying data the disclosure table exists for, and must
+    # not be excluded just because it looks like a number.
+    feed_dir = tmp_path / "feed"
+    feed_dir.mkdir()
+    (feed_dir / "vehicles.txt").write_text(
+        "vehicle_id,badge_number\nbus-1,48213\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "anon"
+    result = invoke("anonymize", str(feed_dir), "-o", str(out), "--salt", "fixed")
+    assert result.exit_code == 0
+    carried_through = result.output.split("Carried through unprotected", 1)[1]
+    assert "vehicles.txt:badge_number" in carried_through
 
 
 def test_anonymize_carried_through_table_always_shown(tmp_path: Path) -> None:

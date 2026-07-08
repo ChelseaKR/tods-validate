@@ -55,16 +55,18 @@ vehicle-identifying values. The `anonymize` subcommand pseudonymizes
 feed is shared; `vehicle_label` (the painted fleet number, which otherwise
 correlates 1:1 with a pseudonymized `vehicle_id` for anyone with a photo of
 the bus) is covered by default. Use `--also FILE:FIELD` to pseudonymize
-additional extension columns.
+additional extension columns; it errors rather than silently overriding if
+FIELD is already one of the default protected fields.
 
 Pseudonymization is not a guarantee of anonymity; correlation with other
 datasets may still re-identify individuals. Treat anonymized output
 accordingly, and prefer a random (default) salt unless stable pseudonyms
 across exports are specifically required. Every `anonymize` run also prints a
 "Carried through unprotected" table naming every column, outside the
-pseudonymized set, that still holds non-enum free text — treat entries there
-as the residual re-identification risk in that export and review or strip
-them by hand before sharing.
+pseudonymized set, that still holds non-enum data — numeric-looking values
+(a badge number, a phone number) are reported too, not just text — treat
+entries there as the residual re-identification risk in that export and
+review or strip them by hand before sharing.
 
 ## Supply chain
 

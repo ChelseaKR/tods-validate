@@ -18,9 +18,11 @@ individuals. Treat the output accordingly.
 
 Because pseudonymization only ever covers a known list of fields, every run
 also reports what it did *not* touch: ``AnonymizeResult.carried_through``
-lists every column, outside that list, that still holds non-enum free text
-after the rewrite (per the field types in ``schema.py``) — the residual risk
-a caller may still need to strip or review by hand.
+lists every column, outside that list, that still holds non-enum data after
+the rewrite (per the field types in ``schema.py``) — including numeric-looking
+data such as a badge number or phone number, which is just as re-identifying
+as text — the residual risk a caller may still need to strip or review by
+hand.
 """
 
 from __future__ import annotations
@@ -54,8 +56,8 @@ _STRUCTURED_TYPES = frozenset(
 class AnonymizeResult:
     written: list[str] = field(default_factory=list)
     replacements: dict[str, int] = field(default_factory=dict)
-    # (file, column) pairs that still carry non-enum free text after the
-    # rewrite: the residual re-identification risk this run did not close.
+    # (file, column) pairs that still carry non-enum data after the rewrite,
+    # numeric or not: the residual re-identification risk this run did not close.
     # Sorted for deterministic output.
     carried_through: list[tuple[str, str]] = field(default_factory=list)
 
@@ -71,23 +73,24 @@ def _derive_prefix(field_name: str) -> str:
     return cleaned or "field"
 
 
-def _looks_numeric(value: str) -> bool:
-    try:
-        float(value)
-    except ValueError:
-        return False
-    return True
+def _has_data(values: list[str]) -> bool:
+    """True if at least one value is non-empty.
+
+    Purely-numeric columns are *not* excluded here: a numeric extension
+    identifier (a badge number, a phone number, a numeric employee ID not in
+    the default map) is exactly the kind of re-identifying data the
+    carried-through table exists to disclose, so it must not be suppressed
+    just because it looks like a number.
+    """
+    return any(v for v in values)
 
 
-def _is_free_text(values: list[str]) -> bool:
-    """True if at least one non-empty value is not purely numeric."""
-    non_empty = [v for v in values if v]
-    if not non_empty:
-        return False
-    return any(not _looks_numeric(v) for v in non_empty)
+class AlreadyProtectedError(ValueError):
+    """Raised when ``--also``/``also`` targets a field already pseudonymized
+    by default, so the caller doesn't silently lose that protection."""
 
 
-def anonymize_package(
+def anonymize_package(  # noqa: C901 - the pseudonymization pass tracks several output buckets
     path: str | Path,
     output: Path,
     salt: str | None = None,
@@ -99,7 +102,10 @@ def anonymize_package(
     ``also`` adds caller-supplied FILE:FIELD pairs (a ``{file: field}`` dict,
     or a list of ``(file, field)`` tuples for repeats/multiple fields per
     file) to the fields pseudonymized by default. Each gets a generic prefix
-    derived from the field name.
+    derived from the field name. Raises ``AlreadyProtectedError`` if a pair
+    names a field already in the default protected-field map, rather than
+    silently overwriting (and potentially weakening or de-correlating) that
+    protection.
     """
     salt = salt if salt is not None else secrets.token_hex(8)
     package = load_package(path, encoding=encoding)
@@ -114,6 +120,7 @@ def anonymize_package(
         ("vehicles.txt", "vehicle_id"): _VEHICLE_PREFIX,
         ("vehicle_assignments.txt", "vehicle_id"): _VEHICLE_PREFIX,
     }
+    default_protected = frozenset(field_prefix)
 
     also_pairs: list[tuple[str, str]]
     if also is None:
@@ -123,6 +130,11 @@ def anonymize_package(
     else:
         also_pairs = list(also)
     for fname, col in also_pairs:
+        if (fname, col) in default_protected:
+            raise AlreadyProtectedError(
+                f"{fname}:{col} is already pseudonymized by default; --also/also is "
+                "for extension columns, not for overriding the default protected fields."
+            )
         field_prefix[(fname, col)] = _derive_prefix(col)
 
     entries: dict[str, bytes] = {}
@@ -139,7 +151,7 @@ def anonymize_package(
             if col in sensitive or typed_columns.get(col) in _STRUCTURED_TYPES:
                 continue
             col_values = [row.values.get(col, "") for row in feed.rows]
-            if _is_free_text(col_values):
+            if _has_data(col_values):
                 result.carried_through.append((name, col))
 
         if not sensitive or not feed.headers:
