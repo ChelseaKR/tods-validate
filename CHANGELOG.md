@@ -7,6 +7,13 @@ new checks may be added in minor releases.
 
 Added:
 
+- `batch --format markdown`, alongside a new `batch --stamp` flag: renders one
+  stamped fleet/portfolio compliance report across every feed passed to
+  `batch`, instead of one report per feed. The report is a summary table
+  (source, errors, warnings, infos, pass/fail/error status) plus a fleet
+  totals line and, with `--stamp`, the same provenance footer (tool version,
+  spec version, UTC timestamp) as `validate --stamp` — a citable artifact,
+  not a hosted dashboard.
 - TODS-W316: the time companion of W315. A run event that works a trip end to end
   should start at the trip's first scheduled departure and end at its last
   scheduled arrival; a mismatch is a warning, skipped for mid-trip events. Uses

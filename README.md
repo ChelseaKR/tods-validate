@@ -194,7 +194,10 @@ A CI job that checks the merged feed with MobilityData's gtfs-validator:
   which findings were fixed, newly introduced, or still present; it exits
   non-zero only on newly introduced errors, which is useful in review.
 - `tods-validate batch a/ b/ c/` validates several feeds and prints a roll-up
-  table (`--format json` for tooling).
+  table (`--format json` for tooling; `--format markdown --stamp` for a single
+  stamped fleet/portfolio compliance report — one artifact covering every
+  feed, with a pass/fail/error summary table, fleet totals, and a provenance
+  footer).
 - `tods-validate anonymize feed/ -o feed-anon/` writes a copy with
   person-identifying fields (employee IDs, license plates, vehicle IDs)
   pseudonymized before sharing. This is pseudonymization, not guaranteed
