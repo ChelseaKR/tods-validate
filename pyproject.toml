@@ -2,6 +2,15 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# `examples/sample-feed` lives outside src/tods_validate, so hatchling's
+# default wheel packaging (source-directory-only) does not pick it up.
+# `tods-validate init` copies its rows into scaffolded packages (see
+# src/tods_validate/init.py), so it must ship in the wheel too, not just the
+# sdist -- otherwise `pip install tods-validate` (as opposed to a source
+# checkout) silently gets a headers-only scaffold.
+[tool.hatch.build.targets.wheel.force-include]
+"examples/sample-feed" = "tods_validate/_sample_feed"
+
 [project]
 name = "tods-validate"
 version = "0.6.0"

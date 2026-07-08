@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from click.testing import CliRunner
 
+import tods_validate.init as init_module
 from tods_validate.api import validate_feed
 from tods_validate.cli import main
 from tods_validate.init import (
@@ -75,6 +76,26 @@ def test_scaffold_is_idempotent_into_its_own_output(tmp_path: Path) -> None:
     # the "not empty" case; --force must be able to scaffold over it cleanly.
     written = scaffold(tmp_path, "runs", force=True)
     assert written
+
+
+# ---------------------------------------------------------------------------
+# Packaging: an install missing the bundled sample feed degrades with a
+# warning, not a silent empty scaffold (e.g. a wheel that predates it being
+# bundled as package data -- see pyproject.toml's force-include).
+# ---------------------------------------------------------------------------
+
+
+def test_scaffold_warns_and_falls_back_to_headers_when_sample_feed_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(init_module, "_SAMPLE_FEED_DIR", None)
+
+    with pytest.warns(RuntimeWarning, match="sample feed data not found"):
+        written = scaffold(tmp_path, "runs")
+
+    assert written  # still produces a structurally valid scaffold
+    header = (tmp_path / "run_events.txt").read_text(encoding="utf-8").splitlines()
+    assert header == [",".join(table_header("run_events.txt"))]
 
 
 def test_scaffold_config_and_workflow_content(tmp_path: Path) -> None:

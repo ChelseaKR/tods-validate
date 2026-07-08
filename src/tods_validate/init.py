@@ -12,14 +12,16 @@ make the result trustworthy rather than merely well-formed:
   feed already known to validate clean instead of synthesizing plausible-
   looking rows that might not.
 
-If the sample feed cannot be found (for example, a packaging layout that
-does not ship it), each table falls back to a schema-accurate header with no
-data rows: still structurally valid, since every TODS file is optional, but
-not a worked example.
+If the sample feed cannot be found (for example, an older wheel built before
+it was bundled as package data), each table falls back to a schema-accurate
+header with no data rows -- still structurally valid, since every TODS file
+is optional, but not a worked example -- and ``scaffold()`` emits a
+``RuntimeWarning`` so this doesn't happen silently.
 """
 
 from __future__ import annotations
 
+import warnings
 from pathlib import Path
 
 from . import __version__
@@ -31,10 +33,31 @@ class DestinationNotEmptyError(Exception):
     """``dest`` already holds files and ``force`` was not given."""
 
 
-# Repo layout in a source checkout: src/tods_validate/init.py -> ../../examples.
-# Not present in every install (e.g. a wheel that does not bundle `examples/`);
-# callers see the headers-only fallback in that case, not an error.
-_SAMPLE_FEED_DIR = Path(__file__).resolve().parents[2] / "examples" / "sample-feed"
+def _locate_sample_feed_dir() -> Path | None:
+    """Find the sample feed to copy rows from.
+
+    Checked in order:
+
+    1. A source checkout: src/tods_validate/init.py -> ../../examples.
+    2. An installed package: bundled as package data alongside this module
+       (see pyproject.toml's ``[tool.hatch.build.targets.wheel.force-include]``),
+       since ``examples/`` itself is not part of the ``tods_validate`` package
+       and would not otherwise ship in a built wheel.
+
+    Returns ``None`` if neither is present -- e.g. a wheel built before the
+    sample feed was bundled -- in which case callers fall back to a
+    headers-only scaffold and ``scaffold()`` warns rather than staying silent.
+    """
+    source_checkout = Path(__file__).resolve().parents[2] / "examples" / "sample-feed"
+    if source_checkout.is_dir():
+        return source_checkout
+    packaged = Path(__file__).resolve().parent / "_sample_feed"
+    if packaged.is_dir():
+        return packaged
+    return None
+
+
+_SAMPLE_FEED_DIR = _locate_sample_feed_dir()
 
 # GTFS base files with no FieldSpec definition of their own in schema.py (this
 # validator does not re-validate GTFS semantics) but that the sample TODS
@@ -82,8 +105,8 @@ def table_header(filename: str) -> list[str]:
 def _write_table(dest: Path, filename: str) -> Path:
     """Write one schema.TABLES file: sample data if available, else headers only."""
     target = dest / filename
-    sample = _SAMPLE_FEED_DIR / filename
-    if sample.is_file():
+    sample = _SAMPLE_FEED_DIR / filename if _SAMPLE_FEED_DIR is not None else None
+    if sample is not None and sample.is_file():
         target.write_bytes(sample.read_bytes())
     else:
         target.write_text(",".join(table_header(filename)) + "\n", encoding="utf-8")
@@ -92,8 +115,8 @@ def _write_table(dest: Path, filename: str) -> Path:
 
 def _write_gtfs_base(dest: Path, filename: str) -> Path | None:
     """Copy one GTFS companion file verbatim from the sample feed, if present."""
-    sample = _SAMPLE_FEED_DIR / filename
-    if not sample.is_file():
+    sample = _SAMPLE_FEED_DIR / filename if _SAMPLE_FEED_DIR is not None else None
+    if sample is None or not sample.is_file():
         return None
     target = dest / filename
     target.write_bytes(sample.read_bytes())
@@ -167,6 +190,16 @@ def scaffold(dest: Path, shape: str = "runs", *, force: bool = False) -> list[Pa
             f"{dest} already exists and is not empty. Pass --force to scaffold into it anyway."
         )
     dest.mkdir(parents=True, exist_ok=True)
+
+    if _SAMPLE_FEED_DIR is None:
+        warnings.warn(
+            "tods-validate: sample feed data not found; `init` is writing "
+            "schema-accurate headers with no example rows instead of a worked "
+            "example. This usually means an incomplete install (the bundled "
+            "sample feed is missing) -- try reinstalling tods-validate.",
+            RuntimeWarning,
+            stacklevel=2,
+        )
 
     written: list[Path] = []
     for filename in GTFS_BASE_FILES:
