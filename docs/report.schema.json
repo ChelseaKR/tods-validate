@@ -113,7 +113,7 @@
     },
     "suggestions": {
       "type": "array",
-      "description": "Machine-form companion to the text/Markdown --suggest block: one entry per mechanically-derived fix. Present only when --suggest is used with JSON output. Added in report schema 1.2.0.",
+      "description": "Machine-form companion to the text/Markdown --suggest block: one entry per mechanically-derived fix. Present only when --suggest is used with JSON output. Added in report schema 1.3.0.",
       "items": {
         "type": "object",
         "required": ["rule_id", "kind", "file", "row", "field", "current", "proposed", "description"],

@@ -228,7 +228,7 @@ def render_json(
     if suggestions is not None:
         # Machine-form companion to --suggest's text/Markdown block, so a
         # dashboard can read structured current/proposed values instead of
-        # parsing prose. Schema 1.2.0.
+        # parsing prose. Schema 1.3.0.
         payload["suggestions"] = [s.to_dict() for s in suggestions]
     return json.dumps(payload, indent=2)
 

@@ -345,7 +345,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
             # report still admits what it did not report.
             coverage = coverage.with_ignored(policy.ignore)
         machine_suggestions: list[Suggestion] | None = None
-        if suggest and output_format in ("json", "sarif"):
+        if suggest and output_format == "json":
             from .suggest import suggest_for_findings
 
             # Machine-form companion to the text/Markdown --suggest block below:

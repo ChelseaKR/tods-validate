@@ -274,9 +274,9 @@ def test_cli_suggest_prints_a_block(tmp_path: Path) -> None:
     assert "09:45:00" in result.output
 
 
-def test_cli_suggest_is_silent_for_json(tmp_path: Path) -> None:
-    # JSON output must stay machine-parseable; the suggestions block is never
-    # appended to it (use the Python API for structured suggestions).
+def test_cli_suggest_json_stays_machine_parseable(tmp_path: Path) -> None:
+    # JSON output must stay machine-parseable; suggestions live in the structured
+    # top-level "suggestions" key, not as appended prose.
     src = _feed(
         tmp_path,
         "run_events.txt",
@@ -286,4 +286,27 @@ def test_cli_suggest_is_silent_for_json(tmp_path: Path) -> None:
     assert "Suggestions (" not in result.output
     import json
 
-    json.loads(result.output)  # still valid JSON
+    payload = json.loads(result.output)
+    assert "suggestions" in payload
+
+
+def test_cli_suggest_sarif_does_not_compute_unused_suggestions(tmp_path: Path, monkeypatch) -> None:
+    src = _feed(
+        tmp_path,
+        "run_events.txt",
+        _RUN_EVENTS_HEADER + "weekday,10000 ,10,sign-in,garage,08:45:00,garage,08:50:00\n",
+    )
+
+    import tods_validate.suggest as suggest_module
+
+    def fail_if_called(*_args: object) -> list[Suggestion]:
+        raise AssertionError("SARIF does not render the suggestions array")
+
+    monkeypatch.setattr(suggest_module, "suggest_for_findings", fail_if_called)
+    result = CliRunner().invoke(main, ["validate", str(src), "--format", "sarif", "--suggest"])
+    assert result.exit_code == 0, result.output
+
+    import json
+
+    payload = json.loads(result.output)
+    assert "runs" in payload
