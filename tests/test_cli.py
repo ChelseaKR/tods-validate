@@ -62,6 +62,7 @@ def test_json_format_is_stable_and_parseable() -> None:
         "suggestion",
         "caused_by",
         "fingerprint",
+        "severity_original",
     }
 
 

@@ -12,6 +12,10 @@ command-line flags in every CI job:
     [workspace]
     history-dir = ".tods-history"
 
+    [severity]
+    "TODS-W316" = "error"
+    "TODS-E205" = {level = "warning", acknowledged = true}
+
 Command-line flags take precedence over the file, which takes precedence over
 its named ``profile``. A config may also ``extends = "../base.toml"`` to inherit
 a shared house policy; the local file overrides the inherited one.
@@ -20,6 +24,14 @@ The ``[workspace]`` table configures the run-history ledger (see
 ``workspace.py``): ``history-dir`` sets where ``batch`` appends run summaries
 and where ``trend`` reads them from, so CI does not need to repeat
 ``--history`` on every invocation.
+
+The optional ``[severity]`` table remaps individual rules to a different
+severity than the spec declares (a rule ID key, mapped to a severity string,
+or an inline table with ``level`` and ``acknowledged``). Every remapped
+finding is disclosed in every report format: this is a non-negotiable honesty
+constraint, not a display option. Downgrading a rule that the spec declares
+ERROR requires ``acknowledged = true``, so silently muting a spec violation
+is impossible by accident.
 """
 
 from __future__ import annotations
@@ -27,6 +39,8 @@ from __future__ import annotations
 import tomllib
 from dataclasses import dataclass, replace
 from pathlib import Path
+
+from .findings import Severity
 
 DEFAULT_FILENAME = "tods-validate.toml"
 
@@ -40,9 +54,16 @@ _ALLOWED_KEYS = {
     "profile",
     "extends",
     "workspace",
+    # "severity" is a table (dict), not a list/string, so it is parsed by its
+    # own helper (_severity_table) rather than the generic _str_list/_opt_str
+    # machinery below. It only needs to be here so the unknown-key check does
+    # not reject it.
+    "severity",
 }
 _WORKSPACE_KEYS = {"history-dir"}
 _FAIL_ON_VALUES = {"error", "warning"}
+_SEVERITY_VALUES = {"error", "warning", "info"}
+_SEVERITY_TABLE_KEYS = {"level", "acknowledged"}
 
 
 # Named presets. A profile sets defaults that the config file and command line
@@ -73,6 +94,87 @@ class Config:
     profile: str | None = None
     history_dir: str | None = None
     source: str | None = None
+    # A `[severity]` table remapping rule_id -> new severity name ("ERROR",
+    # "WARNING", or "INFO"). Applied after rule execution (see runner.py);
+    # every remap must be disclosed in every report format (see report.py).
+    severity_remap: tuple[tuple[str, str], ...] = ()
+    # Rule IDs whose remap in severity_remap carried `acknowledged = true`.
+    # Required (and enforced at parse time) when the remap downgrades a rule
+    # the spec declares ERROR to a lower severity.
+    severity_acknowledged: frozenset[str] = frozenset()
+
+
+def _severity_table(  # noqa: C901 - validates several user-facing config shapes
+    data: dict[str, object], where: str
+) -> tuple[tuple[tuple[str, str], ...], frozenset[str]]:
+    """Parse and validate the optional ``[severity]`` remap table.
+
+    Each key is a rule ID; each value is either a severity string or an
+    inline table ``{level = "...", acknowledged = true}``. Unknown rule IDs
+    are rejected, as is downgrading an ERROR-band rule without
+    ``acknowledged = true``.
+    """
+    raw = data.get("severity")
+    if raw is None:
+        return (), frozenset()
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{where}: 'severity' must be a table, e.g. [severity].")
+
+    # Imported lazily: rules/__init__.py does not import config.py, so this
+    # is not a real cycle, but keeping it local avoids paying the rule-module
+    # import cost (and any future accidental cycle) for configs that never
+    # touch [severity].
+    from .rules import all_rules
+
+    known = {r.id: r.severity for r in all_rules()}
+    remap: list[tuple[str, str]] = []
+    acknowledged: set[str] = set()
+
+    for rule_id, value in raw.items():
+        if rule_id not in known:
+            raise ConfigError(
+                f"{where}: [severity] has unknown rule ID {rule_id!r}. "
+                "See docs/rules.md for the rule catalog."
+            )
+
+        if isinstance(value, str):
+            level_raw: object = value
+            acked = False
+        elif isinstance(value, dict):
+            extra = set(value) - _SEVERITY_TABLE_KEYS
+            if extra:
+                raise ConfigError(
+                    f"{where}: [severity.{rule_id!r}] has unknown key(s): "
+                    f"{', '.join(sorted(extra))}."
+                )
+            level_raw = value.get("level")
+            acked = bool(value.get("acknowledged", False))
+        else:
+            raise ConfigError(
+                f"{where}: [severity.{rule_id!r}] must be a severity string or a table "
+                "with a 'level' key."
+            )
+
+        if not isinstance(level_raw, str) or level_raw.lower() not in _SEVERITY_VALUES:
+            raise ConfigError(
+                f"{where}: [severity.{rule_id!r}] level must be one of "
+                f"{', '.join(sorted(_SEVERITY_VALUES))}; got {level_raw!r}."
+            )
+        level = level_raw.upper()
+
+        original = known[rule_id]
+        if original is Severity.ERROR and Severity[level] < Severity.ERROR and not acked:
+            raise ConfigError(
+                f"{where}: [severity.{rule_id!r}] downgrades {rule_id} from the spec's "
+                f"ERROR severity to {level}. Set acknowledged = true to confirm this is "
+                "intentional local policy."
+            )
+
+        remap.append((rule_id, level))
+        if acked:
+            acknowledged.add(rule_id)
+
+    return tuple(remap), frozenset(acknowledged)
 
 
 def _parse_data(data: dict[str, object], where: str) -> Config:
@@ -116,6 +218,7 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
     max_findings = raw_max if isinstance(raw_max, int) else None
 
     history_dir = _workspace_history_dir(data.get("workspace"), where)
+    severity_remap, severity_acknowledged = _severity_table(data, where)
 
     return Config(
         ignore=_str_list("ignore"),
@@ -127,6 +230,8 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
         profile=profile,
         history_dir=history_dir,
         source=where,
+        severity_remap=severity_remap,
+        severity_acknowledged=severity_acknowledged,
     )
 
 
@@ -152,6 +257,15 @@ def _workspace_history_dir(raw: object, where: str) -> str | None:
 
 def _merge(base: Config, override: Config) -> Config:
     """Layer ``override`` on top of ``base``; non-empty override values win."""
+    # dict.fromkeys-style merge, keyed by rule_id: override's remap for a
+    # given rule replaces base's entirely (including its acknowledged flag),
+    # rather than the two layers' settings for that one rule mixing.
+    severity_map = dict(base.severity_remap)
+    severity_map.update(override.severity_remap)
+    overridden_ids = {rule_id for rule_id, _ in override.severity_remap}
+    severity_acknowledged = (base.severity_acknowledged - overridden_ids) | (
+        override.severity_acknowledged
+    )
     return Config(
         ignore=tuple(dict.fromkeys(base.ignore + override.ignore)),
         fail_on=override.fail_on or base.fail_on,
@@ -164,6 +278,8 @@ def _merge(base: Config, override: Config) -> Config:
         profile=override.profile or base.profile,
         history_dir=override.history_dir or base.history_dir,
         source=override.source or base.source,
+        severity_remap=tuple(severity_map.items()),
+        severity_acknowledged=severity_acknowledged,
     )
 
 

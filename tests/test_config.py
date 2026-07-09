@@ -45,7 +45,7 @@ def test_discovered_file_is_used(tmp_path: Path) -> None:
 
 def test_unknown_key_is_an_error(tmp_path: Path) -> None:
     path = tmp_path / "tods-validate.toml"
-    path.write_text("severity = 3\n", encoding="utf-8")
+    path.write_text("nonsense-key = 3\n", encoding="utf-8")
     with pytest.raises(ConfigError, match="unknown setting"):
         load_config(path)
 
