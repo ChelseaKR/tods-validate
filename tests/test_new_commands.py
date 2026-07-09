@@ -94,9 +94,7 @@ def test_batch_json() -> None:
 
 
 def test_batch_markdown() -> None:
-    result = invoke(
-        "batch", "--format", "markdown", E201, str(FIXTURES / "invalid" / "TODS-W101")
-    )
+    result = invoke("batch", "--format", "markdown", E201, str(FIXTURES / "invalid" / "TODS-W101"))
     assert "# TODS fleet compliance report" in result.output
     assert "| source | errors | warnings | infos | status |" in result.output
     assert "| fail |" in result.output

@@ -38,8 +38,7 @@ def _vehicle_feed(tmp_path: Path, vehicle_ids: str, assigned_vehicle_id: str) ->
     src.mkdir(parents=True, exist_ok=True)
     (src / "vehicles.txt").write_text("vehicle_id\n" + vehicle_ids)
     (src / "vehicle_assignments.txt").write_text(
-        "date,service_id,block_id,vehicle_id\n"
-        f"20260106,weekday,B1,{assigned_vehicle_id}\n"
+        f"date,service_id,block_id,vehicle_id\n20260106,weekday,B1,{assigned_vehicle_id}\n"
     )
     return src
 

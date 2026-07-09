@@ -46,6 +46,7 @@ dev = [
     "jsonschema>=4.21",
     "pygls>=2",
     "pip-audit>=2.7",
+    "hypothesis>=6.100",
 ]
 # Advisory mutation testing (not part of the gate). Kept out of `dev` so the CI
 # gate install stays lean; installed only where mutation runs. See
