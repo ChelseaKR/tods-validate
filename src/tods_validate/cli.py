@@ -21,6 +21,8 @@ from .baseline import diff_findings, load_baseline_identities
 from .config import Config, ConfigError, load_config
 from .findings import Finding, Severity
 from .fix import fix_package
+from .init import SHAPES, DestinationNotEmptyError
+from .init import scaffold as scaffold_package
 from .loader import PackageNotFoundError
 from .merge import merge_feeds
 from .policy import GatingPolicy
@@ -759,6 +761,37 @@ def rules_command(output_format: str) -> None:
         needs = " (needs companion GTFS)" if r.needs_gtfs else ""
         optin = "" if r.default_enabled else f" (opt-in: --enable {r.category})"
         click.echo(f"{r.id}  {r.severity.name:7}  {r.title}{needs}{optin}")
+
+
+@main.command(name="init")
+@click.argument("dest", type=click.Path(exists=False), default=".")
+@click.option(
+    "--shape",
+    type=click.Choice(sorted(SHAPES)),
+    default="runs",
+    show_default=True,
+    help="Which TODS files to scaffold: run events only, or runs plus vehicles.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Scaffold into DEST even if it already exists and is not empty.",
+)
+def init_command(dest: str, shape: str, force: bool) -> None:
+    """Scaffold a starter TODS package at DEST that validates clean.
+
+    Writes GTFS base files, TODS files, and a tods-validate.toml plus CI
+    workflow stub, all generated from schema.py so headers can never drift
+    and sample rows copied from a feed already known to validate clean. Run
+    `tods-validate DEST` afterward to see it pass.
+    """
+    try:
+        written = scaffold_package(Path(dest), shape, force=force)
+    except (ValueError, DestinationNotEmptyError) as exc:
+        _fail(str(exc))
+    click.echo(f"tods-validate init: wrote {len(written)} file(s) to {dest}")
+    for path in written:
+        click.echo(f"  {path}")
 
 
 @main.command(name="lsp")
