@@ -19,7 +19,7 @@ python -m http.server -d web 8000
 
 Select the files in `examples/sample-feed/` to confirm a clean pass, then a feed
 with problems to confirm findings render. If Pyodide fails to load, update the
-version in the `<script src=".../pyodide/vX.Y.Z/...">` tag to the current
+version in the script tag whose `src` contains `pyodide/vX.Y.Z` to the current
 [Pyodide release](https://github.com/pyodide/pyodide/releases).
 
 ## Deploy
