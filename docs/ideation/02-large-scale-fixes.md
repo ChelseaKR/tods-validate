@@ -118,7 +118,19 @@ documented memory ceiling in `SECURITY.md` alongside the existing limits.
 
 ---
 
-## FIX-05 — Structured finding parameters end to end
+## FIX-05 — Structured finding parameters end to end (done 2026-07-03)
+
+**Status:** Done. `data` is populated on every ERROR-band rule across
+`fields.py`, `structure.py`, `semantics.py`, `references.py`, and
+(best-effort) `coverage.py`'s INFO rules; SARIF descriptors carry
+`shortDescription`/`fullDescription`/`helpUri` and each result's
+`properties` carry `data`; `render_json()` accepts an optional
+`suggestions` list and `validate --suggest -f json` emits a structured
+`suggestions` array (`Suggestion.to_dict()`); `docs/report.schema.json`
+documents the new top-level `suggestions` shape under the existing 1.2.0
+bump. LSP quick-fix consumption of `data` (mentioned in the shape-of-work
+below) is not part of this pass — `lsp.py`'s two-rule special case is
+untouched and remains a follow-up.
 
 **Pitch:** add machine-readable fields to `Finding` (offending value,
 expected/allowed values, referenced ID, context row keys) and thread them

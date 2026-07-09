@@ -52,6 +52,13 @@ class LoadProblem:
     code: str  # "encoding" | "empty" | "ragged" | "duplicate_header" | "csv_error"
     message: str
     line: int | None = None
+    # Structured context for the rules that surface this problem as a Finding,
+    # so they need not regex their own generated message. ``column`` is set for
+    # "duplicate_header"; ``expected``/``actual`` (declared vs. actual value
+    # count) are set for "ragged".
+    column: str | None = None
+    expected: int | None = None
+    actual: int | None = None
 
 
 @dataclass
@@ -152,6 +159,7 @@ def _parse_csv(name: str, data: bytes, encoding: str | None = None) -> FeedFile:
                         "may appear only once; values in the duplicate column are ignored."
                     ),
                     line=1,
+                    column=h,
                 )
             )
         seen.add(h)
@@ -173,6 +181,8 @@ def _parse_csv(name: str, data: bytes, encoding: str | None = None) -> FeedFile:
                         "(use empty values for blanks)."
                     ),
                     line=i,
+                    expected=width,
+                    actual=len(raw),
                 )
             )
         # On a duplicate header, keep the first occurrence so the duplicate

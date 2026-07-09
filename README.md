@@ -111,8 +111,8 @@ Apply the auto fixes with: tods-validate fix PATH -o OUTPUT
 A suggestion is only offered when its proposed value is one the validator would
 accept and is reachable by adding leading zeros, a zero seconds field, or
 removing date separators, so it never changes what a value means. `--suggest`
-affects text and Markdown output; the JSON report is left unchanged so it stays
-a stable machine contract, and the same suggestions are available from the
+adds a prose block to text and Markdown output, and adds a structured
+`suggestions` array to JSON output. The same suggestions are available from the
 Python API as `tods_validate.suggest_fixes`.
 
 The `auto` suggestions are the ones `tods-validate fix` applies across a whole

@@ -15,6 +15,7 @@ from tods_validate.cli import main
 from tods_validate.findings import Finding, Severity
 from tods_validate.report import (
     REPORT_SCHEMA_VERSION,
+    RULE_PAGE_BASE,
     render_markdown,
     render_sarif,
     render_text,
@@ -166,7 +167,8 @@ def test_sarif_records_coverage_and_enriched_descriptors() -> None:
     registered = next(r for r in all_rules() if r.id == "TODS-E307")
     assert descriptor["shortDescription"]["text"] == registered.title
     assert descriptor["fullDescription"]["text"] == registered.description
-    assert descriptor["helpUri"] == registered.spec_section
+    assert descriptor["helpUri"] == f"{RULE_PAGE_BASE}{registered.id}.html"
+    assert descriptor["properties"]["specSection"] == registered.spec_section
 
     result = sarif_run["results"][0]
     assert result["properties"]["value"] == "T9"

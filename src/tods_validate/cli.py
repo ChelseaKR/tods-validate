@@ -11,7 +11,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import NoReturn
+from typing import TYPE_CHECKING, NoReturn
 
 import click
 
@@ -65,6 +65,9 @@ from .workspace import (
     load_history,
     render_trend,
 )
+
+if TYPE_CHECKING:
+    from .suggest import Suggestion
 
 
 def _fail(message: str) -> NoReturn:
@@ -134,6 +137,7 @@ def _render(
     quiet: bool,
     stamp: bool,
     coverage: RunCoverage | None = None,
+    suggestions: list[Suggestion] | None = None,
 ) -> str:
     if output_format == "text":
         return render_text(
@@ -142,7 +146,7 @@ def _render(
     if output_format == "markdown":
         return render_markdown(findings, source, stamp=stamp, coverage=coverage)
     if output_format == "json":
-        return render_json(findings, source, coverage=coverage)
+        return render_json(findings, source, coverage=coverage, suggestions=suggestions)
     if output_format == "sarif":
         return render_sarif(findings, source, coverage=coverage)
     if output_format == "html":
@@ -254,7 +258,7 @@ def main() -> None:
     help=(
         "After the report, list concrete fix suggestions for the mechanically-fixable "
         "findings, each marked 'auto' (safe; tods-validate fix applies it) or 'review'. "
-        "Text and Markdown output only."
+        "Text and Markdown print a prose block; JSON adds a structured 'suggestions' array."
     ),
 )
 @click.option(
@@ -345,6 +349,14 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
             # Disclose that --ignore withheld these rules' findings, so a clean
             # report still admits what it did not report.
             coverage = coverage.with_ignored(policy.ignore)
+        machine_suggestions: list[Suggestion] | None = None
+        if suggest and output_format == "json":
+            from .suggest import suggest_for_findings
+
+            # Machine-form companion to the text/Markdown --suggest block below:
+            # a structured suggestions array in the report itself, so a
+            # dashboard need not parse prose to find current/proposed values.
+            machine_suggestions = suggest_for_findings(gate.kept, package)
         click.echo(
             _render(
                 output_format,
@@ -354,6 +366,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
                 quiet=quiet,
                 stamp=stamp,
                 coverage=coverage,
+                suggestions=machine_suggestions,
             )
         )
         if suggest and output_format in ("text", "markdown"):
