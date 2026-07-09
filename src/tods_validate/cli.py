@@ -57,6 +57,14 @@ from .stats import (
     render_stats_text,
     stats_to_dict,
 )
+from .workspace import (
+    DEFAULT_HISTORY_DIR,
+    HistoryError,
+    append_record,
+    build_record,
+    load_history,
+    render_trend,
+)
 
 
 def _fail(message: str) -> NoReturn:
@@ -497,6 +505,17 @@ def diff(
     help="Suppress a rule by ID (repeatable), e.g. --ignore TODS-W206.",
 )
 @click.option(
+    "--history",
+    "history_dir",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Append a schema-versioned summary record for each feed to "
+        "DIR/history.jsonl (counts and rule IDs only, never finding messages). "
+        "Also settable as [workspace] history-dir in tods-validate.toml."
+    ),
+)
+@click.option(
     "--config",
     "config_path",
     type=click.Path(exists=False),
@@ -513,6 +532,7 @@ def batch(
     fail_on: str | None,
     stamp: bool,
     ignore_ids: tuple[str, ...],
+    history_dir: str | None,
     config_path: str | None,
 ) -> None:
     """Validate several feeds and print a roll-up table.
@@ -524,6 +544,7 @@ def batch(
     config = _resolve_config(config_path)
     policy = GatingPolicy.from_config(fail_on=fail_on, config=config, ignore_ids=ignore_ids)
     _check_rule_ids(tuple(policy.ignore))
+    effective_history = history_dir or config.history_dir
 
     rows: list[dict[str, object]] = []
     any_failed = False
@@ -547,6 +568,11 @@ def batch(
         )
         if gate.failed:
             any_failed = True
+        if effective_history is not None:
+            record = build_record(
+                gate.kept, package.source, tool_version=__version__, spec_version=SPEC_VERSION
+            )
+            append_record(Path(effective_history), record)
 
     if output_format == "json":
         click.echo(json.dumps({"feeds": rows}, indent=2))
@@ -604,6 +630,44 @@ def stats(
         click.echo(render_comparison_markdown(feeds))
     else:
         click.echo(render_comparison_text(feeds))
+
+
+@main.command()
+@click.option(
+    "--history",
+    "history_dir",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Directory containing history.jsonl written by `batch --history`. "
+        "Without this, the [workspace] history-dir from tods-validate.toml is "
+        "used, falling back to .tods-history/."
+    ),
+)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Configuration file. Without this option, a tods-validate.toml in the "
+        "current directory is used if present."
+    ),
+)
+def trend(history_dir: str | None, config_path: str | None) -> None:
+    """Print a Markdown trend table from the local run-history ledger.
+
+    Reads the append-only ledger written by `batch --history` and renders one
+    table per feed/source, so a regression between runs (more errors, a new
+    rule firing) is visible without re-running anything.
+    """
+    config = _resolve_config(config_path)
+    effective_history = history_dir or config.history_dir or str(DEFAULT_HISTORY_DIR)
+    try:
+        records = load_history(Path(effective_history))
+    except HistoryError as exc:
+        _fail(str(exc))
+    click.echo(render_trend(records))
 
 
 @main.command()
