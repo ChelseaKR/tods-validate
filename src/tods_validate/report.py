@@ -55,6 +55,14 @@ _ROOT_CAUSE_HINTS = {
     "TODS-W206": (
         "padded values across a file usually come from a fixed-width export; trim values on export."
     ),
+    "TODS-W302": (
+        "many unchecked references usually mean the companion GTFS moved out from under "
+        "your TODS package; re-export both together so referenced files line up."
+    ),
+    "TODS-W313": (
+        "many no-op deletes usually mean your GTFS was regenerated and the supplemented "
+        "rows were already removed; regenerate the supplement against the current GTFS."
+    ),
 }
 
 # Rule metadata by ID, for enriching SARIF descriptors. Built once from the
