@@ -37,12 +37,17 @@ definition time, and mutmut's rewrite would re-execute it (see
 registered with the `@rule(...)` decorator, so the **check bodies themselves are
 not mutated**. What *is* mutated is the un-decorated engine underneath them:
 
-- the parsing and validation helpers (`parse_time`, `_is_valid_date`,
-  `_required_fields`),
+- the parsing and validation helpers (`_is_valid_date`, `_required_fields`),
 - the reference-resolution helpers (`_run_pairs`, `_uses_trip_ids`,
   `_trips_available`, `_calendar_available`, `_supplement_groups`, ...),
-- the run-event model builders (`_events`, `_events_by_run`),
 - the registry dispatch (`rule`, `_is_enabled`, `validate`).
+
+`parse_time` and the run-event model builders (`_Event`, `parse_events`,
+`events_by_run`) moved to `src/tods_validate/run_events.py` as part of FIX-03
+(cached once per validation on `ValidationContext` instead of re-derived per
+rule call — see `docs/ideation/02-large-scale-fixes.md`). That module sits
+outside `src/tods_validate/rules/`, so it is outside `only_mutate` and no
+longer part of this mutation run at all.
 
 These are where a silent bug would let an invalid feed pass or flag a valid one,
 so they are worth pinning down. The check bodies stay covered the usual way: the

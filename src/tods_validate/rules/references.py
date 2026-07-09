@@ -26,15 +26,10 @@ def _rows(context: ValidationContext, filename: str) -> list[Row]:
 
 
 def _run_pairs(context: ValidationContext) -> set[tuple[str, str]]:
-    pairs = set()
-    feed = context.package.get("run_events.txt")
-    if feed is not None:
-        for row in feed.rows:
-            service_id = row.values.get("service_id", "")
-            run_id = row.values.get("run_id", "")
-            if service_id and run_id:
-                pairs.add((service_id, run_id))
-    return pairs
+    # Thin wrapper kept so call sites read the same as before; the set is
+    # derived once per validation and cached on the context (see
+    # ValidationContext.run_pairs / .events_by_run).
+    return context.run_pairs
 
 
 def _trips_available(context: ValidationContext) -> bool:

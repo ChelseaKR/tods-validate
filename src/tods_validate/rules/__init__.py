@@ -17,7 +17,9 @@ from __future__ import annotations
 
 from collections.abc import Callable, Iterable, Iterator
 from dataclasses import dataclass, field
+from functools import cached_property
 
+from .. import run_events
 from ..findings import Finding, Severity
 from ..gtfs_companion import CompanionGTFS
 from ..loader import Package
@@ -30,6 +32,23 @@ class ValidationContext:
     # "flag" if --gtfs was passed, "package" if GTFS files were found next to
     # the TODS files, None if no companion GTFS is available.
     gtfs_source: str | None = None
+
+    # Derived views over run_events.txt, computed once per validation and
+    # cached on this instance (it is created once per validate() call and
+    # shared by every rule; see runner.run()). Parsing lives in
+    # tods_validate.run_events, not here, so it stays outside mutmut's
+    # rules/*-scoped mutated set — see that module's docstring.
+    @cached_property
+    def events(self) -> list[run_events._Event]:
+        return run_events.parse_events(self.package)
+
+    @cached_property
+    def events_by_run(self) -> dict[tuple[str, str], list[run_events._Event]]:
+        return run_events.events_by_run(self.events)
+
+    @cached_property
+    def run_pairs(self) -> set[tuple[str, str]]:
+        return set(self.events_by_run.keys())
 
 
 CheckFunction = Callable[[ValidationContext], Iterator[Finding]]

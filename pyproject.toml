@@ -111,6 +111,13 @@ fail_under = 90
 # resolve, but only the rules modules are mutated. Not part of the CI gate; see
 # docs/mutation-testing.md for the baseline and how to run it.
 source_paths = ["src/tods_validate"]
+# `only_mutate` is an allowlist, not a denylist: anything outside
+# src/tods_validate/rules/ is already excluded, which is why the shared
+# run-event parsing (src/tods_validate/run_events.py — _Event, parse_events,
+# events_by_run, parse_time) lives there rather than in a rules/ module. It is
+# exercised indirectly by nearly every semantic rule, so mutants there would
+# get killed by whichever test runs first rather than pointing at a specific
+# rule's coverage gap (see FIX-03 in docs/ideation/02-large-scale-fixes.md).
 only_mutate = ["src/tods_validate/rules/*"]
 # Drive mutants with the rule test modules: each one asserts rule behaviour
 # against the fixture feeds (a passing + failing fixture per rule). Other

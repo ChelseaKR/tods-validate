@@ -13,7 +13,6 @@ from collections.abc import Iterator
 from ..findings import Finding, Severity
 from ..schema import SPEC_URL
 from . import ValidationContext, rule
-from .fields import parse_time
 
 _BREAK_KEYWORDS = ("break", "lunch", "meal")
 # A continuous on-duty span longer than this (seconds) with no break event is
@@ -37,8 +36,7 @@ _LONG_SPAN_SECONDS = 6 * 3600
 )
 def trips_without_run_events(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
-    feed = context.package.get("run_events.txt")
-    covered = {row.values.get("trip_id", "") for row in feed.rows} if feed else set()
+    covered = {event.trip_id for event in context.events}
     covered.discard("")
     all_trips = set(context.gtfs.trip_service)
     uncovered = sorted(all_trips - covered)
@@ -106,30 +104,17 @@ def blocks_without_vehicle(context: ValidationContext) -> Iterator[Finding]:
     interpretation="advisory: 'break' detected by event_type containing break/lunch/meal",
 )
 def long_run_without_break(context: ValidationContext) -> Iterator[Finding]:
-    feed = context.package.get("run_events.txt")
-    if feed is None:
-        return
-    runs: dict[tuple[str, str], list[tuple[int | None, int | None, str, int]]] = {}
-    for row in feed.rows:
-        run = (row.values.get("service_id", ""), row.values.get("run_id", ""))
-        if not all(run):
-            continue
-        runs.setdefault(run, []).append(
-            (
-                parse_time(row.values.get("start_time", "")),
-                parse_time(row.values.get("end_time", "")),
-                row.values.get("event_type", "").lower(),
-                row.line,
-            )
-        )
-    for (service_id, run_id), events in runs.items():
-        times = [(s, e) for s, e, _t, _l in events if s is not None and e is not None]
+    for (service_id, run_id), events in context.events_by_run.items():
+        times = [(e.start, e.end) for e in events if e.start is not None and e.end is not None]
         if not times:
             continue
         span = max(e for _s, e in times) - min(s for s, _e in times)
-        has_break = any(any(k in t for k in _BREAK_KEYWORDS) for _s, _e, t, _l in events)
+        has_break = any(
+            any(k in event.row.values.get("event_type", "").lower() for k in _BREAK_KEYWORDS)
+            for event in events
+        )
         if span > _LONG_SPAN_SECONDS and not has_break:
-            first_row = min(line for _s, _e, _t, line in events)
+            first_row = min(event.row.line for event in events)
             yield Finding(
                 rule_id="TODS-I601",
                 severity=Severity.INFO,
