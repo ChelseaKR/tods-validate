@@ -114,7 +114,7 @@ those into the location prefix); put the rest in `message`.
 
 If a fix is mechanical, set `suggestion=`; it renders as a `Fix:` line and, when
 the value is one the validator would accept, can feed `tods-validate fix`. Match
-the prose style in [CLAUDE.md](../CLAUDE.md): plain and concrete, no "simply" or
+the repo's prose style: plain and concrete, no "simply" or
 "just", at most one em dash.
 
 ## The fixture and conformance contract
