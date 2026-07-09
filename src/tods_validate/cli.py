@@ -16,7 +16,7 @@ from typing import NoReturn
 import click
 
 from . import __version__
-from .anonymize import anonymize_package
+from .anonymize import AlreadyProtectedError, anonymize_package
 from .baseline import diff_findings, load_baseline_identities
 from .config import Config, ConfigError, load_config
 from .doctor import (
@@ -610,19 +610,51 @@ def stats(
     help="Fixed salt for stable pseudonyms across runs (default: a random, single-use salt).",
 )
 @click.option("--encoding", default=None)
-def anonymize(path: str, output_path: str, salt: str | None, encoding: str | None) -> None:
+@click.option(
+    "--also",
+    "also_fields",
+    multiple=True,
+    metavar="FILE:FIELD",
+    help=("Pseudonymize an extra column, e.g. --also run_events.txt:job_type. Repeatable."),
+)
+def anonymize(
+    path: str,
+    output_path: str,
+    salt: str | None,
+    encoding: str | None,
+    also_fields: tuple[str, ...],
+) -> None:
     """Write a copy of the package with person-identifying fields pseudonymized.
 
-    employee_id, license_plate, and vehicle_id are replaced with stable
-    pseudonyms. This is pseudonymization, not guaranteed anonymity.
+    employee_id, license_plate, vehicle_label, and vehicle_id are replaced
+    with stable pseudonyms. Use --also FILE:FIELD to pseudonymize additional
+    extension columns (fails if FIELD is already protected by default).
+    This is pseudonymization, not guaranteed anonymity: after each run, a
+    "Carried through unprotected" table lists every remaining column that
+    still holds non-enum data, numeric or not, so the residual risk is
+    disclosed rather than silently passed through.
     """
+    also: list[tuple[str, str]] = []
+    for entry in also_fields:
+        if entry.count(":") != 1 or not all(entry.split(":")):
+            _fail(f"invalid --also value {entry!r}; expected FILE:FIELD, e.g. vehicles.txt:notes.")
+        fname, field_name = entry.split(":")
+        also.append((fname, field_name))
     try:
-        result = anonymize_package(path, Path(output_path), salt=salt, encoding=encoding)
+        result = anonymize_package(path, Path(output_path), salt=salt, encoding=encoding, also=also)
     except PackageNotFoundError as exc:
+        _fail(str(exc))
+    except AlreadyProtectedError as exc:
         _fail(str(exc))
     for target, count in sorted(result.replacements.items()):
         click.echo(f"{target}: {count} value(s) pseudonymized")
     click.echo(f"Wrote {len(result.written)} file(s) to {output_path}.")
+    click.echo("Carried through unprotected (not pseudonymized, still free text):")
+    if result.carried_through:
+        for fname, col in result.carried_through:
+            click.echo(f"  {fname}:{col}")
+    else:
+        click.echo("  (none)")
 
 
 @main.command()
