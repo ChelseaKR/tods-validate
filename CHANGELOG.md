@@ -7,6 +7,12 @@ new checks may be added in minor releases.
 
 Added:
 
+- An architecture decision record log under `docs/adr/`: 0000 records the
+  practice, 0001–0005 backfill the decisions already in force (the Python 3.11
+  floor, the i18n N/A declaration, the nested `editor/vscode` project,
+  rules-as-registry, the uv/lockfile adoption). A committed `.python-version`
+  pins local development to 3.12, the same interpreter CI runs its gates on.
+  Closes CQ-01, CQ-26, CQ-44/45, and DOC-04/05 in `docs/CONFORMANCE-GAPS.md`.
 - A permanent per-rule web page for every rule ID, generated into `web/rules/`
   by `scripts/generate_rules_doc.py` alongside `docs/rules.md`, plus a
   `web/rules/index.html` catalog grouped by band. Deployed with the rest of
