@@ -36,12 +36,16 @@ from .policy import GatingPolicy
 from .report import (
     RENDERERS,
     render_batch_markdown,
+    render_github,
+    render_html,
+    render_json,
     render_markdown,
+    render_sarif,
     render_text,
     summarize,
 )
-from .rules import CATEGORIES, all_rules
-from .runner import run
+from .rules import CATEGORIES, RunCoverage, all_rules
+from .runner import run, run_with_coverage
 from .schema import SPEC_VERSION, SUPPORTED_SPEC_VERSIONS
 from .stats import (
     collect_cross_stats,
@@ -121,12 +125,22 @@ def _render(
     max_findings: int | None,
     quiet: bool,
     stamp: bool,
+    coverage: RunCoverage | None = None,
 ) -> str:
     if output_format == "text":
-        return render_text(findings, source, max_findings=max_findings, quiet=quiet)
+        return render_text(
+            findings, source, max_findings=max_findings, quiet=quiet, coverage=coverage
+        )
     if output_format == "markdown":
-        return render_markdown(findings, source, stamp=stamp)
-    return RENDERERS[output_format](findings, source)
+        return render_markdown(findings, source, stamp=stamp, coverage=coverage)
+    if output_format == "json":
+        return render_json(findings, source, coverage=coverage)
+    if output_format == "sarif":
+        return render_sarif(findings, source, coverage=coverage)
+    if output_format == "html":
+        return render_html(findings, source, coverage=coverage)
+    # github annotations carry no manifest; coverage is disclosed by the other formats.
+    return render_github(findings, source)
 
 
 class _DefaultToValidate(click.Group):
@@ -310,10 +324,14 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
     _check_rule_ids(tuple(policy.ignore))
 
     def _validate_once() -> list[Finding]:
-        package, found = run(
+        package, found, coverage = run_with_coverage(
             path, gtfs_path, enabled=frozenset(enable), encoding=effective_encoding
         )
         gate = policy.apply(found)
+        if gate.suppressed_ignored:
+            # Disclose that --ignore withheld these rules' findings, so a clean
+            # report still admits what it did not report.
+            coverage = coverage.with_ignored(policy.ignore)
         click.echo(
             _render(
                 output_format,
@@ -322,6 +340,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
                 max_findings=effective_max,
                 quiet=quiet,
                 stamp=stamp,
+                coverage=coverage,
             )
         )
         if suggest and output_format in ("text", "markdown"):

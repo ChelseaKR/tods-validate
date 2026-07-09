@@ -54,13 +54,21 @@ Added:
 - A contributor guide for authoring rules (docs/authoring-rules.md): how to pick
   a severity and allocate an ID, the scheduler-grade message style, and the
   fixture/conformance contract CI enforces.
-- A curated read namespace, `tods_validate.read`, re-exporting `load_package`,
-  `Package`, `FeedFile`, `Row`, `PackageNotFoundError`, `CompanionGTFS`,
-  `build_companion`, and `merge_supplement`, plus a new pandas-free `to_rows`
-  helper (and `to_dataframe`, gated on the new `dataframe` extra) for callers
-  who want parsed feed data rather than validation findings. Kept as its own
-  submodule, not flattened into the top-level namespace, so the stability
-  promise stays bounded to what is re-exported. See docs/read-api.md.
+- Reports now state their own scope. Every run records a coverage manifest —
+  which rules ran, and which were skipped and why (no companion GTFS feed,
+  opt-in rule not enabled, or suppressed by `--ignore`) — so "no problems
+  found" is qualified by what was actually checked. The JSON report carries it
+  as an additive `coverage` block (report schema 1.2.0, documented in
+  docs/report.schema.json), SARIF records it under `invocations`, and the
+  text/Markdown/HTML reports add a one-line "Checks skipped: …" disclosure
+  (plus a coverage footer on stamped Markdown). Library callers can get the
+  manifest via the new `tods_validate.runner.run_with_coverage`; `run` is
+  unchanged.
+- Reference findings (TODS-E301/E303/E307/E308/E309/E310/E311/E312/E314) now
+  carry structured `data` parameters — the broken value and what it references
+  — and the SARIF output is enriched from the rule registry: each descriptor
+  gains the rule's title, description, and spec link (`helpUri`), and each
+  result carries its finding's structured data in `properties`.
 
 Changed:
 
@@ -82,6 +90,10 @@ Fixed:
   hand-edited constant that had drifted to `0.4.0`.
 - The README and `merge`-recipe GitHub Action snippets now reference the current
   `@v0.6.0` instead of the stale `@v0.4.0` they were pinned at.
+- TODS-W302 now also discloses when `vehicle_assignments.txt` references could
+  not be checked: block_id resolution needs the companion feed's `trips.txt`
+  and service_id resolution needs `calendar.txt`/`calendar_dates.txt`; when a
+  used column's target file is missing, those checks used to no-op silently.
 
 Security / process (2026-07-05 standards-conformance remediation):
 
