@@ -42,7 +42,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["rule_id", "severity", "file", "row", "field", "location", "message", "suggestion"],
+        "required": ["rule_id", "severity", "file", "row", "field", "location", "message", "suggestion", "caused_by"],
         "properties": {
           "rule_id": { "type": "string", "pattern": "^TODS-[EWI][0-9]{3}$" },
           "severity": { "enum": ["ERROR", "WARNING", "INFO"] },
@@ -59,10 +59,9 @@
           },
           "message": { "type": "string" },
           "suggestion": { "type": ["string", "null"] },
-          "data": {
-            "type": ["object", "null"],
-            "description": "Structured, machine-readable context (offending value, referenced ID, etc.) so consumers need not parse the message. Added in report schema 1.2.0.",
-            "additionalProperties": { "type": "string" }
+          "caused_by": {
+            "type": ["string", "null"],
+            "description": "Location identifier (see 'location') of the root finding that structurally caused this one, e.g. a TODS-E104 ragged row that left this field blank. Null when this finding is not a known downstream echo of another."
           }
         },
         "additionalProperties": false

@@ -57,9 +57,9 @@ def test_json_format_is_stable_and_parseable() -> None:
         "row",
         "field",
         "location",
-        "data",
         "message",
         "suggestion",
+        "caused_by",
     }
 
 

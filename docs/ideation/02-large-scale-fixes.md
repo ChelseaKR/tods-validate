@@ -211,6 +211,12 @@ identity.
 
 ## FIX-08 — Finding causality and cascade suppression
 
+**Status:** Done. `Finding.caused_by` (`findings.py`), a `runner._link_causality`
+post-processing pass tagging TODS-E201 findings that share a row with a
+TODS-E104, and a `render_text` collapse into "and N follow-on finding(s)".
+`render_json`/`render_markdown` keep every finding and surface the link.
+`docs/report.schema.json` documents the new field. See `tests/test_causality.py`.
+
 **Pitch:** link derivative findings to their root cause and stop reporting
 the echo by default.
 

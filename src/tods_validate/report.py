@@ -103,7 +103,7 @@ def _max_findings(findings: list[Finding], limit: int | None) -> tuple[list[Find
     return findings[:limit], len(findings) - limit
 
 
-def render_text(
+def render_text(  # noqa: C901 - causality grouping adds display branches
     findings: list[Finding],
     source: str,
     *,
@@ -122,18 +122,31 @@ def render_text(
             group = [f for f in shown if f.severity == severity]
             if not group:
                 continue
-            plural = "s" if len(group) != 1 else ""
-            lines.append(
-                f"{len([f for f in findings if f.severity == severity])} "
-                f"{severity.name.lower()}{plural}:"
-            )
+            # Findings with caused_by are downstream echoes of a root finding
+            # on the same row (e.g. TODS-E201 fired only because a TODS-E104
+            # ragged row left the field blank). Nothing is dropped -- every
+            # rule still fired -- but here, for a human reading the terminal,
+            # each echo collapses into a single "and N follow-on finding(s)"
+            # line right after its root instead of repeating the same row.
+            full_group = [f for f in findings if f.severity == severity]
+            displayed_count = len([f for f in full_group if f.caused_by is None])
+            plural = "s" if displayed_count != 1 else ""
+            lines.append(f"{displayed_count} {severity.name.lower()}{plural}:")
+            follow_on_counts = Counter(f.caused_by for f in group if f.caused_by is not None)
             for f in group:
+                if f.caused_by is not None:
+                    continue  # rendered as its root's follow-on line, below
                 location = f.location()
                 prefix = f"  {severity.name} {f.rule_id}"
                 lines.append(f"{prefix} [{location}]" if location else prefix)
                 lines.append(f"    {f.message}")
                 if f.suggestion:
                     lines.append(f"    Fix: {f.suggestion}")
+                pointer = f.pointer()
+                n_follow_on = follow_on_counts.get(pointer, 0) if pointer else 0
+                if n_follow_on:
+                    fplural = "s" if n_follow_on != 1 else ""
+                    lines.append(f"    and {n_follow_on} follow-on finding{fplural}")
             lines.append("")
         if hidden:
             lines.append(f"... and {hidden} more finding(s) not shown (--max-findings).")
@@ -232,6 +245,11 @@ def render_markdown(findings: list[Finding], source: str, *, stamp: bool = False
                 lines.append(f"- **{f.rule_id}**{where}: {f.message}")
                 if f.suggestion:
                     lines.append(f"  - Fix: {f.suggestion}")
+                if f.caused_by:
+                    # Every finding is kept in Markdown (unlike the terminal
+                    # renderer, which collapses this line into its root's
+                    # follow-on count); the link just says why it's downstream.
+                    lines.append(f"  - Caused by: {f.caused_by}")
     if stamp:
         lines.append("")
         lines.append(_stamp_footer())
