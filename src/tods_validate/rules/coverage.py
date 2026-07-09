@@ -51,6 +51,7 @@ def trips_without_run_events(context: ValidationContext) -> Iterator[Finding]:
                 f"{len(uncovered)} of {len(all_trips)} GTFS trip(s) are not referenced by "
                 f"any run event (e.g. {sample}{more}). No crew work is described for them."
             ),
+            data={"value": sample, "field": "trip_id"},
         )
 
 
@@ -86,6 +87,7 @@ def blocks_without_vehicle(context: ValidationContext) -> Iterator[Finding]:
                 f"{len(unassigned)} of {len(all_blocks)} block(s) have no vehicle "
                 f"assignment (e.g. {sample}{more})."
             ),
+            data={"value": sample, "field": "block_id"},
         )
 
 
@@ -125,4 +127,5 @@ def long_run_without_break(context: ValidationContext) -> Iterator[Finding]:
                     f"{span // 3600}h{(span % 3600) // 60:02d}m with no break, lunch, or "
                     "meal event. Check whether a break belongs in the run."
                 ),
+                data={"value": f"{service_id},{run_id}"},
             )
