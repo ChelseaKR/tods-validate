@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tods-validate rule catalog</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font: 16px/1.5 system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      h1 { margin-bottom: 0.25rem; font-size: 1.5rem; }
+      h2 { margin-top: 2rem; font-size: 1.1rem; }
+      .lede, .meta, .id { color: #666; }
+      .id { font-family: ui-monospace, monospace; margin: 0; }
+      .meta { margin: 0.5rem 0 1rem; }
+      .badge {
+        display: inline-block;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.1rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid #888;
+        margin-right: 0.4rem;
+      }
+      nav a, .rule-list a { text-decoration: none; }
+      nav a:hover, .rule-list a:hover { text-decoration: underline; }
+      a { color: inherit; }
+      code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
+      ul.rule-list { list-style: none; padding-left: 0; }
+      ul.rule-list li { padding: 0.25rem 0; }
+    </style>
+  </head>
+  <body>
+    <h1>tods-validate rule catalog</h1>
+    <p class="lede">
+      Every rule tods-validate checks against TODS v2.1.0, one
+      permanent page per rule ID. These URLs are what SARIF <code>helpUri</code>,
+      editor hovers, and CI annotations link back to; rule IDs are never
+      renumbered once released, so a link made today keeps working.
+    </p>
+    <h2>Package and file structure (TODS-x1xx)</h2>
+    <ul class="rule-list">
+      <li><a href="TODS-W101.html"><code>TODS-W101</code></a> &mdash; No TODS files in package <span class="badge">WARNING</span></li>
+      <li><a href="TODS-I102.html"><code>TODS-I102</code></a> &mdash; File is not part of TODS or GTFS <span class="badge">INFO</span></li>
+      <li><a href="TODS-E103.html"><code>TODS-E103</code></a> &mdash; File could not be read <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E104.html"><code>TODS-E104</code></a> &mdash; Row has the wrong number of values <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E105.html"><code>TODS-E105</code></a> &mdash; Duplicate column name <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E106.html"><code>TODS-E106</code></a> &mdash; Required column is missing <span class="badge">ERROR</span></li>
+      <li><a href="TODS-W107.html"><code>TODS-W107</code></a> &mdash; Column is not defined by TODS <span class="badge">WARNING</span></li>
+      <li><a href="TODS-I108.html"><code>TODS-I108</code></a> &mdash; Supplement column is not defined by GTFS or TODS <span class="badge">INFO</span></li>
+    </ul>
+
+    <h2>Field values (TODS-x2xx)</h2>
+    <ul class="rule-list">
+      <li><a href="TODS-E201.html"><code>TODS-E201</code></a> &mdash; Required value is missing <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E202.html"><code>TODS-E202</code></a> &mdash; Value is not an allowed option <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E203.html"><code>TODS-E203</code></a> &mdash; Value has the wrong format <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E204.html"><code>TODS-E204</code></a> &mdash; Duplicate primary key <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E205.html"><code>TODS-E205</code></a> &mdash; vehicle_assignments needs service_id to be unambiguous <span class="badge">ERROR</span></li>
+      <li><a href="TODS-W206.html"><code>TODS-W206</code></a> &mdash; Value has leading or trailing spaces <span class="badge">WARNING</span></li>
+    </ul>
+
+    <h2>References between files (TODS-x3xx)</h2>
+    <ul class="rule-list">
+      <li><a href="TODS-E301.html"><code>TODS-E301</code></a> &mdash; Employee assignment points to a run that does not exist <span class="badge">ERROR</span></li>
+      <li><a href="TODS-W302.html"><code>TODS-W302</code></a> &mdash; Referenced file is missing, references not checked <span class="badge">WARNING</span></li>
+      <li><a href="TODS-E303.html"><code>TODS-E303</code></a> &mdash; Vehicle assignment points to a vehicle that does not exist <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E304.html"><code>TODS-E304</code></a> &mdash; Supplement both deletes and redefines the same row <span class="badge">ERROR</span></li>
+      <li><a href="TODS-W305.html"><code>TODS-W305</code></a> &mdash; Supplement updates the same row more than once <span class="badge">WARNING</span></li>
+      <li><a href="TODS-W306.html"><code>TODS-W306</code></a> &mdash; Deleted supplement row carries values that will be ignored <span class="badge">WARNING</span></li>
+      <li><a href="TODS-E307.html"><code>TODS-E307</code></a> &mdash; Run event points to a trip that does not exist <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E308.html"><code>TODS-E308</code></a> &mdash; Run uses a service that does not exist <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E309.html"><code>TODS-E309</code></a> &mdash; Run event starts or ends at a stop that does not exist <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E310.html"><code>TODS-E310</code></a> &mdash; Run event block disagrees with the trip&#x27;s block <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E311.html"><code>TODS-E311</code></a> &mdash; Vehicle assignment points to a block that does not exist <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E312.html"><code>TODS-E312</code></a> &mdash; Vehicle assignment uses a service that does not exist <span class="badge">ERROR</span></li>
+      <li><a href="TODS-W313.html"><code>TODS-W313</code></a> &mdash; Supplement deletes a row that is not in GTFS <span class="badge">WARNING</span></li>
+      <li><a href="TODS-E314.html"><code>TODS-E314</code></a> &mdash; Supplement row references a GTFS entity that does not exist <span class="badge">ERROR</span></li>
+      <li><a href="TODS-W315.html"><code>TODS-W315</code></a> &mdash; Run event location does not match the trip&#x27;s first or last stop <span class="badge">WARNING</span></li>
+      <li><a href="TODS-W316.html"><code>TODS-W316</code></a> &mdash; Run event time does not match the trip&#x27;s scheduled time <span class="badge">WARNING</span></li>
+    </ul>
+
+    <h2>Semantic checks (TODS-x4xx)</h2>
+    <ul class="rule-list">
+      <li><a href="TODS-E401.html"><code>TODS-E401</code></a> &mdash; Event ends before it starts <span class="badge">ERROR</span></li>
+      <li><a href="TODS-E402.html"><code>TODS-E402</code></a> &mdash; Two trip events in one run overlap in time <span class="badge">ERROR</span></li>
+      <li><a href="TODS-W403.html"><code>TODS-W403</code></a> &mdash; Event order disagrees with event times <span class="badge">WARNING</span></li>
+      <li><a href="TODS-W404.html"><code>TODS-W404</code></a> &mdash; Employee is assigned to overlapping runs on the same date <span class="badge">WARNING</span></li>
+      <li><a href="TODS-E405.html"><code>TODS-E405</code></a> &mdash; Run operates on dates its trip does not <span class="badge">ERROR</span></li>
+      <li><a href="TODS-W406.html"><code>TODS-W406</code></a> &mdash; Employee assignment date is outside the run&#x27;s service days <span class="badge">WARNING</span></li>
+      <li><a href="TODS-W407.html"><code>TODS-W407</code></a> &mdash; Vehicle assignment date is outside the service days <span class="badge">WARNING</span></li>
+      <li><a href="TODS-W408.html"><code>TODS-W408</code></a> &mdash; Identical employee assignment appears twice <span class="badge">WARNING</span></li>
+      <li><a href="TODS-W409.html"><code>TODS-W409</code></a> &mdash; Consecutive run events do not connect in space <span class="badge">WARNING</span></li>
+    </ul>
+
+    <h2>Coverage (opt-in, informational) (TODS-x5xx)</h2>
+    <ul class="rule-list">
+      <li><a href="TODS-I501.html"><code>TODS-I501</code></a> &mdash; GTFS trips have no run event <span class="badge">INFO</span></li>
+      <li><a href="TODS-I502.html"><code>TODS-I502</code></a> &mdash; Blocks have no vehicle assignment <span class="badge">INFO</span></li>
+    </ul>
+
+    <h2>Advisory (opt-in) (TODS-x6xx)</h2>
+    <ul class="rule-list">
+      <li><a href="TODS-I601.html"><code>TODS-I601</code></a> &mdash; Run has a long span with no break event <span class="badge">INFO</span></li>
+    </ul>
+  </body>
+</html>

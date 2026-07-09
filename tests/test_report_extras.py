@@ -66,6 +66,25 @@ def test_sarif_lists_rules_and_results() -> None:
     assert loc["artifactLocation"]["uri"] == "run_events.txt"
 
 
+def test_sarif_help_uri_is_a_stable_rule_page() -> None:
+    """helpUri points at the permanent per-rule page (EXP-08), not the spec
+
+    citation directly, so links keep resolving even if the spec text moves.
+    The spec citation itself is not lost -- it survives as a property.
+    """
+    import json
+
+    from tods_validate.report import RULE_PAGE_BASE
+    from tods_validate.rules import all_rules
+
+    sarif = json.loads(render_sarif(_findings("TODS-E307", 1), "feed/"))
+    descriptor = sarif["runs"][0]["tool"]["driver"]["rules"][0]
+    rule = next(r for r in all_rules() if r.id == "TODS-E307")
+    assert descriptor["helpUri"] == f"{RULE_PAGE_BASE}{rule.id}.html"
+    assert descriptor["helpUri"].endswith(f"{rule.id}.html")
+    assert descriptor["properties"]["specSection"] == rule.spec_section
+
+
 def test_html_escapes_and_is_standalone() -> None:
     nasty = [Finding(rule_id="TODS-E999", severity=Severity.ERROR, message="<script>x</script>")]
     out = render_html(nasty, "feed/")
