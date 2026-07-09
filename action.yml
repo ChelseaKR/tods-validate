@@ -49,7 +49,10 @@ runs:
       shell: bash
       env:
         ACTION_PATH: ${{ github.action_path }}
-      run: python3 -m pip install --quiet "$ACTION_PATH"
+      run: |
+        python3 -m pip install --quiet --require-hashes --only-binary=:all: \
+          -r "$ACTION_PATH/requirements-action.lock"
+        python3 -m pip install --quiet --no-deps "$ACTION_PATH"
 
     - name: Validate feed
       id: validate
