@@ -36,7 +36,7 @@ SCHEMA = json.loads(
 
 
 def test_report_schema_version_bumped_for_coverage() -> None:
-    assert REPORT_SCHEMA_VERSION == "1.2.0"
+    assert REPORT_SCHEMA_VERSION == "1.3.0"
 
 
 def test_every_registered_rule_gets_an_outcome() -> None:

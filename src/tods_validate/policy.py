@@ -13,7 +13,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 from dataclasses import dataclass
 
-from .baseline import new_findings
+from .baseline import Identity, new_findings
 from .config import Config
 from .findings import Finding, Severity
 from .report import summarize
@@ -62,7 +62,7 @@ class GatingPolicy:
 
     fail_on: str
     ignore: frozenset[str]
-    baseline_identities: set[tuple[str, str, str]] | None = None
+    baseline_identities: set[Identity] | None = None
 
     @classmethod
     def from_config(
@@ -71,7 +71,7 @@ class GatingPolicy:
         fail_on: str | None,
         config: Config,
         ignore_ids: Iterable[str] = (),
-        baseline_identities: set[tuple[str, str, str]] | None = None,
+        baseline_identities: set[Identity] | None = None,
     ) -> GatingPolicy:
         """Resolve CLI flags against a loaded :class:`~tods_validate.config.Config`.
 

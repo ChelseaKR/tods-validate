@@ -42,7 +42,7 @@
       "type": "array",
       "items": {
         "type": "object",
-        "required": ["rule_id", "severity", "file", "row", "field", "location", "data", "message", "suggestion", "caused_by"],
+        "required": ["rule_id", "severity", "file", "row", "field", "location", "data", "message", "suggestion", "caused_by", "fingerprint"],
         "properties": {
           "rule_id": { "type": "string", "pattern": "^TODS-[EWI][0-9]{3}$" },
           "severity": { "enum": ["ERROR", "WARNING", "INFO"] },
@@ -59,7 +59,7 @@
           },
           "data": {
             "type": ["object", "null"],
-            "description": "Machine-readable context for this finding, such as the offending value or referenced ID.",
+            "description": "Structured machine context (offending value, referenced ID, etc.). Additive; null for rules not yet migrated to emit it.",
             "additionalProperties": { "type": "string" }
           },
           "message": { "type": "string" },
@@ -67,6 +67,10 @@
           "caused_by": {
             "type": ["string", "null"],
             "description": "Location identifier (see 'location') of the root finding that structurally caused this one, e.g. a TODS-E104 ragged row that left this field blank. Null when this finding is not a known downstream echo of another."
+          },
+          "fingerprint": {
+            "type": "string",
+            "description": "SHA-256 hex content fingerprint used as the --baseline identity (rule_id, file, field, data); excludes row and message so inserted rows don't churn a baseline."
           }
         },
         "additionalProperties": false
