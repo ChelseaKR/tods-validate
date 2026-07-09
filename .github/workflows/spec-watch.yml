@@ -1,0 +1,60 @@
+name: Spec watch (advisory)
+
+# Advisory only. This never runs on pull_request or push, so it cannot block a
+# merge. It runs on demand and once a week to catch schema.py's hand
+# transcription silently drifting from the upstream TODS spec. See
+# docs/spec-watch.md.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays at 07:00 UTC (mutation.yml runs the same day at 06:00; staggered
+    # so the two advisory jobs don't contend for runners).
+    - cron: "0 7 * * 1"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  spec-watch:
+    runs-on: ubuntu-latest
+    # Belt and suspenders: even a non-zero exit must not fail the workflow.
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+      - run: python -m pip install -e ".[dev]"
+      - name: Diff the upstream spec against schema.py
+        id: diff
+        run: |
+          python scripts/spec_watch.py --format markdown > drift.md || true
+          if [ -s drift.md ] && grep -q "Spec drift detected" drift.md; then
+            echo "drift=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "drift=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Open or update the drift issue
+        if: steps.diff.outputs.drift == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "Spec drift detected"
+        run: |
+          existing="$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file drift.md
+          else
+            gh issue create --title "$TITLE" --body-file drift.md --label "spec-watch" || \
+              gh issue create --title "$TITLE" --body-file drift.md
+          fi
+      - name: Upload the raw diff
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: spec-watch-diff
+          path: drift.md
+          if-no-files-found: ignore
