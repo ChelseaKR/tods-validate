@@ -11,14 +11,6 @@ Effort tiers: **S** ≤ a day · **M** a few days · **L** one to two weeks ·
 
 ## FIX-01 — One supplement-evaluation engine, proven equivalent
 
-**Status:** Done. `src/tods_validate/supplement.py` now exposes
-`apply_supplement()` as the single engine; `gtfs_companion.merge_supplement()`
-and `merge._merge_file()` both delegate to it and populate their existing
-return shapes (dict-of-rows, `MergeStats`) from its `SupplementResult`.
-Differential property test in `tests/test_supplement_equivalence.py` asserts
-the validation view and the materialized merge agree on surviving keys and
-values (`max_examples=750` committed; CI-scale ≥10k left as a follow-up knob).
-
 **Pitch:** collapse the duplicated supplement logic in
 `gtfs_companion.merge_supplement()` and `merge._merge_file()` into one shared
 module, with a differential test that the validation view and the
@@ -179,6 +171,16 @@ precedence table once.
 tests for every subcommand × policy combination before refactoring.
 **Excellent looks like:** a parametrized test proving all four surfaces give
 identical verdicts for identical inputs and policy.
+
+✅ Implemented 2026-07-03 (branch: `roadmap/fix-06-one-gatingpolicy-for-validate-dif`)
+— `src/tods_validate/policy.py` adds `GatingPolicy`/`GateResult`;
+`GatingPolicy.from_config` centralizes the `--fail-on`/config/profile
+precedence. `validate`, `diff`, `batch`, and
+`testing.assert_feed_valid` all gate through `policy.apply()`; `diff` and
+`batch` gained `--config`/`--ignore` (and `validate` keeps `--baseline`).
+`tests/test_policy.py` parametrizes all four surfaces over the same
+findings × policy inputs and asserts identical verdicts, plus golden
+exit-code assertions per subcommand.
 
 ---
 

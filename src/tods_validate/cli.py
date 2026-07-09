@@ -17,12 +17,13 @@ import click
 
 from . import __version__
 from .anonymize import anonymize_package
-from .baseline import diff_findings, load_baseline_identities, new_findings
+from .baseline import diff_findings, load_baseline_identities
 from .config import Config, ConfigError, load_config
 from .findings import Finding, Severity
 from .fix import fix_package
 from .loader import PackageNotFoundError
 from .merge import merge_feeds
+from .policy import GatingPolicy
 from .report import (
     RENDERERS,
     render_batch_markdown,
@@ -277,26 +278,37 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
 
         config = _merge(_parse_data(PROFILES[profile], f"profile {profile!r}"), config)
 
-    ignore = tuple(ignore_ids) + config.ignore
     enable = tuple(enable_tokens) + config.enable
-    _check_rule_ids(ignore)
     _check_enable(enable)
-    effective_fail_on = fail_on or config.fail_on or "error"
     effective_max = max_findings if max_findings is not None else config.max_findings
     effective_encoding = encoding or config.encoding
     effective_spec = spec_version or config.spec_version or SPEC_VERSION
     _check_spec_version(effective_spec)
 
+    baseline_identities = None
+    if baseline_path is not None:
+        try:
+            baseline_identities = load_baseline_identities(baseline_path)
+        except (OSError, json.JSONDecodeError) as exc:
+            _fail(f"baseline {baseline_path} could not be read: {exc}")
+
+    policy = GatingPolicy.from_config(
+        fail_on=fail_on,
+        config=config,
+        ignore_ids=ignore_ids,
+        baseline_identities=baseline_identities,
+    )
+    _check_rule_ids(tuple(policy.ignore))
+
     def _validate_once() -> list[Finding]:
         package, found = run(
             path, gtfs_path, enabled=frozenset(enable), encoding=effective_encoding
         )
-        if ignore:
-            found = [f for f in found if f.rule_id not in ignore]
+        gate = policy.apply(found)
         click.echo(
             _render(
                 output_format,
-                found,
+                gate.kept,
                 package.source,
                 max_findings=effective_max,
                 quiet=quiet,
@@ -307,8 +319,8 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
             from .suggest import render_suggestions, suggest_for_findings
 
             click.echo("")
-            click.echo(render_suggestions(suggest_for_findings(found, package), output_format))
-        return found
+            click.echo(render_suggestions(suggest_for_findings(gate.kept, package), output_format))
+        return gate.kept
 
     if watch:
         from .watch import watch as watch_feed
@@ -333,20 +345,11 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
         _fail(str(exc))
     _write_github_outputs(findings)
 
-    # The exit code considers only findings new since the baseline, if given.
-    gating = findings
-    if baseline_path is not None:
-        try:
-            baseline = load_baseline_identities(baseline_path)
-        except (OSError, json.JSONDecodeError) as exc:
-            _fail(f"baseline {baseline_path} could not be read: {exc}")
-        gating = new_findings(findings, baseline)
-
-    counts = summarize(gating)
-    failed = counts[Severity.ERROR] > 0 or (
-        effective_fail_on == "warning" and counts[Severity.WARNING] > 0
-    )
-    sys.exit(1 if failed else 0)
+    # The exit code considers only findings new since the baseline, if given
+    # (policy.apply already filtered `findings` for --ignore, so re-running it
+    # here just applies the baseline narrowing on top of the same kept list).
+    gate = policy.apply(findings)
+    sys.exit(1 if gate.failed else 0)
 
 
 @main.command()
@@ -356,23 +359,53 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
 @click.option(
     "--fail-on",
     type=click.Choice(["error", "warning"]),
-    default="error",
-    show_default=True,
-    help="Exit non-zero if newly introduced findings reach this severity.",
+    default=None,
+    help="Exit non-zero if newly introduced findings reach this severity.  [default: error]",
 )
-def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
+@click.option(
+    "--ignore",
+    "ignore_ids",
+    multiple=True,
+    metavar="RULE_ID",
+    help="Suppress a rule by ID (repeatable), e.g. --ignore TODS-W206.",
+)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Configuration file. Without this option, a tods-validate.toml in the "
+        "current directory is used if present."
+    ),
+)
+def diff(
+    old: str,
+    new: str,
+    gtfs_path: str | None,
+    fail_on: str | None,
+    ignore_ids: tuple[str, ...],
+    config_path: str | None,
+) -> None:
     """Compare validation of two feeds: OLD then NEW.
 
     Reports which findings were fixed, newly introduced, or still present, so a
-    change to a feed can be reviewed for regressions.
+    change to a feed can be reviewed for regressions. Honors the same
+    --config/--ignore/--fail-on policy as validate.
     """
+    config = _resolve_config(config_path)
+    policy = GatingPolicy.from_config(fail_on=fail_on, config=config, ignore_ids=ignore_ids)
+    _check_rule_ids(tuple(policy.ignore))
+
     try:
         _, old_findings = run(old, gtfs_path)
         _, new_findings_list = run(new, gtfs_path)
     except PackageNotFoundError as exc:
         _fail(str(exc))
 
-    result = diff_findings(old_findings, new_findings_list)
+    old_kept = policy.apply(old_findings).kept
+    new_kept = policy.apply(new_findings_list).kept
+    result = diff_findings(old_kept, new_kept)
     click.echo(f"tods-validate diff: {old} -> {new}")
     click.echo(
         f"  fixed: {len(result.fixed)}, introduced: {len(result.introduced)}, "
@@ -388,11 +421,8 @@ def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
     for rule_id, pointer, message in result.fixed:
         click.echo(f"  - {rule_id} [{pointer}] {message}")
 
-    introduced_counts = summarize(result.introduced)
-    failed = introduced_counts[Severity.ERROR] > 0 or (
-        fail_on == "warning" and introduced_counts[Severity.WARNING] > 0
-    )
-    sys.exit(1 if failed else 0)
+    gate = policy.apply(result.introduced)
+    sys.exit(1 if gate.failed else 0)
 
 
 @main.command()
@@ -408,8 +438,8 @@ def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
 @click.option(
     "--fail-on",
     type=click.Choice(["error", "warning"]),
-    default="error",
-    show_default=True,
+    default=None,
+    help="Exit non-zero if any feed has findings at or above this severity.  [default: error]",
 )
 @click.option(
     "--stamp",
@@ -419,20 +449,42 @@ def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
         "fleet/portfolio compliance artifact."
     ),
 )
+@click.option(
+    "--ignore",
+    "ignore_ids",
+    multiple=True,
+    metavar="RULE_ID",
+    help="Suppress a rule by ID (repeatable), e.g. --ignore TODS-W206.",
+)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Configuration file. Without this option, a tods-validate.toml in the "
+        "current directory is used if present."
+    ),
+)
 def batch(
     paths: tuple[str, ...],
     gtfs_path: str | None,
     output_format: str,
-    fail_on: str,
+    fail_on: str | None,
     stamp: bool,
+    ignore_ids: tuple[str, ...],
+    config_path: str | None,
 ) -> None:
     """Validate several feeds and print a roll-up table.
 
     Each PATH is validated independently; the shared --gtfs companion, if given,
-    is used for all of them. ``--format markdown`` produces a single stamped
-    multi-agency compliance report suitable for an issue or working-group
-    thread, rather than one report per feed.
+    is used for all of them. Honors the same --config/--ignore/--fail-on policy
+    as validate, applied identically to every feed.
     """
+    config = _resolve_config(config_path)
+    policy = GatingPolicy.from_config(fail_on=fail_on, config=config, ignore_ids=ignore_ids)
+    _check_rule_ids(tuple(policy.ignore))
+
     rows: list[dict[str, object]] = []
     any_failed = False
     for path in paths:
@@ -442,20 +494,18 @@ def batch(
             rows.append({"source": path, "error": str(exc)})
             any_failed = True
             continue
-        counts = summarize(findings)
-        failed = counts[Severity.ERROR] > 0 or (
-            fail_on == "warning" and counts[Severity.WARNING] > 0
-        )
+        gate = policy.apply(findings)
+        counts = gate.counts
         rows.append(
             {
                 "source": package.source,
-                "errors": counts[Severity.ERROR],
-                "warnings": counts[Severity.WARNING],
-                "infos": counts[Severity.INFO],
-                "status": "fail" if failed else "pass",
+                "errors": counts.get(Severity.ERROR, 0),
+                "warnings": counts.get(Severity.WARNING, 0),
+                "infos": counts.get(Severity.INFO, 0),
+                "status": "fail" if gate.failed else "pass",
             }
         )
-        if failed:
+        if gate.failed:
             any_failed = True
 
     if output_format == "json":

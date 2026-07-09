@@ -33,6 +33,7 @@ from pathlib import Path
 
 from .api import ValidationResult, validate_feed
 from .findings import Severity
+from .policy import GatingPolicy
 from .report import render_text
 
 _SEVERITY_BY_NAME = {
@@ -74,9 +75,10 @@ def assert_feed_valid(
     """
     __tracebackhide__ = True
     threshold = _coerce_severity(fail_on)
-    ignored = frozenset(ignore)
+    policy = GatingPolicy(fail_on=threshold.name.lower(), ignore=frozenset(ignore))
     result = validate_feed(path, gtfs, enable=enable, encoding=encoding)
-    blocking = [f for f in result.findings if f.severity >= threshold and f.rule_id not in ignored]
+    gate = policy.apply(result.findings)
+    blocking = [f for f in gate.gating if f.severity >= threshold]
     if blocking:
         raise AssertionError(
             f"{result.source}: expected no findings at or above {threshold.name}, "
