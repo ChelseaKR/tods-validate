@@ -450,10 +450,11 @@ def diff(
     config = _resolve_config(config_path)
     policy = GatingPolicy.from_config(fail_on=fail_on, config=config, ignore_ids=ignore_ids)
     _check_rule_ids(tuple(policy.ignore))
+    severity_remap = dict(config.severity_remap)
 
     try:
-        _, old_findings = run(old, gtfs_path)
-        _, new_findings_list = run(new, gtfs_path)
+        _, old_findings = run(old, gtfs_path, severity_remap=severity_remap)
+        _, new_findings_list = run(new, gtfs_path, severity_remap=severity_remap)
     except PackageNotFoundError as exc:
         _fail(str(exc))
 
@@ -563,12 +564,13 @@ def batch(
     policy = GatingPolicy.from_config(fail_on=fail_on, config=config, ignore_ids=ignore_ids)
     _check_rule_ids(tuple(policy.ignore))
     effective_history = history_dir or config.history_dir
+    severity_remap = dict(config.severity_remap)
 
     rows: list[dict[str, object]] = []
     any_failed = False
     for path in paths:
         try:
-            package, findings = run(path, gtfs_path)
+            package, findings = run(path, gtfs_path, severity_remap=severity_remap)
         except PackageNotFoundError as exc:
             rows.append({"source": path, "error": str(exc)})
             any_failed = True

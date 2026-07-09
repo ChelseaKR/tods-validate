@@ -219,7 +219,6 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
 
     history_dir = _workspace_history_dir(data.get("workspace"), where)
     severity_remap, severity_acknowledged = _severity_table(data, where)
-    history_dir = _workspace_history_dir(data.get("workspace"), where)
 
     return Config(
         ignore=_str_list("ignore"),

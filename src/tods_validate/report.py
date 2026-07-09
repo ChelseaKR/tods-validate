@@ -107,20 +107,28 @@ def _disclosure_lines(findings: list[Finding]) -> list[str]:
     Listed as rule_id: ORIGINAL -> NEW, with "(acknowledged)" appended for
     remaps that downgraded an ERROR-band rule (config.py only permits those
     with an explicit acknowledgment, so any downgrade from ERROR reaching
-    this point was acknowledged by construction).
+    this point was acknowledged by construction). One line per remapped rule,
+    not per finding — a rule that fires thousands of times must not turn the
+    disclosure block (or the GitHub-annotation stream built from it) into
+    thousands of identical lines — with a ``×N`` count when N > 1.
     """
     remapped = _remapped(findings)
     if not remapped:
         return []
-    plural = "y" if len(remapped) == 1 else "ies"
-    lines = [f"Local policy: {len(remapped)} severit{plural} remapped:"]
+    grouped: dict[tuple[str, Severity, Severity], int] = {}
     for f in remapped:
         original = f.severity_original
         if original is None:
             continue
-        is_downgrade = original is Severity.ERROR and f.severity < Severity.ERROR
+        key = (f.rule_id, original, f.severity)
+        grouped[key] = grouped.get(key, 0) + 1
+    plural = "y" if len(remapped) == 1 else "ies"
+    lines = [f"Local policy: {len(remapped)} severit{plural} remapped:"]
+    for (rule_id, original, new), count in grouped.items():
+        is_downgrade = original is Severity.ERROR and new < Severity.ERROR
         note = " (acknowledged)" if is_downgrade else ""
-        lines.append(f"  {f.rule_id}: {original.name} -> {f.severity.name}{note}")
+        times = f" ×{count}" if count > 1 else ""
+        lines.append(f"  {rule_id}: {original.name} -> {new.name}{note}{times}")
     return lines
 
 

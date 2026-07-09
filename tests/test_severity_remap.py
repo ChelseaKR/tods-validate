@@ -258,3 +258,48 @@ def test_cli_stamp_output_discloses_remap(tmp_path: Path) -> None:
     )
     assert "Local policy: " in result.output
     assert "severity remapped" in result.output or "severities remapped" in result.output
+
+
+# --- diff/batch honor the same [severity] policy as validate ----------------
+
+
+def test_batch_applies_remap_to_gate(tmp_path: Path) -> None:
+    config = tmp_path / "tods-validate.toml"
+    config.write_text('[severity]\n"TODS-W101" = "error"\n', encoding="utf-8")
+    fixture = str(FIXTURES / "invalid" / "TODS-W101")
+    without = invoke("batch", fixture, "--fail-on", "error")
+    assert without.exit_code == 0, without.output
+    with_remap = invoke("batch", fixture, "--config", str(config), "--fail-on", "error")
+    assert with_remap.exit_code == 1, with_remap.output
+
+
+def test_diff_applies_remap_to_gate(tmp_path: Path) -> None:
+    config = tmp_path / "tods-validate.toml"
+    config.write_text('[severity]\n"TODS-W101" = "error"\n', encoding="utf-8")
+    old = str(FIXTURES / "valid" / "tods")
+    new = str(FIXTURES / "invalid" / "TODS-W101")
+    without = invoke("diff", old, new, "--fail-on", "error")
+    assert without.exit_code == 0, without.output
+    with_remap = invoke("diff", old, new, "--config", str(config), "--fail-on", "error")
+    assert with_remap.exit_code == 1, with_remap.output
+
+
+# --- disclosure stays bounded when one rule fires many times ----------------
+
+
+def test_disclosure_dedupes_repeated_rule_lines() -> None:
+    repeats = [
+        Finding(
+            rule_id="TODS-W101",
+            severity=Severity.ERROR,
+            file="run_events.txt",
+            row=row,
+            message=f"Example message {row}.",
+            severity_original=Severity.WARNING,
+        )
+        for row in range(2, 5)
+    ]
+    text = render_text(repeats, "feed/")
+    assert "Local policy: 3 severities remapped:" in text
+    assert text.count("TODS-W101: WARNING -> ERROR") == 1
+    assert "TODS-W101: WARNING -> ERROR ×3" in text
