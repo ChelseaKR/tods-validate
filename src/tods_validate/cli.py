@@ -19,6 +19,13 @@ from . import __version__
 from .anonymize import anonymize_package
 from .baseline import diff_findings, load_baseline_identities
 from .config import Config, ConfigError, load_config
+from .doctor import (
+    ValidatePayload,
+    doctor_to_dict,
+    render_doctor_markdown,
+    render_doctor_text,
+    run_doctor,
+)
 from .findings import Finding, Severity
 from .fix import fix_package
 from .init import SHAPES, DestinationNotEmptyError
@@ -726,6 +733,101 @@ def merge(path: str, gtfs_path: str | None, output_path: str, manifest: bool) ->
         click.echo(f"Wrote merge manifest to {manifest_file}.")
 
     click.echo(f"Wrote {len(result.written)} file(s) to {output_path}.")
+
+
+@main.command()
+@click.argument("path", type=click.Path(exists=False))
+@click.option(
+    "--gtfs",
+    "gtfs_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Companion GTFS feed (directory or .zip). Omit if the GTFS files sit "
+        "next to the TODS files."
+    ),
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "markdown", "json"]),
+    default="text",
+    show_default=True,
+    help="Report format for the combined pass.",
+)
+@click.option(
+    "--gtfs-validator-jar",
+    "gtfs_validator_jar",
+    type=click.Path(exists=False),
+    default=None,
+    envvar="GTFS_VALIDATOR_JAR",
+    help=(
+        "Path to MobilityData's gtfs-validator jar, to check the merged feed. Never "
+        "downloaded automatically; without java and this jar (or GTFS_VALIDATOR_JAR), "
+        "that stage is skipped and clearly labeled as such."
+    ),
+)
+@click.option(
+    "--encoding", default=None, help="Override UTF-8 decoding for non-conforming exports."
+)
+@click.option(
+    "--stamp",
+    is_flag=True,
+    help="Add a provenance footer (version, timestamp) to Markdown for a citable report.",
+)
+@click.option(
+    "--fail-on",
+    type=click.Choice(["error", "warning"]),
+    default=None,
+    help="Exit non-zero if validate findings reach this severity.  [default: error]",
+)
+def doctor(
+    path: str,
+    gtfs_path: str | None,
+    output_format: str,
+    gtfs_validator_jar: str | None,
+    encoding: str | None,
+    stamp: bool,
+    fail_on: str | None,
+) -> None:
+    """Run validate, merge, gtfs-validator, and stats as one pass on PATH.
+
+    One combined report covering the full publish-readiness sequence: validate
+    the TODS package, merge it against its companion GTFS feed, optionally
+    check that merged feed with MobilityData's gtfs-validator (only if java
+    and a jar are already available; never downloaded), and print feed stats.
+    Any stage that could not run is labeled SKIPPED with its reason, so a
+    skipped check can never be misread as a pass.
+    """
+    try:
+        report = run_doctor(
+            path,
+            gtfs_path,
+            jar_path=gtfs_validator_jar,
+            encoding=encoding,
+        )
+    except PackageNotFoundError as exc:
+        _fail(str(exc))
+
+    if output_format == "json":
+        click.echo(json.dumps(doctor_to_dict(report), indent=2))
+    elif output_format == "markdown":
+        click.echo(render_doctor_markdown(report, stamp=stamp))
+    else:
+        click.echo(render_doctor_text(report))
+
+    validate_stage = report.stage("validate")
+    validate_payload = validate_stage.payload if validate_stage is not None else None
+    findings = validate_payload.findings if isinstance(validate_payload, ValidatePayload) else []
+    counts = summarize(findings)
+    effective_fail_on = fail_on or "error"
+    failed = counts[Severity.ERROR] > 0 or (
+        effective_fail_on == "warning" and counts[Severity.WARNING] > 0
+    )
+    validator_stage = report.stage("gtfs-validator")
+    if validator_stage is not None and validator_stage.status == "failed":
+        failed = True
+    sys.exit(1 if failed else 0)
 
 
 @main.command(name="rules")

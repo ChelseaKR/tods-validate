@@ -189,6 +189,16 @@ A CI job that checks the merged feed with MobilityData's gtfs-validator:
     java -jar gtfs-validator.jar -i supplemented.zip -o validator-report
 ```
 
+`tods-validate doctor feed/tods --gtfs feed/gtfs --gtfs-validator-jar gtfs-validator.jar`
+runs that whole sequence — validate, merge, gtfs-validator on the merged
+feed, stats — as one command with a single combined report. gtfs-validator is
+never downloaded automatically: without java or a jar (`--gtfs-validator-jar`
+or `GTFS_VALIDATOR_JAR`) already available, that stage is labeled SKIPPED
+with the reason ("merged-feed GTFS validity NOT checked"), never silently
+treated as a pass. `doctor` exits non-zero on validate findings at
+`--fail-on` severity or a gtfs-validator stage that actually failed to run,
+not on one that was honestly skipped.
+
 ## Other subcommands
 
 - `tods-validate stats feed/ --gtfs gtfs/` prints descriptive metrics (run
