@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 from tods_validate.findings import Severity
-from tods_validate.rules import all_rules
+from tods_validate.rules import EXAMPLES, all_rules, render_example_markdown
 from tods_validate.schema import SPEC_VERSION
 
 DOC_PATH = Path(__file__).parent.parent / "docs" / "rules.md"
@@ -67,8 +67,9 @@ def generate() -> str:
             if r.interpretation:
                 lines.append(f"Interpretation: {r.interpretation}")
                 lines.append("")
-            if r.example:
-                lines.append(f"Example: {r.example}")
+            example = EXAMPLES.get(r.id)
+            if example is not None:
+                lines.extend(render_example_markdown(example))
                 lines.append("")
             lines.append(f"Spec reference: <{r.spec_section}>")
             lines.append("")
