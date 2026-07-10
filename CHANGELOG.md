@@ -7,6 +7,13 @@ new checks may be added in minor releases.
 
 Added:
 
+- `tods-validate drift OLD_GTFS NEW_GTFS --tods FEED` (EXP-02): diagnoses the
+  "your GTFS moved under your TODS" failure directly, reporting exactly which
+  referenced `trip_id`/`stop_id` values disappeared and which trips'
+  `block_id` changed between two GTFS versions, with a conservative rename
+  guess offered only when exactly one new GTFS ID is an unambiguous close
+  match. `--format text|markdown|json`; exits non-zero on any break so it can
+  gate a GTFS update in CI.
 - An architecture decision record log under `docs/adr/`: 0000 records the
   practice, 0001–0005 backfill the decisions already in force (the Python 3.11
   floor, the i18n N/A declaration, the nested `editor/vscode` project,
