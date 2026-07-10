@@ -138,19 +138,33 @@ def _render(
     stamp: bool,
     coverage: RunCoverage | None = None,
     suggestions: list[Suggestion] | None = None,
+    spec_version: str = SPEC_VERSION,
 ) -> str:
     if output_format == "text":
         return render_text(
-            findings, source, max_findings=max_findings, quiet=quiet, coverage=coverage
+            findings,
+            source,
+            max_findings=max_findings,
+            quiet=quiet,
+            coverage=coverage,
+            spec_version=spec_version,
         )
     if output_format == "markdown":
-        return render_markdown(findings, source, stamp=stamp, coverage=coverage)
+        return render_markdown(
+            findings, source, stamp=stamp, coverage=coverage, spec_version=spec_version
+        )
     if output_format == "json":
-        return render_json(findings, source, coverage=coverage, suggestions=suggestions)
+        return render_json(
+            findings,
+            source,
+            coverage=coverage,
+            suggestions=suggestions,
+            spec_version=spec_version,
+        )
     if output_format == "sarif":
         return render_sarif(findings, source, coverage=coverage)
     if output_format == "html":
-        return render_html(findings, source, coverage=coverage)
+        return render_html(findings, source, coverage=coverage, spec_version=spec_version)
     # github annotations carry no manifest; coverage is disclosed by the other formats.
     return render_github(findings, source)
 
@@ -343,6 +357,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
             enabled=frozenset(enable),
             encoding=effective_encoding,
             severity_remap=severity_remap,
+            spec_version=effective_spec,
         )
         gate = policy.apply(found)
         if gate.suppressed_ignored:
@@ -367,6 +382,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
                 stamp=stamp,
                 coverage=coverage,
                 suggestions=machine_suggestions,
+                spec_version=effective_spec,
             )
         )
         if suggest and output_format in ("text", "markdown"):

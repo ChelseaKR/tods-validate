@@ -156,6 +156,28 @@ References into GTFS are resolved after applying the supplement files, so a
 trip added by `trips_supplement.txt` is a valid target for
 `run_events.trip_id`, and a stop deleted by `stops_supplement.txt` is not.
 
+## Validating against an older spec version
+
+TODS changed shape substantially between v1.0.0 (2022) and the current
+v2.1.0: file names were added and removed, and `run_events.txt` itself has
+different, incompatible fields in each version. `tods-validate` defaults to
+v2.1.0; pass `--spec-version 1.0.0` to validate a feed against the older
+spec text instead:
+
+```sh
+tods-validate exports/tods/ --spec-version 1.0.0
+```
+
+Structure and field-value rules (required columns, required values, enum
+values, value formats, duplicate primary keys) run against whichever
+version's file/field inventory you asked for. Reference and semantic rules,
+and the opt-in coverage/advisory categories, assume v2.1.0-only mechanisms
+(the Supplement-file GTFS overlay; `vehicle_assignments.txt`) and are
+skipped under `--spec-version 1.0.0`, disclosed in the report the same way
+`--enable`-gated rules are. See [docs/spec-versions.md](docs/spec-versions.md)
+for the full file/field inventory, spec citations, and exactly what does and
+does not run under each version.
+
 ## Merging supplements into GTFS
 
 The spec says that GTFS plus the supplement files should form a valid GTFS
@@ -305,7 +327,9 @@ registry as `docs/rules.md` and editor hovers, so all three describe a rule
 identically.
 
 Ambiguities in the spec discovered while building the validator are tracked
-in [docs/spec-questions.md](docs/spec-questions.md).
+in [docs/spec-questions.md](docs/spec-questions.md). What changed between
+spec versions, and what `--spec-version` does and does not check, is in
+[docs/spec-versions.md](docs/spec-versions.md).
 
 ## What this does not check
 

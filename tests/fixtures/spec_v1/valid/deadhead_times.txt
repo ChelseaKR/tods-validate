@@ -1,0 +1,2 @@
+deadhead_id,arrival_time,departure_time,ops_location_id,stop_id,location_sequence,shape_dist_traveled
+DH1,07:30:00,07:45:00,GARAGE,,1,

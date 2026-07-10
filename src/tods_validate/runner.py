@@ -13,7 +13,7 @@ from .findings import Finding, Severity
 from .gtfs_companion import build_companion
 from .loader import Package, load_package
 from .rules import RunCoverage, ValidationContext, validate
-from .schema import GTFS_FILENAMES
+from .schema import GTFS_FILENAMES, SPEC_VERSION
 
 # Rule ID that marks a structural "root cause" row, and the rule IDs whose
 # findings on that same row are downstream echoes of it rather than
@@ -57,6 +57,7 @@ def run_with_coverage(
     enabled: frozenset[str] = frozenset(),
     encoding: str | None = None,
     severity_remap: Mapping[str, str] | None = None,
+    spec_version: str = SPEC_VERSION,
 ) -> tuple[Package, list[Finding], RunCoverage]:
     """Load and validate the TODS package at ``path``.
 
@@ -72,7 +73,9 @@ def run_with_coverage(
     overrides the default UTF-8 decoding for non-conforming exports.
     ``severity_remap`` maps rule ID -> severity name ("ERROR"/"WARNING"/"INFO"),
     applied to findings after validation; see ``config.py``'s ``[severity]``
-    table for how it is populated and disclosed.
+    table for how it is populated and disclosed. ``spec_version`` selects the
+    TODS spec version to validate against (schema.SUPPORTED_SPEC_VERSIONS);
+    see docs/spec-versions.md for what changes between versions.
     """
     package = load_package(path, encoding=encoding)
     gtfs = None
@@ -84,7 +87,9 @@ def run_with_coverage(
     elif any(name in GTFS_FILENAMES for name in package.files):
         gtfs = build_companion(package, package, source=package.source)
         gtfs_source = "package"
-    context = ValidationContext(package=package, gtfs=gtfs, gtfs_source=gtfs_source)
+    context = ValidationContext(
+        package=package, gtfs=gtfs, gtfs_source=gtfs_source, spec_version=spec_version
+    )
     findings, coverage = validate(context, enabled)
     findings = _apply_severity_remap(findings, severity_remap or {})
     return package, _link_causality(findings), coverage
@@ -125,6 +130,7 @@ def run(
     enabled: frozenset[str] = frozenset(),
     encoding: str | None = None,
     severity_remap: Mapping[str, str] | None = None,
+    spec_version: str = SPEC_VERSION,
 ) -> tuple[Package, list[Finding]]:
     """Load and validate the TODS package at ``path``; return package + findings.
 
@@ -137,5 +143,6 @@ def run(
         enabled=enabled,
         encoding=encoding,
         severity_remap=severity_remap,
+        spec_version=spec_version,
     )
     return package, findings

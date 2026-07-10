@@ -1,0 +1,2 @@
+ops_location_id,ops_location_code,ops_location_name,ops_location_desc,ops_location_lat,ops_location_lon
+GARAGE,G1,Main Garage,,38.5449,-121.7405
