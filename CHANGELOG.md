@@ -3,10 +3,80 @@
 Notable changes to tods-validate. Rule IDs are never renumbered or reused;
 new checks may be added in minor releases.
 
-## Unreleased
+## v0.7.0 - 2026-07-09
+
+A large release: editor integration (language server + VS Code client),
+new end-to-end and scaffolding commands (`doctor`, `init`, `explain`,
+`trend`), honest-reporting features (coverage manifests, severity-remap
+disclosure, causality links), content-anchored baselines, and the
+2026-07-05 standards-conformance/supply-chain remediation. No rule IDs
+were renumbered or reused; the JSON report is now schema 1.2.0 with only
+additive fields.
 
 Added:
 
+- `tods-validate doctor PATH`: one honest end-to-end publish-readiness
+  pass composing validate -> merge -> an optional gtfs-validator run on the
+  merged feed -> stats into a single combined report. A stage that cannot
+  run (no companion GTFS, no local gtfs-validator jar/java) is reported as
+  skipped with its reason — a skipped check never reads as a pass.
+- `tods-validate init [DEST]`: scaffolds a starter TODS package that
+  validates clean out of the box (headers always derived from the schema
+  registry, so the scaffold cannot drift from the validator).
+  `--shape runs|runs+vehicles` picks the file set.
+- Workspace mode (opt-in): `batch --history DIR` appends a
+  schema-versioned record per feed to an append-only `history.jsonl`
+  ledger (counts and rule IDs only — never finding messages, which can
+  carry personal identifiers), and the new `trend --history DIR` command
+  renders a Markdown table per source with per-run error deltas and
+  new/worse rules, so a regression is visible without re-running anything.
+  A `[workspace]` table in tods-validate.toml can set the history dir.
+- Severity remapping with mandatory disclosure: an optional `[severity]`
+  table in tods-validate.toml remaps individual rule severities. Every
+  remapped finding is disclosed in every report format, and downgrading a
+  rule the spec declares ERROR requires an explicit `acknowledged = true`.
+- `stats` now accepts multiple PATHs and renders a cross-feed comparison
+  table plus totals/means/min/max aggregates (text/json/markdown); `batch`
+  gained `--format markdown` and `--stamp` for a single stamped, citable
+  fleet compliance report.
+- An `ingest-ready` named profile for CAD/AVL import gating: at least as
+  strict as `strict` (fail on warning, coverage + advisory rules enabled,
+  no ignores), giving downstream consumers a go/no-go signal distinct from
+  the authoring-time presets.
+- A curated `tods_validate.read` namespace for callers who want parsed
+  feed data rather than findings (load_package, merge_supplement,
+  build_companion, a pandas-free `to_rows()`, and `to_dataframe()` behind
+  a new `dataframe` extra), documented in docs/read-api.md.
+- Did-you-mean suggestions for broken `vehicle_id` references
+  (TODS-E303): when a broken reference is a typo, case, whitespace, or
+  zero-padding variant of exactly one existing vehicle_id, `--suggest`
+  proposes it — always marked `review`, never applied automatically, and
+  never offered on ambiguous matches.
+- Finding causality links: a TODS-E201 (missing required value) that
+  exists only because its row was short (TODS-E104 ragged row) is tagged
+  with a `caused_by` link to its root and collapsed in the text report
+  into a single "and N follow-on finding(s)" line. No finding is removed;
+  JSON/Markdown keep every finding and surface the link (the JSON report
+  schema gains the nullable `caused_by` field).
+- Root-cause hints for TODS-W302/TODS-W313 clusters, pointing at the
+  shared underlying cause (the companion GTFS drifted out of sync with
+  the TODS package).
+- spec-watch (`scripts/spec_watch.py` + a scheduled CI workflow): diffs
+  the upstream TODS spec's per-table field definitions against this
+  repo's hand-transcribed `schema.py` and reports added/removed fields and
+  type/presence/enum changes, so silent spec drift gets caught.
+- `scripts/generate_feed.py`: a seeded, deterministic synthetic TODS+GTFS
+  benchmark generator with `--profile` presets (clean-100k, drifted-gtfs,
+  messy-export). Every generated package carries a loud SYNTHETIC.md
+  banner and a manifest recording the exact seed/params.
+- Published benchmark methodology and throughput results at 1k/10k/50k/
+  100k trips in docs/BENCHMARKS.md.
+- Hypothesis property tests for the untrusted-input parsing path
+  (loader/merge/fix): CSV round-trip fidelity, `fix` idempotence, and
+  friends — plus advisory mutation testing on the rules engine in CI.
+- A synthetic user-research panel (docs/USER-RESEARCH.md, clearly labeled
+  synthetic) and a cited, triaged research roadmap
+  (docs/RESEARCH-ROADMAP.md) that the recent feature work traces back to.
 - An architecture decision record log under `docs/adr/`: 0000 records the
   practice, 0001–0005 backfill the decisions already in force (the Python 3.11
   floor, the i18n N/A declaration, the nested `editor/vscode` project,
@@ -89,6 +159,29 @@ Added:
 
 Changed:
 
+- Baseline comparisons (`--baseline`) now identify findings by a
+  content-anchored fingerprint — a SHA-256 of rule ID, file, field, and
+  the finding's structured data, deliberately excluding row number and
+  message text — so regenerating a feed with one inserted row no longer
+  marks every existing finding "new" and every baseline entry "fixed".
+  Baselines written before this release still match via a legacy
+  identity fallback. Fingerprints are emitted in the JSON report.
+- Gating is now one shared policy (`GatingPolicy`): `diff`, `batch`, and
+  the `tods_validate.testing` helpers honor the config file, `--ignore`,
+  `--profile`, and baseline narrowing exactly as `validate` does, instead
+  of each re-implementing (or silently skipping) the threshold logic.
+- `anonymize` now also pseudonymizes `vehicle_label` (the painted fleet
+  number, which correlates 1:1 with a pseudonymized vehicle_id), accepts
+  a repeatable `--also FILE:FIELD` for extension columns, and prints a
+  "Carried through unprotected" residual-risk table on every run, so
+  "pseudonymization, not anonymity" is disclosed per run rather than
+  only stated in the docs. SECURITY.md's personal-data section updated
+  to match.
+- Parsed run events are now cached on the validation context and shared
+  by every rule (previously up to ~9 redundant full-file parse passes on
+  a large feed); the parsing helpers moved to `tods_validate.run_events`.
+- The shared supplement-application engine was extracted to
+  `tods_validate.supplement`, removing the duplicated merge logic.
 - The `--format html` report is now an explicit accessibility pass: it declares
   its language and a responsive viewport, uses `header`/`main` landmarks, gives
   the findings table a caption and column-scoped headers, and lightens the info
@@ -111,8 +204,27 @@ Fixed:
   not be checked: block_id resolution needs the companion feed's `trips.txt`
   and service_id resolution needs `calendar.txt`/`calendar_dates.txt`; when a
   used column's target file is missing, those checks used to no-op silently.
+- `validate --suggest` output aligned to its documented contract.
+- `make audit` (the blocking pip-audit gate) now audits the uv.lock
+  export (`uv export --no-emit-project`) instead of the live
+  environment. The environment contains tods-validate itself as an
+  editable install, and at release time the tagged version does not
+  exist on PyPI yet — so the pre-publish verify gate introduced by
+  REL-14/15 would have strict-failed on the project's own unpublished
+  package, blocking every future release. All real pinned dependencies
+  are still audited strictly.
 
 Security / process (2026-07-05 standards-conformance remediation):
+
+- The GitHub Action now installs with a hash-verified lock
+  (`requirements-action.lock`, `pip install --require-hashes` +
+  `--no-deps` for the package itself), so an Action run never resolves
+  dependencies fresh from PyPI.
+- The browser playground now pins the exact tods-validate wheel version,
+  loads Pyodide with an SRI integrity hash, and carries a CSP; the ready
+  status line states both pinned versions.
+- Releases now attach a CycloneDX SBOM and SLSA build-provenance
+  attestations for the published wheel/sdist.
 
 - The release pipeline (`pypi-publish.yml`, `docker.yml`, `release-corpus.yml`)
   no longer publishes anything without first re-running the full gate set
@@ -125,9 +237,12 @@ Security / process (2026-07-05 standards-conformance remediation):
   + CI), and a blocking `pip-audit` gate; adopted `uv` with a committed
   `uv.lock`; added a Trivy CVE scan and a digest-pinned base image to the
   Docker build; the Dockerfile now runs as a non-root user.
+- Added a root `Makefile` whose `verify` target reproduces the full
+  merge-blocking CI gate set locally, plus a committed dev lockfile.
 - Added a `README.md` Standards Conformance table, `docs/CONFORMANCE-GAPS.md`,
   `docs/RESPONSIBLE-TECH-AUDITS.md`, `DEFINITION_OF_DONE.md`,
-  `.github/PULL_REQUEST_TEMPLATE.md`, `.github/CODEOWNERS`, and a vendored
+  `.github/PULL_REQUEST_TEMPLATE.md`, `.github/CODEOWNERS`,
+  `CONTRIBUTING.md`, `CODE_OF_CONDUCT.md`, `NOTICE`, and a vendored
   copy of the engineering standards this project is held to
   (`docs/standards/`).
 - No user-facing behavior changed in this entry; see `docs/CONFORMANCE-GAPS.md`
