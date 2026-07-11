@@ -330,3 +330,40 @@ def test_github_outputs_written(tmp_path: Path, monkeypatch) -> None:
     invoke(E201, "--format", "github")
     written = output_file.read_text(encoding="utf-8")
     assert "error-count=1" in written
+
+
+def _copy_gtfs_with_trip_renamed(tmp_path: Path, old_id: str, new_id: str) -> tuple[Path, Path]:
+    """Copy VALID_GTFS into old/new dirs, renaming one trip_id in the new copy."""
+    import shutil
+
+    old_dir, new_dir = tmp_path / "old_gtfs", tmp_path / "new_gtfs"
+    shutil.copytree(VALID_GTFS, old_dir)
+    shutil.copytree(VALID_GTFS, new_dir)
+    for name in ("trips.txt", "stop_times.txt"):
+        path = new_dir / name
+        path.write_text(path.read_text(encoding="utf-8").replace(old_id, new_id), encoding="utf-8")
+    return old_dir, new_dir
+
+
+def test_drift_reports_broken_trip_id_and_fails(tmp_path: Path) -> None:
+    old_dir, new_dir = _copy_gtfs_with_trip_renamed(tmp_path, "103", "103A")
+    result = invoke("drift", str(old_dir), str(new_dir), "--tods", str(VALID_TODS))
+    assert result.exit_code == 1
+    assert "103" in result.output
+    assert "103A" in result.output
+
+
+def test_drift_clean_when_gtfs_unchanged() -> None:
+    result = invoke("drift", str(VALID_GTFS), str(VALID_GTFS), "--tods", str(VALID_TODS))
+    assert result.exit_code == 0
+    assert "No referenced" in result.output
+
+
+def test_drift_json_format(tmp_path: Path) -> None:
+    old_dir, new_dir = _copy_gtfs_with_trip_renamed(tmp_path, "103", "103A")
+    result = invoke(
+        "drift", str(old_dir), str(new_dir), "--tods", str(VALID_TODS), "--format", "json"
+    )
+    payload = json.loads(result.output)
+    assert payload["brokenTripIds"][0]["value"] == "103"
+    assert payload["brokenTripIds"][0]["candidates"] == ["103A"]

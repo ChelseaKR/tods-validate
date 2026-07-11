@@ -26,11 +26,12 @@ from .doctor import (
     render_doctor_text,
     run_doctor,
 )
+from .drift import analyze_drift, drift_to_dict, render_drift_markdown, render_drift_text
 from .findings import Finding, Severity
 from .fix import fix_package
 from .init import SHAPES, DestinationNotEmptyError
 from .init import scaffold as scaffold_package
-from .loader import PackageNotFoundError
+from .loader import PackageNotFoundError, load_package
 from .merge import merge_feeds
 from .policy import GatingPolicy
 from .report import (
@@ -506,6 +507,63 @@ def diff(
 
     gate = policy.apply(result.introduced)
     sys.exit(1 if gate.failed else 0)
+
+
+@main.command()
+@click.argument("old_gtfs_path", metavar="OLD_GTFS", type=click.Path(exists=False))
+@click.argument("new_gtfs_path", metavar="NEW_GTFS", type=click.Path(exists=False))
+@click.option(
+    "--tods",
+    "tods_path",
+    required=True,
+    type=click.Path(exists=False),
+    help="The TODS package whose GTFS references are being checked.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json", "markdown"]),
+    default="text",
+    show_default=True,
+)
+@click.option("--encoding", default=None)
+def drift(
+    old_gtfs_path: str,
+    new_gtfs_path: str,
+    tods_path: str,
+    output_format: str,
+    encoding: str | None,
+) -> None:
+    """Diagnose which TODS references break moving OLD_GTFS to NEW_GTFS.
+
+    Given a TODS package (--tods) and two versions of its companion GTFS
+    feed, reports exactly which referenced trip_id/stop_id values disappear
+    and which trips' block_id changes -- the diagnosis behind the "your GTFS
+    moved under your TODS" failure (see TODS-W302/W313's root-cause hint).
+    Rename candidates are offered only when exactly one new GTFS ID is an
+    unambiguous close match; they are hints for a human to review, never
+    applied. Supplements from the TODS package are applied to both GTFS
+    versions before comparing, so a break reported here is one `validate`
+    against NEW_GTFS would also raise.
+
+    Exits 1 if any reference breaks or block_id changes were found, so this
+    can gate a GTFS-update PR before it reaches production; 0 if clean.
+    """
+    try:
+        old_gtfs = load_package(old_gtfs_path, encoding=encoding)
+        new_gtfs = load_package(new_gtfs_path, encoding=encoding)
+        tods = load_package(tods_path, encoding=encoding)
+    except PackageNotFoundError as exc:
+        _fail(str(exc))
+
+    report = analyze_drift(old_gtfs, new_gtfs, tods)
+    if output_format == "json":
+        click.echo(json.dumps(drift_to_dict(report), indent=2))
+    elif output_format == "markdown":
+        click.echo(render_drift_markdown(report))
+    else:
+        click.echo(render_drift_text(report))
+    sys.exit(1 if report.has_breaks else 0)
 
 
 @main.command()

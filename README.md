@@ -197,7 +197,7 @@ package first so the merge rests on clean inputs.
 A CI job that checks the merged feed with MobilityData's gtfs-validator:
 
 ```yaml
-- uses: ChelseaKR/tods-validate@v0.6.0
+- uses: ChelseaKR/tods-validate@v0.7.0
   with:
     path: feed/tods
     gtfs: feed/gtfs
@@ -233,6 +233,14 @@ not on one that was honestly skipped.
 - `tods-validate diff old/ new/` validates two versions of a feed and reports
   which findings were fixed, newly introduced, or still present; it exits
   non-zero only on newly introduced errors, which is useful in review.
+- `tods-validate drift old-gtfs/ new-gtfs/ --tods feed/` diagnoses the "your
+  GTFS moved under your TODS" failure directly: given a TODS package and two
+  versions of its companion GTFS feed, it reports exactly which referenced
+  `trip_id`/`stop_id` values disappeared and which trips' `block_id` changed,
+  with a conservative rename guess when exactly one new GTFS ID is an
+  unambiguous close match (never applied automatically — a hint to review).
+  Exits non-zero if anything broke, so it can gate a GTFS update before it
+  reaches production.
 - `tods-validate batch a/ b/ c/` validates several feeds and prints a roll-up
   table (`--format json` for tooling).
 - `tods-validate batch a/ b/ --history .tods-history/` additionally appends
@@ -296,7 +304,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ChelseaKR/tods-validate@v0.6.0
+      - uses: ChelseaKR/tods-validate@v0.7.0
         with:
           path: feed/tods
           gtfs: feed/gtfs        # omit if GTFS files sit next to the TODS files

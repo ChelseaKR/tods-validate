@@ -26,8 +26,16 @@ i18n-check:
 
 # Dependency vulnerability audit (CQ-11 / SEC-11). --strict also fails on any
 # dependency pip-audit could not evaluate, rather than silently skipping it.
+# Audits the exact pins in uv.lock (what `uv sync --frozen` installs) minus
+# the project itself: during a release PR the bumped version does not exist
+# on PyPI yet, so auditing the local package can only ever fail; every real
+# dependency is still audited.
 audit:
-	pip-audit --strict
+	req="$$(mktemp)" && \
+	uv export --frozen --extra dev --no-emit-project --no-hashes --quiet \
+		--format requirements-txt -o "$$req" && \
+	pip-audit --strict --no-deps -r "$$req"; \
+	rc=$$?; rm -f "$$req"; exit $$rc
 
 # Secret scan over the working tree + history (SEC-17/18). Requires the
 # gitleaks binary (see https://github.com/gitleaks/gitleaks#installing); the
