@@ -3,7 +3,17 @@ name: Docker image
 on:
   release:
     types: [published]
+  # A release event runs the workflow file at the tagged commit, so a fix to
+  # this file cannot re-run for an already-published release. The `tag` input
+  # lets a dispatch (which runs the file from main) rebuild an existing
+  # release tag with the same verify-at-tag/scan-before-push/sign chain.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build (e.g. v0.7.0). Empty builds main as latest-only."
+        required: false
+        type: string
+        default: ""
 
 # Least-privilege default; the build-push job escalates only what it needs
 # (CICD-04: write scopes job-level only).
@@ -21,7 +31,7 @@ jobs:
   verify:
     uses: ./.github/workflows/verify.yml
     with:
-      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag || '' }}
 
   build-push:
     needs: [verify]
@@ -35,6 +45,9 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
+          # On a release event inputs.tag is empty, so this stays github.ref
+          # (the tag); a dispatch with a tag builds that tag's tree.
+          ref: ${{ inputs.tag || github.ref }}
       - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:
           registry: ghcr.io
@@ -45,8 +58,10 @@ jobs:
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}
+          # semver value: on a release event ref_name is the tag, matching the
+          # old ref-derived behavior; a dispatch supplies the tag explicitly.
           tags: |
-            type=semver,pattern={{version}}
+            type=semver,pattern={{version}},value=${{ inputs.tag || github.ref_name }}
             type=raw,value=latest
 
       # Build once, locally (push: false), so Trivy can scan the image before
@@ -61,10 +76,19 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
+      # OCI references reject uppercase; github.repository is mixed-case
+      # (ChelseaKR/...), which made this scan fail to parse the ref on the
+      # v0.7.0 release. metadata-action lowercases the tags it builds, so the
+      # locally-loaded image only exists under the lowercased name.
+      - name: Lowercase the image name for the scan
+        id: image
+        env:
+          REPO: ${{ github.repository }}
+        run: echo "name=ghcr.io/${REPO,,}" >> "$GITHUB_OUTPUT"
       - name: Scan the image for CRITICAL/HIGH CVEs (blocking)
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         with:
-          image-ref: ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.version }}
+          image-ref: ${{ steps.image.outputs.name }}:${{ steps.meta.outputs.version }}
           severity: "CRITICAL,HIGH"
           exit-code: "1"
           ignore-unfixed: true
