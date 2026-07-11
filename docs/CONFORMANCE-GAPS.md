@@ -176,7 +176,9 @@ response SLA (3 business days ack; 30/90-day fix-or-mitigate by severity).
   created annotated and signed. **⛔ Manual action for the next release:**
   `git tag -s vX.Y.Z -m "release: vX.Y.Z"` (requires a configured GPG or SSH
   signing key) instead of `git tag vX.Y.Z`, then push the tag before
-  creating the GitHub release. The historical tags were **not** rewritten
+  creating the GitHub release. Since v0.7.0 release tags are SSH-signed with
+  the key listed in `.github/allowed_signers`, and `verify.yml` verifies the
+  signature against that file. The historical tags were **not** rewritten
   (rewriting published tags retroactively is destructive to anyone who
   already fetched them, and out of scope for a file-edit-only remediation
   pass).

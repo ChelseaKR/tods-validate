@@ -3,7 +3,14 @@
 Notable changes to tods-validate. Rule IDs are never renumbered or reused;
 new checks may be added in minor releases.
 
-## Unreleased
+## v0.7.0 - 2026-07-11
+
+Findings now reach the editor (a language server with hovers and quick fixes,
+plus a thin VS Code client), reports state exactly which checks ran and which
+were skipped, and local severity policy is supported with mandatory
+disclosure. Also new: fix suggestions (`validate --suggest`), an offline
+`explain` command with worked examples, pytest helpers for exporters, and two
+run-continuity warnings (TODS-W316, TODS-W409).
 
 Added:
 
@@ -86,6 +93,12 @@ Added:
   registry (`tods_validate.rules.EXAMPLES`) that `explain`, `docs/rules.md`,
   and LSP hovers all render through the same `render_rule_detail()`, so the
   three cannot drift from each other.
+- An optional `[severity]` table in `tods-validate.toml` remaps individual
+  rule severities to encode local policy, with a hard honesty constraint:
+  every remapped finding is disclosed in every report format (a "Local
+  policy" block plus a per-finding "(spec: ORIGINAL)" note), and downgrading
+  a rule the spec declares ERROR requires an explicit `acknowledged = true`.
+  The report schema (1.2.0) documents `findings[].severity_original`. (#25)
 
 Changed:
 
@@ -113,6 +126,12 @@ Fixed:
   used column's target file is missing, those checks used to no-op silently.
 
 Security / process (2026-07-05 standards-conformance remediation):
+
+- `make audit` (pip-audit) now audits the exact `uv.lock` pins minus the
+  project itself, so a release version bump (a version that is not on PyPI
+  until after the release publishes) cannot fail the gate; release tags are
+  SSH-signed and `verify.yml` verifies them against the committed
+  `.github/allowed_signers`.
 
 - The release pipeline (`pypi-publish.yml`, `docker.yml`, `release-corpus.yml`)
   no longer publishes anything without first re-running the full gate set
