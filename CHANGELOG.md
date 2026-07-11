@@ -127,6 +127,12 @@ Fixed:
 
 Security / process (2026-07-05 standards-conformance remediation):
 
+- `make audit` (pip-audit) now audits the exact `uv.lock` pins minus the
+  project itself, so a release version bump (a version that is not on PyPI
+  until after the release publishes) cannot fail the gate; release tags are
+  SSH-signed and `verify.yml` verifies them against the committed
+  `.github/allowed_signers`.
+
 - The release pipeline (`pypi-publish.yml`, `docker.yml`, `release-corpus.yml`)
   no longer publishes anything without first re-running the full gate set
   (`make verify`, new) at the tagged commit, plus a version-consistency check
