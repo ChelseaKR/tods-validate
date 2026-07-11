@@ -7,6 +7,17 @@ new checks may be added in minor releases.
 
 Added:
 
+- `--spec-version 1.0.0` validates against the TODS spec text as it stood
+  before v2.0.0-alpha.1 (deadheads.txt/ops_locations.txt/deadhead_times.txt,
+  runs_pieces.txt, and a differently-shaped run_events.txt), transcribed from
+  the last commit before v2 spec work began; see `docs/spec-versions.md` for
+  the full file/field delta, citations, and exactly which rule bands run
+  under each version (structure and field-value rules run against either
+  version's schema; reference/semantic/coverage/advisory rules, which assume
+  v2.1.0-only mechanisms, are skipped and disclosed via the coverage
+  manifest's new `skipped:spec_version` status). `--spec-version` previously
+  parsed and validated the flag but had no effect on which schema was
+  checked.
 - `tods-validate drift OLD_GTFS NEW_GTFS --tods FEED` (EXP-02): diagnoses the
   "your GTFS moved under your TODS" failure directly, reporting exactly which
   referenced `trip_id`/`stop_id` values disappeared and which trips'

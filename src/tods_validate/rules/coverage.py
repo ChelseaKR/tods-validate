@@ -11,16 +11,20 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from ..findings import Finding, Severity
-from ..schema import SPEC_URL
+from ..schema import SPEC_URL, SPEC_VERSION
 from . import ValidationContext, rule
 
 _BREAK_KEYWORDS = ("break", "lunch", "meal")
 # A continuous on-duty span longer than this (seconds) with no break event is
 # worth a second look. Conservative; real rules vary by labor agreement.
 _LONG_SPAN_SECONDS = 6 * 3600
+# These checks assume v2.1.0's run_events.txt/vehicle_assignments.txt field
+# names and the companion-GTFS coverage they describe; see docs/spec-versions.md.
+_V2_ONLY = (SPEC_VERSION,)
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-I501",
     severity=Severity.INFO,
     title="GTFS trips have no run event",
@@ -56,6 +60,7 @@ def trips_without_run_events(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-I502",
     severity=Severity.INFO,
     title="Blocks have no vehicle assignment",
@@ -92,6 +97,7 @@ def blocks_without_vehicle(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-I601",
     severity=Severity.INFO,
     title="Run has a long span with no break event",

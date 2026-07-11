@@ -14,13 +14,20 @@ from ..findings import Finding, Severity
 from ..gtfs_companion import parse_gtfs_date
 from ..loader import Row
 from ..run_events import _Event
-from ..schema import SPEC_URL
+from ..schema import SPEC_URL, SPEC_VERSION
 from . import ValidationContext, rule
 
 _RUN_EVENTS_SECTION = f"{SPEC_URL}#run_eventstxt"
+# These checks assume v2.1.0's run_events.txt field names (start_time/end_time,
+# service_id+run_id+event_sequence) and vehicle_assignments.txt/
+# employee_run_dates.txt, none of which v1.0.0 has in this shape (v1's
+# run_events.txt uses event_time/event_duration instead, and has no service_id/
+# run_id columns at all -- see docs/spec-versions.md). Restricted to v2.1.0.
+_V2_ONLY = (SPEC_VERSION,)
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E401",
     severity=Severity.ERROR,
     title="Event ends before it starts",
@@ -61,6 +68,7 @@ def event_ends_before_start(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E402",
     severity=Severity.ERROR,
     title="Two trip events in one run overlap in time",
@@ -110,6 +118,7 @@ def overlapping_trip_events(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W403",
     severity=Severity.WARNING,
     title="Event order disagrees with event times",
@@ -152,6 +161,7 @@ def sequence_disagrees_with_time(context: ValidationContext) -> Iterator[Finding
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W404",
     severity=Severity.WARNING,
     title="Employee is assigned to overlapping runs on the same date",
@@ -213,6 +223,7 @@ def employee_double_booked(context: ValidationContext) -> Iterator[Finding]:  # 
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E405",
     severity=Severity.ERROR,
     title="Run operates on dates its trip does not",
@@ -269,6 +280,7 @@ def run_dates_exceed_trip_dates(context: ValidationContext) -> Iterator[Finding]
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W406",
     severity=Severity.WARNING,
     title="Employee assignment date is outside the run's service days",
@@ -315,6 +327,7 @@ def assignment_outside_service(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W407",
     severity=Severity.WARNING,
     title="Vehicle assignment date is outside the service days",
@@ -357,6 +370,7 @@ def vehicle_assignment_outside_service(context: ValidationContext) -> Iterator[F
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W408",
     severity=Severity.WARNING,
     title="Identical employee assignment appears twice",
@@ -407,6 +421,7 @@ def duplicate_assignment(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W409",
     severity=Severity.WARNING,
     title="Consecutive run events do not connect in space",

@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from ..findings import Finding, Severity
-from ..schema import GTFS_FILENAMES, SPEC_URL, TABLES, Presence
+from ..schema import GTFS_FILENAMES, SPEC_URL, Presence, spec_link
 from . import ValidationContext, rule
 
 _FILES_SECTION = f"{SPEC_URL}#files"
@@ -16,23 +16,24 @@ _FILES_SECTION = f"{SPEC_URL}#files"
     severity=Severity.WARNING,
     title="No TODS files in package",
     description=(
-        "The package contains none of the ten files defined by TODS. Every TODS file is "
-        "optional, but a package with none of them has nothing to validate."
+        "The package contains none of the files defined by the TODS spec version being "
+        "validated against. Every TODS file is optional, but a package with none of them "
+        "has nothing to validate."
     ),
     spec_section=_FILES_SECTION,
 )
 def no_tods_files(context: ValidationContext) -> Iterator[Finding]:
-    if not any(name in TABLES for name in context.package.files):
+    if not any(name in context.tables for name in context.package.files):
         yield Finding(
             rule_id="TODS-W101",
             severity=Severity.WARNING,
             message=(
                 "No TODS files were found in this package. Expected at least one of: "
-                + ", ".join(sorted(TABLES))
+                + ", ".join(sorted(context.tables))
                 + "."
             ),
             suggestion="Check that the TODS files are at the top level, not in a subfolder.",
-            data={"expected": ",".join(sorted(TABLES))},
+            data={"expected": ",".join(sorted(context.tables))},
         )
 
 
@@ -48,7 +49,7 @@ def no_tods_files(context: ValidationContext) -> Iterator[Finding]:
 )
 def unknown_file(context: ValidationContext) -> Iterator[Finding]:
     for name in context.package.files:
-        if name not in TABLES and name not in GTFS_FILENAMES:
+        if name not in context.tables and name not in GTFS_FILENAMES:
             yield Finding(
                 rule_id="TODS-I102",
                 severity=Severity.INFO,
@@ -84,7 +85,7 @@ def unknown_file(context: ValidationContext) -> Iterator[Finding]:
 )
 def file_unreadable(context: ValidationContext) -> Iterator[Finding]:
     for name, feed in context.package.files.items():
-        if name not in TABLES:
+        if name not in context.tables:
             continue
         for problem in feed.problems:
             if problem.code in ("encoding", "empty", "csv_error"):
@@ -115,7 +116,7 @@ def file_unreadable(context: ValidationContext) -> Iterator[Finding]:
 )
 def ragged_row(context: ValidationContext) -> Iterator[Finding]:
     for name, feed in context.package.files.items():
-        if name not in TABLES:
+        if name not in context.tables:
             continue
         for problem in feed.problems:
             if problem.code == "ragged":
@@ -145,7 +146,7 @@ def ragged_row(context: ValidationContext) -> Iterator[Finding]:
 )
 def duplicate_column(context: ValidationContext) -> Iterator[Finding]:
     for name, feed in context.package.files.items():
-        if name not in TABLES:
+        if name not in context.tables:
             continue
         for problem in feed.problems:
             if problem.code == "duplicate_header":
@@ -176,7 +177,7 @@ def duplicate_column(context: ValidationContext) -> Iterator[Finding]:
     ),
 )
 def missing_required_column(context: ValidationContext) -> Iterator[Finding]:
-    for name, table in TABLES.items():
+    for name, table in context.tables.items():
         feed = context.package.get(name)
         if feed is None or not feed.headers:
             continue
@@ -195,7 +196,7 @@ def missing_required_column(context: ValidationContext) -> Iterator[Finding]:
                     row=1,
                     field=column,
                     message=(f"{name} is missing the required column {column!r} ({why})."),
-                    suggestion=f"Add a {column!r} column. See {SPEC_URL}{table.spec_anchor}.",
+                    suggestion=f"Add a {column!r} column. See {spec_link(table)}.",
                     data={"field": column},
                 )
 
@@ -211,7 +212,7 @@ def missing_required_column(context: ValidationContext) -> Iterator[Finding]:
     spec_section=SPEC_URL,
 )
 def unknown_column_tods(context: ValidationContext) -> Iterator[Finding]:
-    for name, table in TABLES.items():
+    for name, table in context.tables.items():
         if table.kind != "tods":
             continue
         feed = context.package.get(name)
@@ -232,7 +233,7 @@ def unknown_column_tods(context: ValidationContext) -> Iterator[Finding]:
                     ),
                     suggestion=(
                         "Check the spelling against the field list in the spec: "
-                        f"{SPEC_URL}{table.spec_anchor}."
+                        f"{spec_link(table)}."
                     ),
                     data={"value": column, "field": column},
                 )
@@ -250,7 +251,7 @@ def unknown_column_tods(context: ValidationContext) -> Iterator[Finding]:
     spec_section=f"{SPEC_URL}#supplement-files",
 )
 def unknown_column_supplement(context: ValidationContext) -> Iterator[Finding]:
-    for name, table in TABLES.items():
+    for name, table in context.tables.items():
         if table.kind != "supplement":
             continue
         feed = context.package.get(name)

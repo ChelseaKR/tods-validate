@@ -17,7 +17,7 @@ available (via `--gtfs` or GTFS files alongside the TODS files).
 
 Severity: WARNING.
 
-The package contains none of the ten files defined by TODS. Every TODS file is optional, but a package with none of them has nothing to validate.
+The package contains none of the files defined by the TODS spec version being validated against. Every TODS file is optional, but a package with none of them has nothing to validate.
 
 Example (`(package root)`):
 

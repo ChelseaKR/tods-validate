@@ -23,6 +23,7 @@ from .. import run_events
 from ..findings import Finding, Severity
 from ..gtfs_companion import CompanionGTFS
 from ..loader import Package
+from ..schema import SPEC_VERSION, TableSpec, tables_for_version
 
 
 @dataclass
@@ -32,6 +33,19 @@ class ValidationContext:
     # "flag" if --gtfs was passed, "package" if GTFS files were found next to
     # the TODS files, None if no companion GTFS is available.
     gtfs_source: str | None = None
+    # Which TODS spec version to validate against (schema.SUPPORTED_SPEC_VERSIONS).
+    spec_version: str = SPEC_VERSION
+
+    @property
+    def tables(self) -> dict[str, TableSpec]:
+        """The file/field inventory for this context's spec_version.
+
+        Structure and field-value rules (TODS-x1xx, TODS-x2xx) read this
+        instead of importing schema.TABLES directly, so the same rule logic
+        validates whichever spec version was requested. See
+        docs/spec-versions.md.
+        """
+        return tables_for_version(self.spec_version)
 
     # Derived views over run_events.txt, computed once per validation and
     # cached on this instance (it is created once per validate() call and
@@ -86,6 +100,14 @@ class Rule:
     # A short "Before: ... / After: ..." worked fix example, written for feed
     # producers. Set on the highest-frequency rules; None elsewhere.
     example: str | None = None
+    # Which --spec-version(s) this rule applies to. None (the default) means
+    # every version in schema.SUPPORTED_SPEC_VERSIONS: true for every rule
+    # written generically over ValidationContext.tables (TODS-x1xx, TODS-x2xx).
+    # Rules that assume the v2.1.0-only Supplement/GTFS-merge mechanism, or
+    # v2.1.0's specific run_events.txt/vehicle_assignments.txt field names
+    # (TODS-x3xx, TODS-x4xx, coverage, advisory), set this explicitly. See
+    # docs/spec-versions.md.
+    spec_versions: tuple[str, ...] | None = None
 
 
 @dataclass(frozen=True)
@@ -743,12 +765,14 @@ STATUS_RAN = "ran"
 STATUS_SKIPPED_NEEDS_GTFS = "skipped:needs_gtfs"
 STATUS_SKIPPED_DISABLED = "skipped:disabled"
 STATUS_SKIPPED_IGNORED = "skipped:ignored"
+STATUS_SKIPPED_SPEC_VERSION = "skipped:spec_version"
 
 # Human-readable reason per status, for the one-line disclosure in reports.
 _STATUS_REASON = {
     STATUS_SKIPPED_NEEDS_GTFS: "no companion GTFS feed was provided",
     STATUS_SKIPPED_DISABLED: "opt-in rule not enabled (use --enable)",
     STATUS_SKIPPED_IGNORED: "suppressed by local policy (--ignore)",
+    STATUS_SKIPPED_SPEC_VERSION: "not defined by the requested --spec-version",
 }
 
 
@@ -796,6 +820,7 @@ class RunCoverage:
             STATUS_SKIPPED_NEEDS_GTFS,
             STATUS_SKIPPED_DISABLED,
             STATUS_SKIPPED_IGNORED,
+            STATUS_SKIPPED_SPEC_VERSION,
         ):
             members = [o for o in self.outcomes if o.status == status]
             if members:
@@ -861,6 +886,7 @@ def rule(
     default_enabled: bool = True,
     interpretation: str | None = None,
     example: str | None = None,
+    spec_versions: tuple[str, ...] | None = None,
 ) -> Callable[[CheckFunction], CheckFunction]:
     """Register a check function. Used as a decorator in the rule modules."""
     if category not in CATEGORIES:
@@ -882,6 +908,7 @@ def rule(
                 default_enabled=default_enabled,
                 interpretation=interpretation,
                 example=example,
+                spec_versions=spec_versions,
             )
         )
         return check
@@ -896,6 +923,8 @@ def _is_enabled(r: Rule, enabled: frozenset[str]) -> bool:
 
 
 def _rule_status(r: Rule, context: ValidationContext, enabled: frozenset[str]) -> str:
+    if r.spec_versions is not None and context.spec_version not in r.spec_versions:
+        return STATUS_SKIPPED_SPEC_VERSION
     if r.needs_gtfs and context.gtfs is None:
         return STATUS_SKIPPED_NEEDS_GTFS
     if not _is_enabled(r, enabled):

@@ -24,6 +24,7 @@ from pathlib import Path
 
 from .findings import Finding, Severity
 from .runner import run
+from .schema import SPEC_VERSION
 from .suggest import Suggestion, suggest_for_findings
 
 
@@ -66,16 +67,21 @@ def validate_feed(
     *,
     enable: Iterable[str] = (),
     encoding: str | None = None,
+    spec_version: str = SPEC_VERSION,
 ) -> ValidationResult:
     """Validate the TODS feed at ``path`` and return a :class:`ValidationResult`.
 
     ``gtfs`` resolves trip/stop/service/block references; omit it when the GTFS
     files sit alongside the TODS files. ``enable`` turns on opt-in rules by ID
     or category ("coverage", "advisory", "experimental"). ``encoding`` overrides
-    UTF-8 decoding. Raises :class:`tods_validate.loader.PackageNotFoundError`
+    UTF-8 decoding. ``spec_version`` selects the TODS spec version to validate
+    against (schema.SUPPORTED_SPEC_VERSIONS); see docs/spec-versions.md for what
+    changes between versions. Raises :class:`tods_validate.loader.PackageNotFoundError`
     when the package cannot be read at all.
     """
-    package, findings = run(path, gtfs, enabled=frozenset(enable), encoding=encoding)
+    package, findings = run(
+        path, gtfs, enabled=frozenset(enable), encoding=encoding, spec_version=spec_version
+    )
     return ValidationResult(source=package.source, findings=findings)
 
 
@@ -85,6 +91,7 @@ def suggest_fixes(
     *,
     enable: Iterable[str] = (),
     encoding: str | None = None,
+    spec_version: str = SPEC_VERSION,
 ) -> list[Suggestion]:
     """Validate the feed at ``path`` and return concrete fix suggestions for it.
 
@@ -92,9 +99,15 @@ def suggest_fixes(
     knows how to fix mechanically, classified ``auto`` (safe and meaning-preserving,
     the kind ``tods-validate fix`` applies) or ``review`` (derivable but worth a
     human's confirmation). Arguments mirror :func:`validate_feed`. Suggestions
-    never change the feed; applying them is up to the caller.
+    never change the feed; applying them is up to the caller. Note that fix-value
+    suggestions (as opposed to the trim/dedupe structural ones) are currently
+    derived from the v2.1.0 field inventory regardless of ``spec_version``, so
+    under v1.0.0 they degrade to offering none rather than a wrong one; see
+    docs/spec-versions.md.
     """
-    package, findings = run(path, gtfs, enabled=frozenset(enable), encoding=encoding)
+    package, findings = run(
+        path, gtfs, enabled=frozenset(enable), encoding=encoding, spec_version=spec_version
+    )
     return suggest_for_findings(findings, package)
 
 

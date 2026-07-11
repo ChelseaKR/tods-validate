@@ -8,7 +8,7 @@ from collections.abc import Iterator
 from ..findings import Finding, Severity
 from ..loader import FeedFile
 from ..run_events import parse_time as parse_time
-from ..schema import SPEC_URL, TABLES, FieldSpec, FieldType, Presence, TableSpec
+from ..schema import SPEC_URL, SPEC_VERSION, FieldSpec, FieldType, Presence, TableSpec, spec_link
 from . import ValidationContext, rule
 
 # GTFS Time: H:MM:SS or HH:MM:SS; hours may exceed 24 for service past midnight
@@ -28,7 +28,7 @@ def _is_valid_date(value: str) -> bool:
 
 
 def _tods_tables(context: ValidationContext) -> Iterator[tuple[TableSpec, FeedFile]]:
-    for name, table in TABLES.items():
+    for name, table in context.tables.items():
         feed = context.package.get(name)
         if feed is not None and feed.headers:
             yield table, feed
@@ -66,7 +66,7 @@ def missing_required_value(context: ValidationContext) -> Iterator[Finding]:
                         message=(
                             f"{table.filename} row {row.line}: {f.name!r} is required but empty."
                         ),
-                        suggestion=f"See {SPEC_URL}{table.spec_anchor}.",
+                        suggestion=f"See {spec_link(table)}.",
                         data={"value": "", "field": f.name},
                     )
 
@@ -87,9 +87,16 @@ def invalid_enum(context: ValidationContext) -> Iterator[Finding]:
         for row in feed.rows:
             for f in enums:
                 value = row.values.get(f.name, "")
+                if value == "":
+                    # Blank on a Required enum is TODS-E201's concern; blank on an
+                    # Optional enum is a legitimate empty value (its enum_values
+                    # tuple already includes "" when the spec allows blank).
+                    continue
                 if value not in f.enum_values:
+                    blank_allowed = "" in f.enum_values
                     allowed = ", ".join(repr(v) for v in f.enum_values if v) or "'1'"
                     allowed_values = ",".join(v for v in f.enum_values if v) or "1"
+                    blank_clause = "blank or " if blank_allowed else ""
                     yield Finding(
                         rule_id="TODS-E202",
                         severity=Severity.ERROR,
@@ -98,9 +105,9 @@ def invalid_enum(context: ValidationContext) -> Iterator[Finding]:
                         field=f.name,
                         message=(
                             f"{table.filename} row {row.line}: {f.name} is {value!r}, "
-                            f"but the only allowed values are blank or {allowed}."
+                            f"but the only allowed values are {blank_clause}{allowed}."
                         ),
-                        suggestion=f"See {SPEC_URL}{table.spec_anchor}.",
+                        suggestion=f"See {spec_link(table)}.",
                         data={"value": value, "field": f.name, "allowed": allowed_values},
                     )
 
@@ -257,6 +264,8 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
         "per-row reading: fires only for rows whose block_id is ambiguous, not for "
         "every row once any block is shared (spec-questions #8)."
     ),
+    # vehicle_assignments.txt does not exist in TODS v1.0.0 (added in v2.1.0).
+    spec_versions=(SPEC_VERSION,),
 )
 def vehicle_assignment_ambiguous(context: ValidationContext) -> Iterator[Finding]:
     feed = context.package.get("vehicle_assignments.txt")

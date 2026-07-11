@@ -13,11 +13,15 @@ from collections.abc import Iterator
 
 from ..findings import Finding, Severity
 from ..loader import FeedFile, Package, Row
-from ..schema import SPEC_URL, TABLES
+from ..schema import SPEC_URL, SPEC_VERSION, TABLES
 from . import ValidationContext, rule
 from .fields import parse_time
 
 _SUPPLEMENT_SECTION = f"{SPEC_URL}#supplement-files"
+# These rules resolve IDs against the companion GTFS "TODS-Supplemented GTFS",
+# a mechanism the v1.0.0 spec does not have (Supplement files were introduced
+# in v2.0.0-alpha.1). Restricted to v2.1.0; see docs/spec-versions.md.
+_V2_ONLY = (SPEC_VERSION,)
 
 
 def _rows(context: ValidationContext, filename: str) -> list[Row]:
@@ -66,6 +70,7 @@ def _routes_available(context: ValidationContext) -> bool:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E301",
     severity=Severity.ERROR,
     title="Employee assignment points to a run that does not exist",
@@ -110,6 +115,7 @@ def employee_run_missing(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W302",
     severity=Severity.WARNING,
     title="Referenced file is missing, references not checked",
@@ -185,6 +191,7 @@ def _uses_column(package: Package, filename: str, column: str) -> bool:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E303",
     severity=Severity.ERROR,
     title="Vehicle assignment points to a vehicle that does not exist",
@@ -232,6 +239,7 @@ def _supplement_groups(
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E304",
     severity=Severity.ERROR,
     title="Supplement both deletes and redefines the same row",
@@ -280,6 +288,7 @@ def delete_and_readd(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W305",
     severity=Severity.WARNING,
     title="Supplement updates the same row more than once",
@@ -319,6 +328,7 @@ def duplicate_supplement_update(context: ValidationContext) -> Iterator[Finding]
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W306",
     severity=Severity.WARNING,
     title="Deleted supplement row carries values that will be ignored",
@@ -359,6 +369,7 @@ def delete_with_values(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E307",
     severity=Severity.ERROR,
     title="Run event points to a trip that does not exist",
@@ -402,6 +413,7 @@ def run_event_trip_missing(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E308",
     severity=Severity.ERROR,
     title="Run uses a service that does not exist",
@@ -449,6 +461,7 @@ def run_event_service_missing(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E309",
     severity=Severity.ERROR,
     title="Run event starts or ends at a stop that does not exist",
@@ -495,6 +508,7 @@ def run_event_stop_missing(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E310",
     severity=Severity.ERROR,
     title="Run event block disagrees with the trip's block",
@@ -538,6 +552,7 @@ def run_event_block_mismatch(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W315",
     severity=Severity.WARNING,
     title="Run event location does not match the trip's first or last stop",
@@ -592,6 +607,7 @@ def run_event_endpoint_mismatch(context: ValidationContext) -> Iterator[Finding]
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W316",
     severity=Severity.WARNING,
     title="Run event time does not match the trip's scheduled time",
@@ -655,6 +671,7 @@ def run_event_time_mismatch(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E311",
     severity=Severity.ERROR,
     title="Vehicle assignment points to a block that does not exist",
@@ -688,6 +705,7 @@ def vehicle_block_missing(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E312",
     severity=Severity.ERROR,
     title="Vehicle assignment uses a service that does not exist",
@@ -721,6 +739,7 @@ def vehicle_service_missing(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W313",
     severity=Severity.WARNING,
     title="Supplement deletes a row that is not in GTFS",
@@ -770,6 +789,7 @@ def delete_target_missing(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E314",
     severity=Severity.ERROR,
     title="Supplement row references a GTFS entity that does not exist",
