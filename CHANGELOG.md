@@ -3,6 +3,18 @@
 Notable changes to tods-validate. Rule IDs are never renumbered or reused;
 new checks may be added in minor releases.
 
+## Unreleased
+
+Added:
+
+- `tods-validate drift OLD_GTFS NEW_GTFS --tods FEED` (EXP-02): diagnoses the
+  "your GTFS moved under your TODS" failure directly, reporting exactly which
+  referenced `trip_id`/`stop_id` values disappeared and which trips'
+  `block_id` changed between two GTFS versions, with a conservative rename
+  guess offered only when exactly one new GTFS ID is an unambiguous close
+  match. `--format text|markdown|json`; exits non-zero on any break so it can
+  gate a GTFS update in CI.
+
 ## v0.7.0 - 2026-07-11
 
 Findings now reach the editor (a language server with hovers and quick fixes,

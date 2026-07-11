@@ -211,6 +211,14 @@ not on one that was honestly skipped.
 - `tods-validate diff old/ new/` validates two versions of a feed and reports
   which findings were fixed, newly introduced, or still present; it exits
   non-zero only on newly introduced errors, which is useful in review.
+- `tods-validate drift old-gtfs/ new-gtfs/ --tods feed/` diagnoses the "your
+  GTFS moved under your TODS" failure directly: given a TODS package and two
+  versions of its companion GTFS feed, it reports exactly which referenced
+  `trip_id`/`stop_id` values disappeared and which trips' `block_id` changed,
+  with a conservative rename guess when exactly one new GTFS ID is an
+  unambiguous close match (never applied automatically — a hint to review).
+  Exits non-zero if anything broke, so it can gate a GTFS update before it
+  reaches production.
 - `tods-validate batch a/ b/ c/` validates several feeds and prints a roll-up
   table (`--format json` for tooling).
 - `tods-validate batch a/ b/ --history .tods-history/` additionally appends
