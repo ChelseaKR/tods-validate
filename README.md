@@ -175,7 +175,7 @@ package first so the merge rests on clean inputs.
 A CI job that checks the merged feed with MobilityData's gtfs-validator:
 
 ```yaml
-- uses: ChelseaKR/tods-validate@v0.6.0
+- uses: ChelseaKR/tods-validate@v0.7.0
   with:
     path: feed/tods
     gtfs: feed/gtfs
@@ -274,7 +274,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ChelseaKR/tods-validate@v0.6.0
+      - uses: ChelseaKR/tods-validate@v0.7.0
         with:
           path: feed/tods
           gtfs: feed/gtfs        # omit if GTFS files sit next to the TODS files

@@ -13,7 +13,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "tods-validate"
-version = "0.6.0"
+version = "0.7.0"
 description = "Validator for Transit Operational Data Standard (TODS) feeds, formerly the Operational Data Standard (ODS)"
 readme = "README.md"
 license = "Apache-2.0"
