@@ -67,4 +67,8 @@ Real-world feeds that expose gaps are the most valuable contribution. If you can
 share one (privately is fine), please open an issue. Synthetic fixtures should
 be minimal — just enough rows to trip the rule under test — and live under
 `tests/fixtures/invalid/<RULE_ID>/`. Offering this corpus upstream as a shared
-TODS conformance suite is tracked on the [roadmap](roadmap.md).
+TODS conformance suite is tracked on the [roadmap](roadmap.md). The corpus and
+a transfer or co-maintenance path have been offered to the TODS Board in
+[MobilityData/transit-operational-data-standard#153](https://github.com/MobilityData/transit-operational-data-standard/issues/153).
+Until the Board decides whether and where to adopt it, this remains a
+downstream, validator-specific corpus rather than an official TODS suite.
