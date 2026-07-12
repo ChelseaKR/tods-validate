@@ -297,6 +297,12 @@ For a fast loop while editing a feed by hand:
   })
   ```
 
+  A thin VS Code client lives in [`editor/vscode/`](editor/vscode/). Install the
+  Python server first with `pipx install 'tods-validate[lsp]'`; the extension
+  finds `tods-validate-lsp` on `PATH` or accepts its full path in
+  `tods-validate.serverPath`. CI builds a reviewable VSIX artifact, but the
+  extension is not yet published to the Marketplace or Open VSX.
+
 ## GitHub Action
 
 If your TODS export lives in a repository, this workflow validates it on

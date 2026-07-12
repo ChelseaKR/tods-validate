@@ -11,15 +11,22 @@ language server, which this client launches over stdio.
 ## Prerequisites
 
 Install the language server (it ships with the Python package's `lsp` extra) and
-make sure `tods-validate-lsp` is on your `PATH`:
+make sure `tods-validate-lsp` is on your `PATH`. `pipx` keeps the server in an
+isolated environment and is the recommended editor install:
 
 ```sh
-pip install 'tods-validate[lsp]'
-tods-validate-lsp --help  # should be found (it serves over stdio, so it waits)
+pipx install 'tods-validate[lsp]'
+command -v tods-validate-lsp  # macOS/Linux: prints the executable path
+# where tods-validate-lsp     # Windows
 ```
 
+Installing into an existing environment with
+`pip install 'tods-validate[lsp]'` also works.
+
 If it lives somewhere not on `PATH`, set **`tods-validate.serverPath`** in your
-VS Code settings to its full path.
+VS Code settings to its full path. Find that path with
+the commands above. A startup error includes an **Open setup guide** action
+that returns to these instructions.
 
 ## Build and try it locally
 
@@ -43,5 +50,8 @@ npm run package   # produces tods-validate-<version>.vsix via @vscode/vsce
 code --install-extension tods-validate-*.vsix
 ```
 
-This extension has not been published to the Marketplace; build the VSIX to share
-or install it. Verify it in a real editor before relying on it.
+The repository's **VS Code extension** workflow performs the same locked install,
+type-check, package, and vulnerability-audit steps and uploads the VSIX as a
+workflow artifact. The extension has not been published to the Marketplace or
+Open VSX; publisher-account setup and terms acceptance remain maintainer-only
+steps. Verify the VSIX in a real editor before relying on it.
