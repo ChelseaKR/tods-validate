@@ -55,7 +55,10 @@ are welcome as GitHub issues.
   2024-08 with real field-level disagreements still unresolved. See
   `docs/research/E1-upstream-spec-state.md` for the cited current state of
   each and why `--enable experimental` support would be premature.
-- Offering this project's fixture feeds upstream as a conformance suite.
+- Offering this project's fixture feeds upstream as a conformance suite. The
+  corpus and governance hand-off are proposed in
+  [MobilityData issue #153](https://github.com/MobilityData/transit-operational-data-standard/issues/153);
+  it remains downstream and validator-specific unless the TODS Board adopts it.
 
 ## v1.0.0 — Stability commitments
 
