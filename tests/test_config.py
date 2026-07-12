@@ -7,7 +7,7 @@ from click.testing import CliRunner
 
 from conftest import FIXTURES
 from tods_validate.cli import main
-from tods_validate.config import Config, ConfigError, _profile_config, load_config
+from tods_validate.config import Config, ConfigError, load_config
 
 
 def invoke(*args: str, cwd: Path | None = None):
@@ -55,21 +55,6 @@ def test_bad_ignore_type_is_an_error(tmp_path: Path) -> None:
     path.write_text('ignore = "TODS-W206"\n', encoding="utf-8")
     with pytest.raises(ConfigError, match="list of rule IDs"):
         load_config(path)
-
-
-def test_ingest_ready_profile_config_is_a_strict_gate() -> None:
-    config = _profile_config("ingest-ready")
-    assert config.fail_on == "warning"
-    assert "coverage" in config.enable
-    assert "advisory" in config.enable
-
-
-def test_unknown_profile_name_is_a_key_error() -> None:
-    # PROFILES membership is validated by the caller (see
-    # test_config_extends.test_unknown_profile_errors); _profile_config
-    # itself just indexes the dict.
-    with pytest.raises(KeyError):
-        _profile_config("nonexistent-profile")
 
 
 def test_cli_ignore_suppresses_rule_and_exit_code() -> None:

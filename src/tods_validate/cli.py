@@ -18,7 +18,7 @@ import click
 from . import __version__
 from .anonymize import AlreadyProtectedError, anonymize_package
 from .baseline import diff_findings, load_baseline_identities
-from .config import Config, ConfigError, load_config
+from .config import PROFILES, Config, ConfigError, _merge, _profile_config, load_config
 from .doctor import (
     ValidatePayload,
     doctor_to_dict,
@@ -240,7 +240,7 @@ def main() -> None:
 )
 @click.option(
     "--profile",
-    type=click.Choice(["default", "strict", "lenient", "ingest-ready"]),
+    type=click.Choice(sorted(PROFILES)),
     default=None,
     help=(
         "Apply a named preset of settings (overridden by other flags). "
@@ -324,9 +324,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
     """
     config = _resolve_config(config_path)
     if profile is not None:
-        from .config import PROFILES, _merge, _parse_data
-
-        config = _merge(_parse_data(PROFILES[profile], f"profile {profile!r}"), config)
+        config = _merge(_profile_config(profile), config)
 
     enable = tuple(enable_tokens) + config.enable
     _check_enable(enable)
