@@ -16,6 +16,10 @@ validator checks feeds against the current spec, TODS v2.1.0.
 findings in language a scheduler can act on. Each finding says what is wrong,
 where, and what good looks like, and cites the spec section it comes from.
 
+To try the validator without installing anything, use the
+[browser playground](https://chelseakr.github.io/tods-validate/). Validation
+runs locally in your browser; feed files are not uploaded.
+
 ## Install
 
 Requires Python 3.11 or newer.
@@ -91,7 +95,8 @@ reports group findings by rule and add a root-cause hint when one rule clusters.
 
 New developers can also call the validator in-process; see
 [docs/api.md](docs/api.md). Not a programmer? Start with
-[docs/getting-started.md](docs/getting-started.md).
+[docs/getting-started.md](docs/getting-started.md), or use the
+[browser playground](https://chelseakr.github.io/tods-validate/).
 
 ## Fixing common problems
 
