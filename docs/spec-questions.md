@@ -16,6 +16,8 @@ published spec at <https://tods-transit.org/>.
 
 ## 1. Packaging is undefined
 
+*Upstream:* [MobilityData/transit-operational-data-standard#151](https://github.com/MobilityData/transit-operational-data-standard/issues/151)
+
 The spec names the ten files and their filename conventions (the `_supplement`
 suffix and the exact filenames), but never says how a TODS dataset is
 physically packaged or distributed: a zip, a directory, or how a consumer
@@ -31,6 +33,8 @@ with or without GTFS files in the same package. If GTFS files are present they
 are used as the companion feed.
 
 ## 2. The "Run as Directed" example appears to violate the primary key rule
+
+*Upstream:* fixed by [MobilityData/transit-operational-data-standard#147](https://github.com/MobilityData/transit-operational-data-standard/pull/147).
 
 In the spec's
 [Run as Directed work example](https://tods-transit.org/spec/examples/#run-as-directed-work),
@@ -54,6 +58,9 @@ second row should be sequence 40.
 
 ## 3. Example CSVs contain padded values
 
+*Upstream:* tracked with the remaining v2.1.0 clarifications in
+[MobilityData/transit-operational-data-standard#152](https://github.com/MobilityData/transit-operational-data-standard/issues/152).
+
 Several example CSV snippets pad values with spaces for column alignment,
 e.g. `weekday,10000,10,       ,sign-in        ,...`. GTFS-style CSV has no
 trimming rule for values, so a literal reading produces `block_id` / `event_type`
@@ -67,6 +74,9 @@ warning (TODS-W206) because padded IDs will not match their referents.
 
 ## 4. `mid_trip` field names are inconsistent between prose and the field table
 
+*Upstream:* tracked in
+[MobilityData/transit-operational-data-standard#152](https://github.com/MobilityData/transit-operational-data-standard/issues/152).
+
 The `run_events.txt` field descriptions refer to `mid_trip_start` and
 `mid_trip_end` in prose ("If `trip_id` is set (and `mid_trip_start` is not
 `1`)...") while the field table defines the fields as `start_mid_trip` and
@@ -77,6 +87,8 @@ The `run_events.txt` field descriptions refer to `mid_trip_start` and
 ([spec](https://tods-transit.org/spec/#run_eventstxt)).
 
 ## 5. The `Time` type for `start_time`/`end_time` is undefined
+
+*Upstream:* [MobilityData/transit-operational-data-standard#148](https://github.com/MobilityData/transit-operational-data-standard/issues/148)
 
 `start_time` and `end_time` are typed `Time` in the `run_events.txt` field
 table, but the spec never defines `Time`: there is no field-types or
@@ -101,6 +113,9 @@ error (TODS-E401).
 
 ## 6. `employee_run_dates.txt` declares Primary Key `*`
 
+*Upstream:* tracked in
+[MobilityData/transit-operational-data-standard#152](https://github.com/MobilityData/transit-operational-data-standard/issues/152).
+
 `employee_run_dates.txt` declares `Primary Key: *`, but TODS never defines what
 `*` means: it has no conventions or terms section, and it states GTFS field
 inheritance only for Supplement files, not for its TODS-Specific files. Under
@@ -120,6 +135,9 @@ leniency.
 
 ## 7. How strictly should added supplement rows meet GTFS requirements
 
+*Upstream:* tracked in
+[MobilityData/transit-operational-data-standard#152](https://github.com/MobilityData/transit-operational-data-standard/issues/152).
+
 A supplement row that *adds* a new entity (e.g. a new trip) does not have to
 carry all fields GTFS marks required, and the spec only says the merged result
 "should form a valid GTFS dataset" with limited exceptions. It is unclear how
@@ -135,6 +153,9 @@ rows; full GTFS validation is delegated to gtfs-validator run on the merged
 feed.
 
 ## 8. `vehicle_assignments.service_id` condition reads as global, not per-row
+
+*Upstream:* tracked in
+[MobilityData/transit-operational-data-standard#152](https://github.com/MobilityData/transit-operational-data-standard/issues/152).
 
 `service_id` is "Required if `block_id`s are repeated between different
 `service_id`s." Read literally, one repeated block anywhere in the feed makes
