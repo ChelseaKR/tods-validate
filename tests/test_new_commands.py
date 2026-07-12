@@ -68,6 +68,12 @@ def test_profile_strict_fails_on_warning() -> None:
     assert result.exit_code == 1
 
 
+def test_profile_ingest_ready_is_available_and_fails_on_warning() -> None:
+    result = invoke(str(FIXTURES / "invalid" / "TODS-W101"), "--profile", "ingest-ready")
+    assert result.exit_code == 1
+    assert "TODS-W101" in result.output
+
+
 def test_baseline_suppresses_known_findings(tmp_path: Path) -> None:
     baseline = tmp_path / "base.json"
     baseline.write_text(invoke(E201, "--format", "json").output, encoding="utf-8")

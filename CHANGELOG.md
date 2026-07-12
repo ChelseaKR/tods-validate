@@ -7,6 +7,10 @@ new checks may be added in minor releases.
 
 Added:
 
+- An `ingest-ready` named profile for CAD/AVL import gates. It fails on
+  warnings, enables coverage and advisory checks, and adds no ignored rules;
+  select it with `--profile ingest-ready` or `profile = "ingest-ready"` in
+  `tods-validate.toml`.
 - `--spec-version 1.0.0` validates against the TODS spec text as it stood
   before v2.0.0-alpha.1 (deadheads.txt/ops_locations.txt/deadhead_times.txt,
   runs_pieces.txt, and a differently-shaped run_events.txt), transcribed from
