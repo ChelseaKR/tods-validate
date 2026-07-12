@@ -42,11 +42,19 @@ are welcome as GitHub issues.
 
 ## v0.5.0 — Spec tracking
 
-- `--spec-version` flag. TODS changed substantially between v1 and v2; the
-  validator should be explicit about which spec text it enforces.
+- `--spec-version 1.0.0` validates against TODS as it stood before
+  v2.0.0-alpha.1: five files, no Supplement mechanism, a differently-shaped
+  `run_events.txt`. Done; see `docs/spec-versions.md` for the file/field
+  delta and exactly which rule bands run under each version.
 - Validation for spec additions as they are adopted upstream (the spec
   repository currently has open proposals for rosters, runtimes, and
-  electrification files such as chargers and energy consumption).
+  electrification files such as chargers and energy consumption). Researched
+  but deliberately not implemented: as of 2026-07, rosters (#45), runtimes
+  (#42/#43), and chargers (#46) are all still open, unmerged proposals —
+  chargers dormant since 2023-12, the others last substantively discussed
+  2024-08 with real field-level disagreements still unresolved. See
+  `docs/research/E1-upstream-spec-state.md` for the cited current state of
+  each and why `--enable experimental` support would be premature.
 - Offering this project's fixture feeds upstream as a conformance suite.
 
 ## v1.0.0 — Stability commitments

@@ -3,6 +3,18 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!--
+      Content-Security-Policy: restricts network access to the two origins
+      the playground actually needs: cdn.jsdelivr.net (Pyodide runtime, wasm,
+      and its bundled packages) and files.pythonhosted.org / pypi.org
+      (micropip fetching the tods-validate wheel and its metadata).
+      'wasm-unsafe-eval' is required for Pyodide's WebAssembly execution;
+      'unsafe-inline' is required for the inline <script> and <style> below.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src https://cdn.jsdelivr.net https://files.pythonhosted.org https://pypi.org; img-src 'self' data:; frame-src 'self'; worker-src blob:; child-src blob:;"
+    />
     <title>tods-validate playground</title>
     <style>
       :root { color-scheme: light dark; }
@@ -54,9 +66,10 @@
       </p>
       <input type="file" id="files" multiple />
       <button id="run" disabled>Validate</button>
-      <p id="status">Loading Python (this takes a few seconds the first time)…</p>
+      <p id="status" role="status">Loading Python (this takes a few seconds the first time)…</p>
     </div>
 
+    <h2 id="report-heading" tabindex="-1">Validation report</h2>
     <iframe id="report" title="Validation report" sandbox="allow-same-origin"></iframe>
 
     <!-- Pyodide runtime. Update the version to the current Pyodide release,
@@ -69,19 +82,28 @@
       crossorigin="anonymous"
     ></script>
     <script>
+      // Keep in sync with the pinned wheel version below and the Pyodide
+      // <script> tag's src/integrity above when bumping either.
+      const TODS_VALIDATE_VERSION = "0.7.0";
+      const PYODIDE_VERSION = "v0.26.4";
+
       const status = document.getElementById("status");
       const runBtn = document.getElementById("run");
       const filesInput = document.getElementById("files");
       const report = document.getElementById("report");
+      const reportHeading = document.getElementById("report-heading");
+      const footerVersion = document.getElementById("footer-version");
       const selected = new Map(); // filename -> Uint8Array
       let pyodide;
+
+      footerVersion.textContent = `tods-validate ${TODS_VALIDATE_VERSION} · Pyodide ${PYODIDE_VERSION}`;
 
       async function boot() {
         pyodide = await loadPyodide();
         await pyodide.loadPackage("micropip");
         const micropip = pyodide.pyimport("micropip");
-        await micropip.install("tods-validate");
-        status.textContent = "Ready. Choose your feed files, then click Validate.";
+        await micropip.install(`tods-validate==${TODS_VALIDATE_VERSION}`);
+        status.textContent = `Ready — validating with tods-validate ${TODS_VALIDATE_VERSION} on Pyodide ${PYODIDE_VERSION}. Choose your feed files, then click Validate.`;
         runBtn.disabled = false;
       }
 
@@ -116,6 +138,9 @@ render_html(result.findings, "your feed")
 `);
           report.srcdoc = html;
           status.textContent = "Done.";
+          // Move focus to the report heading so keyboard/screen-reader users
+          // are taken to the newly rendered report.
+          reportHeading.focus();
         } catch (err) {
           status.textContent = "Validation error: " + err;
         } finally {

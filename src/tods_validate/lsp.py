@@ -225,16 +225,17 @@ def build_code_actions(
 
 
 def hover_markdown(rule_id: str) -> str | None:
-    """Markdown describing a rule, for an editor hover over one of its findings."""
-    from .rules import all_rules
+    """Markdown describing a rule, for an editor hover over one of its findings.
+
+    Renders through :func:`tods_validate.rules.render_rule_detail`, the same
+    function ``tods-validate explain --format markdown`` uses, so a hover and
+    ``explain`` describe a rule (worked example included) identically.
+    """
+    from .rules import all_rules, render_rule_detail
 
     for rule_def in all_rules():
         if rule_def.id == rule_id:
-            return (
-                f"**{rule_def.id}** — {rule_def.title}  ({rule_def.severity.name})\n\n"
-                f"{rule_def.description}\n\n"
-                f"[TODS specification]({rule_def.spec_section})"
-            )
+            return render_rule_detail(rule_def, "markdown")
     return None
 
 

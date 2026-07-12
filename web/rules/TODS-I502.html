@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TODS-I502: Blocks have no vehicle assignment — tods-validate rule catalog</title>
+    <style>
+      :root { color-scheme: light dark; }
+      body {
+        font: 16px/1.5 system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      h1 { margin-bottom: 0.25rem; font-size: 1.5rem; }
+      h2 { margin-top: 2rem; font-size: 1.1rem; }
+      .lede, .meta, .id { color: #666; }
+      .id { font-family: ui-monospace, monospace; margin: 0; }
+      .meta { margin: 0.5rem 0 1rem; }
+      .badge {
+        display: inline-block;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.1rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid #888;
+        margin-right: 0.4rem;
+      }
+      nav a, .rule-list a { text-decoration: none; }
+      nav a:hover, .rule-list a:hover { text-decoration: underline; }
+      a { color: inherit; }
+      code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
+      ul.rule-list { list-style: none; padding-left: 0; }
+      ul.rule-list li { padding: 0.25rem 0; }
+    </style>
+  </head>
+  <body>
+    <nav><a href="index.html">&larr; All rules</a></nav>
+    <p class="id">TODS-I502</p>
+    <h1>Blocks have no vehicle assignment</h1>
+    <p class="meta"><span class="badge">INFO</span></p>
+    <p class='meta'>Needs a companion GTFS feed. Opt-in: off by default, enable with --enable coverage or --enable TODS-I502.</p>
+    <p>Some blocks in the companion GTFS feed have no row in vehicle_assignments.txt, so no vehicle is assigned to operate them. Informational: vehicle assignments are optional, but unassigned blocks may signal an incomplete export.</p>
+    <p>Spec reference: <a href="https://tods-transit.org/spec/#vehicle_assignmentstxt">https://tods-transit.org/spec/#vehicle_assignmentstxt</a></p>
+  </body>
+</html>

@@ -11,17 +11,20 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from ..findings import Finding, Severity
-from ..schema import SPEC_URL
+from ..schema import SPEC_URL, SPEC_VERSION
 from . import ValidationContext, rule
-from .fields import parse_time
 
 _BREAK_KEYWORDS = ("break", "lunch", "meal")
 # A continuous on-duty span longer than this (seconds) with no break event is
 # worth a second look. Conservative; real rules vary by labor agreement.
 _LONG_SPAN_SECONDS = 6 * 3600
+# These checks assume v2.1.0's run_events.txt/vehicle_assignments.txt field
+# names and the companion-GTFS coverage they describe; see docs/spec-versions.md.
+_V2_ONLY = (SPEC_VERSION,)
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-I501",
     severity=Severity.INFO,
     title="GTFS trips have no run event",
@@ -37,8 +40,7 @@ _LONG_SPAN_SECONDS = 6 * 3600
 )
 def trips_without_run_events(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
-    feed = context.package.get("run_events.txt")
-    covered = {row.values.get("trip_id", "") for row in feed.rows} if feed else set()
+    covered = {event.trip_id for event in context.events}
     covered.discard("")
     all_trips = set(context.gtfs.trip_service)
     uncovered = sorted(all_trips - covered)
@@ -53,10 +55,12 @@ def trips_without_run_events(context: ValidationContext) -> Iterator[Finding]:
                 f"{len(uncovered)} of {len(all_trips)} GTFS trip(s) are not referenced by "
                 f"any run event (e.g. {sample}{more}). No crew work is described for them."
             ),
+            data={"value": sample, "field": "trip_id"},
         )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-I502",
     severity=Severity.INFO,
     title="Blocks have no vehicle assignment",
@@ -88,10 +92,12 @@ def blocks_without_vehicle(context: ValidationContext) -> Iterator[Finding]:
                 f"{len(unassigned)} of {len(all_blocks)} block(s) have no vehicle "
                 f"assignment (e.g. {sample}{more})."
             ),
+            data={"value": sample, "field": "block_id"},
         )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-I601",
     severity=Severity.INFO,
     title="Run has a long span with no break event",
@@ -106,30 +112,17 @@ def blocks_without_vehicle(context: ValidationContext) -> Iterator[Finding]:
     interpretation="advisory: 'break' detected by event_type containing break/lunch/meal",
 )
 def long_run_without_break(context: ValidationContext) -> Iterator[Finding]:
-    feed = context.package.get("run_events.txt")
-    if feed is None:
-        return
-    runs: dict[tuple[str, str], list[tuple[int | None, int | None, str, int]]] = {}
-    for row in feed.rows:
-        run = (row.values.get("service_id", ""), row.values.get("run_id", ""))
-        if not all(run):
-            continue
-        runs.setdefault(run, []).append(
-            (
-                parse_time(row.values.get("start_time", "")),
-                parse_time(row.values.get("end_time", "")),
-                row.values.get("event_type", "").lower(),
-                row.line,
-            )
-        )
-    for (service_id, run_id), events in runs.items():
-        times = [(s, e) for s, e, _t, _l in events if s is not None and e is not None]
+    for (service_id, run_id), events in context.events_by_run.items():
+        times = [(e.start, e.end) for e in events if e.start is not None and e.end is not None]
         if not times:
             continue
         span = max(e for _s, e in times) - min(s for s, _e in times)
-        has_break = any(any(k in t for k in _BREAK_KEYWORDS) for _s, _e, t, _l in events)
+        has_break = any(
+            any(k in event.row.values.get("event_type", "").lower() for k in _BREAK_KEYWORDS)
+            for event in events
+        )
         if span > _LONG_SPAN_SECONDS and not has_break:
-            first_row = min(line for _s, _e, _t, line in events)
+            first_row = min(event.row.line for event in events)
             yield Finding(
                 rule_id="TODS-I601",
                 severity=Severity.INFO,
@@ -140,4 +133,5 @@ def long_run_without_break(context: ValidationContext) -> Iterator[Finding]:
                     f"{span // 3600}h{(span % 3600) // 60:02d}m with no break, lunch, or "
                     "meal event. Check whether a break belongs in the run."
                 ),
+                data={"value": f"{service_id},{run_id}"},
             )

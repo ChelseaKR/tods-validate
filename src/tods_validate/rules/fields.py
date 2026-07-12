@@ -7,22 +7,18 @@ from collections.abc import Iterator
 
 from ..findings import Finding, Severity
 from ..loader import FeedFile
-from ..schema import SPEC_URL, TABLES, FieldSpec, FieldType, Presence, TableSpec
+from ..run_events import parse_time as parse_time
+from ..schema import SPEC_URL, SPEC_VERSION, FieldSpec, FieldType, Presence, TableSpec, spec_link
 from . import ValidationContext, rule
 
 # GTFS Time: H:MM:SS or HH:MM:SS; hours may exceed 24 for service past midnight
 # and have no upper bound in the spec, so the hour field is not width-capped.
-_TIME_RE = re.compile(r"^(\d+):([0-5]\d):([0-5]\d)$")
 _DATE_RE = re.compile(r"^\d{8}$")
 
-
-def parse_time(value: str) -> int | None:
-    """Return seconds since noon-minus-12h, or None if not a valid GTFS time."""
-    m = _TIME_RE.match(value)
-    if m is None:
-        return None
-    hours, minutes, seconds = (int(g) for g in m.groups())
-    return hours * 3600 + minutes * 60 + seconds
+# parse_time itself lives in tods_validate.run_events (imported above) so that
+# ValidationContext's derived-state parsing can use it without importing back
+# into this package; re-imported here under its original name so existing
+# `from .fields import parse_time` call sites are unaffected.
 
 
 def _is_valid_date(value: str) -> bool:
@@ -32,7 +28,7 @@ def _is_valid_date(value: str) -> bool:
 
 
 def _tods_tables(context: ValidationContext) -> Iterator[tuple[TableSpec, FeedFile]]:
-    for name, table in TABLES.items():
+    for name, table in context.tables.items():
         feed = context.package.get(name)
         if feed is not None and feed.headers:
             yield table, feed
@@ -70,7 +66,8 @@ def missing_required_value(context: ValidationContext) -> Iterator[Finding]:
                         message=(
                             f"{table.filename} row {row.line}: {f.name!r} is required but empty."
                         ),
-                        suggestion=f"See {SPEC_URL}{table.spec_anchor}.",
+                        suggestion=f"See {spec_link(table)}.",
+                        data={"value": "", "field": f.name},
                     )
 
 
@@ -90,8 +87,16 @@ def invalid_enum(context: ValidationContext) -> Iterator[Finding]:
         for row in feed.rows:
             for f in enums:
                 value = row.values.get(f.name, "")
+                if value == "":
+                    # Blank on a Required enum is TODS-E201's concern; blank on an
+                    # Optional enum is a legitimate empty value (its enum_values
+                    # tuple already includes "" when the spec allows blank).
+                    continue
                 if value not in f.enum_values:
+                    blank_allowed = "" in f.enum_values
                     allowed = ", ".join(repr(v) for v in f.enum_values if v) or "'1'"
+                    allowed_values = ",".join(v for v in f.enum_values if v) or "1"
+                    blank_clause = "blank or " if blank_allowed else ""
                     yield Finding(
                         rule_id="TODS-E202",
                         severity=Severity.ERROR,
@@ -100,9 +105,10 @@ def invalid_enum(context: ValidationContext) -> Iterator[Finding]:
                         field=f.name,
                         message=(
                             f"{table.filename} row {row.line}: {f.name} is {value!r}, "
-                            f"but the only allowed values are blank or {allowed}."
+                            f"but the only allowed values are {blank_clause}{allowed}."
                         ),
-                        suggestion=f"See {SPEC_URL}{table.spec_anchor}.",
+                        suggestion=f"See {spec_link(table)}.",
+                        data={"value": value, "field": f.name, "allowed": allowed_values},
                     )
 
 
@@ -146,6 +152,7 @@ def invalid_format(context: ValidationContext) -> Iterator[Finding]:
                             "which is not a valid time. Use HH:MM:SS, e.g. '09:45:00' "
                             "or '25:10:00' for 1:10 AM the next service day."
                         ),
+                        data={"value": value, "field": f.name, "expected": "HH:MM:SS"},
                     )
                 elif f.type is FieldType.DATE and not _is_valid_date(value):
                     yield Finding(
@@ -158,6 +165,7 @@ def invalid_format(context: ValidationContext) -> Iterator[Finding]:
                             f"{table.filename} row {row.line}: {f.name} is {value!r}, "
                             "which is not a valid date. Use YYYYMMDD, e.g. '20260315'."
                         ),
+                        data={"value": value, "field": f.name, "expected": "YYYYMMDD"},
                     )
                 elif f.type is FieldType.NON_NEGATIVE_INTEGER and not value.isdigit():
                     yield Finding(
@@ -170,6 +178,11 @@ def invalid_format(context: ValidationContext) -> Iterator[Finding]:
                             f"{table.filename} row {row.line}: {f.name} is {value!r}, "
                             "which is not a non-negative whole number."
                         ),
+                        data={
+                            "value": value,
+                            "field": f.name,
+                            "expected": "non-negative integer",
+                        },
                     )
 
 
@@ -223,6 +236,11 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
                         f"({pretty}) already used on row {seen[key]}. Each "
                         f"({', '.join(table.primary_key)}) combination may appear once."
                     ),
+                    data={
+                        "value": pretty,
+                        "field": ",".join(table.primary_key),
+                        "referenced": f"{table.filename}#L{seen[key]}",
+                    },
                 )
             else:
                 seen[key] = row.line
@@ -246,6 +264,8 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
         "per-row reading: fires only for rows whose block_id is ambiguous, not for "
         "every row once any block is shared (spec-questions #8)."
     ),
+    # vehicle_assignments.txt does not exist in TODS v1.0.0 (added in v2.1.0).
+    spec_versions=(SPEC_VERSION,),
 )
 def vehicle_assignment_ambiguous(context: ValidationContext) -> Iterator[Finding]:
     feed = context.package.get("vehicle_assignments.txt")
@@ -272,6 +292,11 @@ def vehicle_assignment_ambiguous(context: ValidationContext) -> Iterator[Finding
                     "to identify which block instance the vehicle covers."
                 ),
                 suggestion="Fill in the service_id the assignment applies to.",
+                data={
+                    "value": block_id,
+                    "field": "service_id",
+                    "expected": ",".join(sorted(services)),
+                },
             )
 
 
@@ -306,4 +331,5 @@ def padded_value(context: ValidationContext) -> Iterator[Finding]:
                             "which has leading or trailing spaces."
                         ),
                         suggestion="Remove the padding so IDs match exactly.",
+                        data={"value": value, "field": name, "expected": value.strip()},
                     )

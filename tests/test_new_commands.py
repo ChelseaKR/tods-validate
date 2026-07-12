@@ -207,6 +207,113 @@ def test_anonymize_pseudonymizes_consistently(tmp_path: Path) -> None:
     assert va_ids <= veh_ids  # vehicle_id references still resolve
 
 
+def test_anonymize_pseudonymizes_vehicle_label(tmp_path: Path) -> None:
+    out = tmp_path / "anon"
+    result = invoke("anonymize", str(VALID_TODS), "-o", str(out), "--salt", "fixed")
+    assert result.exit_code == 0
+    veh = (out / "vehicles.txt").read_text(encoding="utf-8")
+    assert "vlbl_" in veh
+    assert "Old Reliable" not in veh
+    assert "Buster" not in veh
+    assert "vehicles.txt:vehicle_label" in result.output
+
+
+def test_anonymize_also_pseudonymizes_extension_field(tmp_path: Path) -> None:
+    out = tmp_path / "anon"
+    result = invoke(
+        "anonymize",
+        str(VALID_TODS),
+        "-o",
+        str(out),
+        "--salt",
+        "fixed",
+        "--also",
+        "run_events.txt:job_type",
+    )
+    assert result.exit_code == 0
+    run_events = (out / "run_events.txt").read_text(encoding="utf-8")
+    header, *rows = run_events.splitlines()
+    job_type_col = header.split(",").index("job_type")
+    job_types = {row.split(",")[job_type_col] for row in rows if row}
+    assert job_types
+    assert all(v.startswith("job_type_") for v in job_types)
+    assert "run_events.txt:job_type: " in result.output  # replacement count line
+    # A pseudonymized column is no longer reported as carried through.
+    carried_through = result.output.split("Carried through unprotected", 1)[1]
+    assert "run_events.txt:job_type" not in carried_through
+
+
+def test_anonymize_rejects_malformed_also(tmp_path: Path) -> None:
+    out = tmp_path / "anon"
+    result = invoke("anonymize", str(VALID_TODS), "-o", str(out), "--also", "not-a-pair")
+    assert result.exit_code == 2
+    assert "invalid --also value" in result.output
+
+
+def test_anonymize_also_rejects_default_protected_field(tmp_path: Path) -> None:
+    # --also must not be able to silently overwrite (and de-correlate or
+    # weaken) a field already protected by default, e.g. vehicle_id, whose
+    # pseudonym prefix must match across vehicles.txt and
+    # vehicle_assignments.txt for the assignment to still resolve.
+    out = tmp_path / "anon"
+    result = invoke(
+        "anonymize",
+        str(VALID_TODS),
+        "-o",
+        str(out),
+        "--salt",
+        "fixed",
+        "--also",
+        "vehicles.txt:vehicle_label",
+    )
+    assert result.exit_code == 2
+    assert "already pseudonymized by default" in result.output
+    assert not out.exists()
+
+
+def test_anonymize_carried_through_reports_numeric_identifier(tmp_path: Path) -> None:
+    # A numeric-looking extension identifier (a badge number) is exactly the
+    # kind of re-identifying data the disclosure table exists for, and must
+    # not be excluded just because it looks like a number.
+    feed_dir = tmp_path / "feed"
+    feed_dir.mkdir()
+    (feed_dir / "vehicles.txt").write_text(
+        "vehicle_id,badge_number\nbus-1,48213\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "anon"
+    result = invoke("anonymize", str(feed_dir), "-o", str(out), "--salt", "fixed")
+    assert result.exit_code == 0
+    carried_through = result.output.split("Carried through unprotected", 1)[1]
+    assert "vehicles.txt:badge_number" in carried_through
+
+
+def test_anonymize_carried_through_table_always_shown(tmp_path: Path) -> None:
+    out = tmp_path / "anon"
+    result = invoke("anonymize", str(VALID_TODS), "-o", str(out), "--salt", "fixed")
+    assert result.exit_code == 0
+    assert "Carried through unprotected" in result.output
+    # run_events.txt job_type is free text and not in the default map.
+    assert "run_events.txt:job_type" in result.output
+
+
+def test_anonymize_carried_through_empty_prints_none(tmp_path: Path) -> None:
+    # A package whose only free-text columns are all in the default map (or
+    # covered by --also) should print the header with an explicit "(none)"
+    # rather than an empty/absent table.
+    feed_dir = tmp_path / "feed"
+    feed_dir.mkdir()
+    (feed_dir / "vehicles.txt").write_text(
+        "vehicle_id,vehicle_label,license_plate\nbus-1,Old Reliable,OR-E285104\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "anon"
+    result = invoke("anonymize", str(feed_dir), "-o", str(out), "--salt", "fixed")
+    assert result.exit_code == 0
+    assert "Carried through unprotected" in result.output
+    assert "(none)" in result.output
+
+
 def test_merge_writes_manifest(tmp_path: Path) -> None:
     out = tmp_path / "merged"
     result = invoke("merge", str(VALID_TODS), "--gtfs", str(VALID_GTFS), "-o", str(out))
@@ -223,3 +330,40 @@ def test_github_outputs_written(tmp_path: Path, monkeypatch) -> None:
     invoke(E201, "--format", "github")
     written = output_file.read_text(encoding="utf-8")
     assert "error-count=1" in written
+
+
+def _copy_gtfs_with_trip_renamed(tmp_path: Path, old_id: str, new_id: str) -> tuple[Path, Path]:
+    """Copy VALID_GTFS into old/new dirs, renaming one trip_id in the new copy."""
+    import shutil
+
+    old_dir, new_dir = tmp_path / "old_gtfs", tmp_path / "new_gtfs"
+    shutil.copytree(VALID_GTFS, old_dir)
+    shutil.copytree(VALID_GTFS, new_dir)
+    for name in ("trips.txt", "stop_times.txt"):
+        path = new_dir / name
+        path.write_text(path.read_text(encoding="utf-8").replace(old_id, new_id), encoding="utf-8")
+    return old_dir, new_dir
+
+
+def test_drift_reports_broken_trip_id_and_fails(tmp_path: Path) -> None:
+    old_dir, new_dir = _copy_gtfs_with_trip_renamed(tmp_path, "103", "103A")
+    result = invoke("drift", str(old_dir), str(new_dir), "--tods", str(VALID_TODS))
+    assert result.exit_code == 1
+    assert "103" in result.output
+    assert "103A" in result.output
+
+
+def test_drift_clean_when_gtfs_unchanged() -> None:
+    result = invoke("drift", str(VALID_GTFS), str(VALID_GTFS), "--tods", str(VALID_TODS))
+    assert result.exit_code == 0
+    assert "No referenced" in result.output
+
+
+def test_drift_json_format(tmp_path: Path) -> None:
+    old_dir, new_dir = _copy_gtfs_with_trip_renamed(tmp_path, "103", "103A")
+    result = invoke(
+        "drift", str(old_dir), str(new_dir), "--tods", str(VALID_TODS), "--format", "json"
+    )
+    payload = json.loads(result.output)
+    assert payload["brokenTripIds"][0]["value"] == "103"
+    assert payload["brokenTripIds"][0]["candidates"] == ["103A"]

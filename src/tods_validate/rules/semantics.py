@@ -9,67 +9,25 @@ spec actually states are errors here.
 from __future__ import annotations
 
 from collections.abc import Iterator
-from dataclasses import dataclass
 
 from ..findings import Finding, Severity
 from ..gtfs_companion import parse_gtfs_date
 from ..loader import Row
-from ..schema import SPEC_URL
+from ..run_events import _Event
+from ..schema import SPEC_URL, SPEC_VERSION
 from . import ValidationContext, rule
-from .fields import parse_time
 
 _RUN_EVENTS_SECTION = f"{SPEC_URL}#run_eventstxt"
-
-
-@dataclass(frozen=True)
-class _Event:
-    row: Row
-    service_id: str
-    run_id: str
-    sequence: int | None
-    trip_id: str
-    start: int | None  # seconds
-    end: int | None
-    start_location: str
-    end_location: str
-
-    @property
-    def run(self) -> tuple[str, str]:
-        return (self.service_id, self.run_id)
-
-
-def _events(context: ValidationContext) -> list[_Event]:
-    feed = context.package.get("run_events.txt")
-    if feed is None:
-        return []
-    events = []
-    for row in feed.rows:
-        sequence_raw = row.values.get("event_sequence", "")
-        events.append(
-            _Event(
-                row=row,
-                service_id=row.values.get("service_id", ""),
-                run_id=row.values.get("run_id", ""),
-                sequence=int(sequence_raw) if sequence_raw.isdigit() else None,
-                trip_id=row.values.get("trip_id", ""),
-                start=parse_time(row.values.get("start_time", "")),
-                end=parse_time(row.values.get("end_time", "")),
-                start_location=row.values.get("start_location", ""),
-                end_location=row.values.get("end_location", ""),
-            )
-        )
-    return events
-
-
-def _events_by_run(context: ValidationContext) -> dict[tuple[str, str], list[_Event]]:
-    runs: dict[tuple[str, str], list[_Event]] = {}
-    for event in _events(context):
-        if event.service_id and event.run_id:
-            runs.setdefault(event.run, []).append(event)
-    return runs
+# These checks assume v2.1.0's run_events.txt field names (start_time/end_time,
+# service_id+run_id+event_sequence) and vehicle_assignments.txt/
+# employee_run_dates.txt, none of which v1.0.0 has in this shape (v1's
+# run_events.txt uses event_time/event_duration instead, and has no service_id/
+# run_id columns at all -- see docs/spec-versions.md). Restricted to v2.1.0.
+_V2_ONLY = (SPEC_VERSION,)
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E401",
     severity=Severity.ERROR,
     title="Event ends before it starts",
@@ -85,7 +43,7 @@ def _events_by_run(context: ValidationContext) -> dict[tuple[str, str], list[_Ev
     ),
 )
 def event_ends_before_start(context: ValidationContext) -> Iterator[Finding]:
-    for event in _events(context):
+    for event in context.events:
         if event.start is not None and event.end is not None and event.end < event.start:
             yield Finding(
                 rule_id="TODS-E401",
@@ -102,10 +60,15 @@ def event_ends_before_start(context: ValidationContext) -> Iterator[Finding]:
                     "If the event runs past midnight, keep counting hours upward: "
                     "write 1:10 AM the next day as '25:10:00'."
                 ),
+                data={
+                    "value": event.row.values.get("end_time", ""),
+                    "expected": event.row.values.get("start_time", ""),
+                },
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E402",
     severity=Severity.ERROR,
     title="Two trip events in one run overlap in time",
@@ -117,7 +80,7 @@ def event_ends_before_start(context: ValidationContext) -> Iterator[Finding]:
     spec_section=f"{SPEC_URL}#event_sequence-and-event-times",
 )
 def overlapping_trip_events(context: ValidationContext) -> Iterator[Finding]:
-    for events in _events_by_run(context).values():
+    for events in context.events_by_run.values():
         trip_events = [e for e in events if e.trip_id and e.start is not None and e.end is not None]
         trip_events.sort(key=lambda e: (e.start or 0, e.end or 0))
         # Sweep with the latest-ending event seen so far, so an event that
@@ -144,12 +107,18 @@ def overlapping_trip_events(context: ValidationContext) -> Iterator[Finding]:
                         f"{previous.row.line}). Trip events in one run must not "
                         "overlap; an employee cannot work two trips at once."
                     ),
+                    data={
+                        "value": current.row.values.get("start_time", ""),
+                        "expected": previous.row.values.get("end_time", ""),
+                        "referenced": f"run_events.txt#L{previous.row.line}",
+                    },
                 )
             if previous is None or (current.end or 0) > (previous.end or 0):
                 previous = current
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W403",
     severity=Severity.WARNING,
     title="Event order disagrees with event times",
@@ -161,7 +130,7 @@ def overlapping_trip_events(context: ValidationContext) -> Iterator[Finding]:
     spec_section=f"{SPEC_URL}#event_sequence-and-event-times",
 )
 def sequence_disagrees_with_time(context: ValidationContext) -> Iterator[Finding]:
-    for events in _events_by_run(context).values():
+    for events in context.events_by_run.values():
         timed = [e for e in events if e.sequence is not None and e.start is not None]
         timed.sort(key=lambda e: e.sequence or 0)
         for previous, current in zip(timed, timed[1:], strict=False):
@@ -182,11 +151,17 @@ def sequence_disagrees_with_time(context: ValidationContext) -> Iterator[Finding
                         f"{previous.row.values.get('start_time', '')}) in the same "
                         "run. Sequence values should increase through the day."
                     ),
+                    data={
+                        "value": str(current.sequence),
+                        "expected": str(previous.sequence),
+                        "referenced": f"run_events.txt#L{previous.row.line}",
+                    },
                 )
                 break  # one finding per run is enough to point at the problem
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W404",
     severity=Severity.WARNING,
     title="Employee is assigned to overlapping runs on the same date",
@@ -202,7 +177,7 @@ def employee_double_booked(context: ValidationContext) -> Iterator[Finding]:  # 
     if assignments is None:
         return
     spans: dict[tuple[str, str], tuple[int, int]] = {}
-    for run, events in _events_by_run(context).items():
+    for run, events in context.events_by_run.items():
         times = [(e.start, e.end) for e in events if e.start is not None and e.end is not None]
         if times:
             spans[run] = (min(t[0] for t in times), max(t[1] for t in times))
@@ -240,10 +215,15 @@ def employee_double_booked(context: ValidationContext) -> Iterator[Finding]:  # 
                             "If this is intentional (split duties), no change is "
                             "needed; otherwise check for a stale assignment."
                         ),
+                        data={
+                            "value": f"{run_b[0]},{run_b[1]}",
+                            "referenced": f"{run_a[0]},{run_a[1]}",
+                        },
                     )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E405",
     severity=Severity.ERROR,
     title="Run operates on dates its trip does not",
@@ -259,7 +239,7 @@ def run_dates_exceed_trip_dates(context: ValidationContext) -> Iterator[Finding]
     assert context.gtfs is not None
     dates = context.gtfs.service_dates
     reported: set[tuple[str, str]] = set()
-    for event in _events(context):
+    for event in context.events:
         if not event.trip_id or not event.service_id:
             continue
         trip_service = context.gtfs.trip_service.get(event.trip_id)
@@ -291,10 +271,16 @@ def run_dates_exceed_trip_dates(context: ValidationContext) -> Iterator[Finding]
                     "calendar_dates_supplement.txt so they are a subset of the "
                     "trip's."
                 ),
+                data={
+                    "value": event.service_id,
+                    "expected": trip_service,
+                    "referenced": event.trip_id,
+                },
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W406",
     severity=Severity.WARNING,
     title="Employee assignment date is outside the run's service days",
@@ -333,10 +319,15 @@ def assignment_outside_service(context: ValidationContext) -> Iterator[Finding]:
                 suggestion=(
                     "Check the date, or extend the service via the calendar supplement files."
                 ),
+                data={
+                    "value": row.values.get("date", ""),
+                    "referenced": f"calendar.service_id={service_id}",
+                },
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W407",
     severity=Severity.WARNING,
     title="Vehicle assignment date is outside the service days",
@@ -371,10 +362,15 @@ def vehicle_assignment_outside_service(context: ValidationContext) -> Iterator[F
                     f"{service_id!r} operates, so block "
                     f"{row.values.get('block_id', '')!r} does not run then."
                 ),
+                data={
+                    "value": row.values.get("date", ""),
+                    "referenced": f"calendar.service_id={service_id}",
+                },
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W408",
     severity=Severity.WARNING,
     title="Identical employee assignment appears twice",
@@ -415,12 +411,17 @@ def duplicate_assignment(context: ValidationContext) -> Iterator[Finding]:
                     f"{key[1]!r}, run_id {key[2]!r}, employee_id {key[3]!r})."
                 ),
                 suggestion="Remove the duplicate row.",
+                data={
+                    "value": ",".join(key),
+                    "referenced": f"employee_run_dates.txt#L{seen[key]}",
+                },
             )
         else:
             seen[key] = row.line
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W409",
     severity=Severity.WARNING,
     title="Consecutive run events do not connect in space",
@@ -438,7 +439,7 @@ def duplicate_assignment(context: ValidationContext) -> Iterator[Finding]:
     ),
 )
 def run_events_discontinuous(context: ValidationContext) -> Iterator[Finding]:
-    for events in _events_by_run(context).values():
+    for events in context.events_by_run.values():
         ordered = sorted(
             (e for e in events if e.sequence is not None), key=lambda e: e.sequence or 0
         )
@@ -464,4 +465,9 @@ def run_events_discontinuous(context: ValidationContext) -> Iterator[Finding]:
                         "Add the missing deadhead or move event between them, or correct the "
                         "location so each event begins where the last one ended."
                     ),
+                    data={
+                        "value": current.start_location,
+                        "expected": previous.end_location,
+                        "referenced": f"run_events.txt#L{previous.row.line}",
+                    },
                 )

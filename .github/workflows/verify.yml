@@ -9,8 +9,9 @@ name: Verify (reusable)
 #  - version consistency: the tag, pyproject.toml, and CITATION.cff all agree,
 #    and CHANGELOG.md has a section for the released version (REL-03/REL-10).
 #  - the tag is an annotated, signed tag object, not a lightweight one
-#    (REL-08). This is a forward-fix: existing tags (through v0.6.0) predate
-#    it and are not retroactively rewritten.
+#    (REL-08), and its SSH signature verifies against the committed
+#    .github/allowed_signers file. This is a forward-fix: existing tags
+#    (through v0.6.0) predate it and are not retroactively rewritten.
 
 on:
   workflow_call:
@@ -82,6 +83,11 @@ jobs:
             echo "::error::$TAG is a $TAG_TYPE, not an annotated tag object. Create release tags with: git tag -s $TAG -m \"release: $TAG\""
             exit 1
           fi
+          # Release tags are SSH-signed; git verify-tag needs an
+          # allowed-signers list to map the signature to a trusted principal.
+          # The list is committed at the verified ref, so trusting it is the
+          # same trust decision as running this workflow's own code.
+          git config gpg.ssh.allowedSignersFile "$PWD/.github/allowed_signers"
           if ! git verify-tag "$TAG" >/tmp/verify-tag.log 2>&1; then
             echo "::error::$TAG is not a verifiable signed tag. Sign it: git tag -s $TAG -m \"release: $TAG\" (see the log below)."
             cat /tmp/verify-tag.log

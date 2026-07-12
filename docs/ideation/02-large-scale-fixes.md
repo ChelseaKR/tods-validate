@@ -11,14 +11,6 @@ Effort tiers: **S** ≤ a day · **M** a few days · **L** one to two weeks ·
 
 ## FIX-01 — One supplement-evaluation engine, proven equivalent
 
-**Status:** Done. `src/tods_validate/supplement.py` now exposes
-`apply_supplement()` as the single engine; `gtfs_companion.merge_supplement()`
-and `merge._merge_file()` both delegate to it and populate their existing
-return shapes (dict-of-rows, `MergeStats`) from its `SupplementResult`.
-Differential property test in `tests/test_supplement_equivalence.py` asserts
-the validation view and the materialized merge agree on surviving keys and
-values (`max_examples=750` committed; CI-scale ≥10k left as a follow-up knob).
-
 **Pitch:** collapse the duplicated supplement logic in
 `gtfs_companion.merge_supplement()` and `merge._merge_file()` into one shared
 module, with a differential test that the validation view and the
@@ -126,7 +118,19 @@ documented memory ceiling in `SECURITY.md` alongside the existing limits.
 
 ---
 
-## FIX-05 — Structured finding parameters end to end
+## FIX-05 — Structured finding parameters end to end (done 2026-07-03)
+
+**Status:** Done. `data` is populated on every ERROR-band rule across
+`fields.py`, `structure.py`, `semantics.py`, `references.py`, and
+(best-effort) `coverage.py`'s INFO rules; SARIF descriptors carry
+`shortDescription`/`fullDescription`/`helpUri` and each result's
+`properties` carry `data`; `render_json()` accepts an optional
+`suggestions` list and `validate --suggest -f json` emits a structured
+`suggestions` array (`Suggestion.to_dict()`); `docs/report.schema.json`
+documents the new top-level `suggestions` shape under the existing 1.2.0
+bump. LSP quick-fix consumption of `data` (mentioned in the shape-of-work
+below) is not part of this pass — `lsp.py`'s two-rule special case is
+untouched and remains a follow-up.
 
 **Pitch:** add machine-readable fields to `Finding` (offending value,
 expected/allowed values, referenced ID, context row keys) and thread them
@@ -180,6 +184,16 @@ tests for every subcommand × policy combination before refactoring.
 **Excellent looks like:** a parametrized test proving all four surfaces give
 identical verdicts for identical inputs and policy.
 
+✅ Implemented 2026-07-03 (branch: `roadmap/fix-06-one-gatingpolicy-for-validate-dif`)
+— `src/tods_validate/policy.py` adds `GatingPolicy`/`GateResult`;
+`GatingPolicy.from_config` centralizes the `--fail-on`/config/profile
+precedence. `validate`, `diff`, `batch`, and
+`testing.assert_feed_valid` all gate through `policy.apply()`; `diff` and
+`batch` gained `--config`/`--ignore` (and `validate` keeps `--baseline`).
+`tests/test_policy.py` parametrizes all four surfaces over the same
+findings × policy inputs and asserts identical verdicts, plus golden
+exit-code assertions per subcommand.
+
 ---
 
 ## FIX-07 — Content-anchored baseline fingerprints
@@ -205,9 +219,41 @@ must state that renumbered *and* revalued rows still churn. **Excellent looks
 like:** a test where 500 rows shift by one line and zero findings change
 identity.
 
+**Status (2026-07-03):** done. `Finding.fingerprint()` (`findings.py`)
+SHA-256-hashes a canonical JSON payload of `rule_id`, `file`, `field`, the
+sorted `data` items, and the offending value, deliberately excluding `row`
+and `message`; it is emitted as `fingerprint` in `to_dict()` alongside `data`
+(report schema bumped to 1.3.0, `docs/report.schema.json` updated).
+`baseline.finding_identity()` now returns the fingerprint; the previous
+(rule_id, pointer, message) tuple survives as `_legacy_identity()`, and
+`load_baseline_identities()` prefers a stored `fingerprint`, falls back to
+recomputing one from a dict's `data`/`file`/`field`/`rule_id`, and falls back
+further to the legacy tuple for reports that predate structured data
+entirely — old and new baselines both stay usable. `Diff` gained a `moved`
+category (fingerprint matches an old finding, pointer/row differs), reported
+separately from `persisting`/`introduced` by `diff_findings()` and by
+`tods-validate diff`'s CLI output. Honesty note added to `baseline.py`'s
+module docstring: a rule that has not been migrated to populate `data` still
+fingerprints on (rule_id, file, field) alone and can collide across rows in
+the same file, and a row whose *content* changes still churns identity even
+when its row number does not — this land ahead of FIX-05 landing on `main`,
+so `data` scaffolding (`Finding.data`, additive and optional) was added here
+too, matching the shape already implemented on the `roadmap/fix-05-*`
+branch. Tests in `tests/test_baseline_fingerprint.py` cover fingerprint
+stability and uniqueness, the legacy-baseline fallback, the `moved` category,
+and the roadmap's bar: 500 findings each shifted by one row report zero
+introduced and zero fixed. `pytest -q`, `mypy`, and `ruff check`/`ruff
+format --check` all green.
+
 ---
 
 ## FIX-08 — Finding causality and cascade suppression
+
+**Status:** Done. `Finding.caused_by` (`findings.py`), a `runner._link_causality`
+post-processing pass tagging TODS-E201 findings that share a row with a
+TODS-E104, and a `render_text` collapse into "and N follow-on finding(s)".
+`render_json`/`render_markdown` keep every finding and surface the link.
+`docs/report.schema.json` documents the new field. See `tests/test_causality.py`.
 
 **Pitch:** link derivative findings to their root cause and stop reporting
 the echo by default.
@@ -259,6 +305,24 @@ severity contract — the disclosure block and the acknowledgment flag are the
 mitigation, and profiles (E6) become expressible *as* shipped remap sets.
 **Excellent looks like:** no output format can contain a remapped finding
 without the disclosure.
+
+**Status (2026-07-03):** done. `config.py` parses an optional `[severity]`
+table (rule ID key -> a severity string or `{level=..., acknowledged=...}`)
+against the rule registry, rejecting unknown rule IDs and requiring
+`acknowledged = true` to downgrade a spec-ERROR rule; `_merge` resolves
+layered configs override-wins per rule_id. `runner.run()` applies the remap
+in one place after `rules.validate()` so every caller (CLI, tests, the
+public API's callers of `run()`) inherits it; `Finding` gained
+`severity_original` (None unless remapped). Every renderer in `report.py`
+(text, Markdown/`--stamp`, JSON `to_dict()`, GitHub annotations, SARIF,
+HTML) discloses remapped findings — a "Local policy: N severit(y/ies)
+remapped" block (or SARIF `run.properties`/per-result `properties`, or a
+per-finding "(spec: ORIGINAL)" note) — so no format can carry a remapped
+finding silently. `docs/report.schema.json` documents
+`findings[].severity_original` (schema 1.2.0). Tests in
+`tests/test_severity_remap.py` cover the upgrade/downgrade/acknowledgment
+paths, unknown-rule-ID rejection, override-wins merging, and disclosure
+presence in every output format; full suite green.
 
 ---
 
@@ -316,6 +380,15 @@ unpinned network installs and starts ≥2× faster on a warm cache.
 ---
 
 ## FIX-12 — Anonymize: close the identifier gaps and report residual risk
+
+**Status: Done.** Implemented on branch
+`roadmap/fix-12-close-anonymize-identifier-gaps-a`: `vehicle_label` is now
+pseudonymized by default (`anonymize.py`), `--also FILE:FIELD` pseudonymizes
+caller-supplied extension columns, every `anonymize` run prints a "Carried
+through unprotected" table of remaining non-enum free-text columns (`cli.py`),
+and `SECURITY.md`'s personal-data section reflects the closed `vehicle_label`
+channel. The `--salt`-less-write-into-existing-export refusal described below
+was treated as a nice-to-have and was not implemented in this pass.
 
 **Pitch:** pseudonymize the fields that are still identifying, and make
 `anonymize` report what it could *not* protect.

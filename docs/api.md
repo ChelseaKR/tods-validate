@@ -16,7 +16,7 @@ if not result.ok:                       # ok is True when there are no errors
 print(result.error_count, "errors;", len(result.warnings), "warnings")
 ```
 
-## `validate_feed(path, gtfs=None, *, enable=(), encoding=None)`
+## `validate_feed(path, gtfs=None, *, enable=(), encoding=None, spec_version=SPEC_VERSION)`
 
 - `path`: the TODS package (directory or `.zip`).
 - `gtfs`: companion GTFS feed to resolve references against. Omit when the GTFS
@@ -24,6 +24,9 @@ print(result.error_count, "errors;", len(result.warnings), "warnings")
 - `enable`: opt-in rules to turn on, by rule ID or category (`"coverage"`,
   `"advisory"`, `"experimental"`).
 - `encoding`: override UTF-8 decoding for non-conforming exports.
+- `spec_version`: which TODS spec version to validate against — a value from
+  `tods_validate.schema.SUPPORTED_SPEC_VERSIONS` (currently `"1.0.0"` or the
+  default, `"2.1.0"`). See [docs/spec-versions.md](spec-versions.md).
 
 Returns a `ValidationResult`. Raises
 `tods_validate.loader.PackageNotFoundError` when the package cannot be read at
@@ -47,10 +50,15 @@ A frozen dataclass: `rule_id`, `severity`, `message`, `file`, `row`, `field`,
 `file.txt#L4/field` identifier). `to_dict()` matches
 [docs/report.schema.json](report.schema.json).
 
-## `suggest_fixes(path, gtfs=None, *, enable=(), encoding=None)`
+## `suggest_fixes(path, gtfs=None, *, enable=(), encoding=None, spec_version=SPEC_VERSION)`
 
 Validates the feed and returns a `list[Suggestion]`: one entry per finding the
 validator knows how to fix mechanically. Arguments mirror `validate_feed`.
+Value-format suggestions are currently derived from the v2.1.0 field
+inventory regardless of `spec_version`; under `"1.0.0"` they degrade to
+offering none rather than a wrong one (the trim/dedupe suggestions are
+schema-independent and unaffected). See
+[docs/spec-versions.md](spec-versions.md).
 
 ```python
 from tods_validate import suggest_fixes
@@ -76,14 +84,14 @@ assertions, for exporter teams who want a CI gate against the same checks the
 CLI runs. They are kept out of the top-level namespace so importing the library
 never pulls in test-only code; import them from `tods_validate.testing`.
 
-### `assert_feed_valid(path, gtfs=None, *, enable=(), encoding=None, fail_on="error", ignore=())`
+### `assert_feed_valid(path, gtfs=None, *, enable=(), encoding=None, fail_on="error", ignore=(), spec_version=SPEC_VERSION)`
 
 Asserts the feed has no findings at or above `fail_on` (`"error"` by default,
 `"warning"` to gate on warnings; a `Severity` is also accepted). `ignore` is a
 set of rule IDs to accept. Raises `AssertionError` carrying the rendered report;
 returns the `ValidationResult` on success.
 
-### `assert_feed_produces(path, expected, gtfs=None, *, enable=(), encoding=None, exactly=False)`
+### `assert_feed_produces(path, expected, gtfs=None, *, enable=(), encoding=None, exactly=False, spec_version=SPEC_VERSION)`
 
 Asserts that validating `path` produces the `expected` rule ID(s) — a single ID
 or an iterable. A subset check by default; pass `exactly=True` to require the

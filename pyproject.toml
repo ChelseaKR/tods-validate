@@ -2,9 +2,18 @@
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
+# `examples/sample-feed` lives outside src/tods_validate, so hatchling's
+# default wheel packaging (source-directory-only) does not pick it up.
+# `tods-validate init` copies its rows into scaffolded packages (see
+# src/tods_validate/init.py), so it must ship in the wheel too, not just the
+# sdist -- otherwise `pip install tods-validate` (as opposed to a source
+# checkout) silently gets a headers-only scaffold.
+[tool.hatch.build.targets.wheel.force-include]
+"examples/sample-feed" = "tods_validate/_sample_feed"
+
 [project]
 name = "tods-validate"
-version = "0.6.0"
+version = "0.7.0"
 description = "Validator for Transit Operational Data Standard (TODS) feeds, formerly the Operational Data Standard (ODS)"
 readme = "README.md"
 license = "Apache-2.0"
@@ -111,6 +120,13 @@ fail_under = 90
 # resolve, but only the rules modules are mutated. Not part of the CI gate; see
 # docs/mutation-testing.md for the baseline and how to run it.
 source_paths = ["src/tods_validate"]
+# `only_mutate` is an allowlist, not a denylist: anything outside
+# src/tods_validate/rules/ is already excluded, which is why the shared
+# run-event parsing (src/tods_validate/run_events.py — _Event, parse_events,
+# events_by_run, parse_time) lives there rather than in a rules/ module. It is
+# exercised indirectly by nearly every semantic rule, so mutants there would
+# get killed by whichever test runs first rather than pointing at a specific
+# rule's coverage gap (see FIX-03 in docs/ideation/02-large-scale-fixes.md).
 only_mutate = ["src/tods_validate/rules/*"]
 # Drive mutants with the rule test modules: each one asserts rule behaviour
 # against the fixture feeds (a passing + failing fixture per rule). Other

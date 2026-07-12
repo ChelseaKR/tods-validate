@@ -1,0 +1,2 @@
+run_event_id,piece_id,event_type,event_name,event_time,event_duration,event_from_location_type,event_from_location_id,event_to_location_type,event_to_location_id
+E1,P1,0,Sign-in,07:15:00,600,0,GARAGE,,

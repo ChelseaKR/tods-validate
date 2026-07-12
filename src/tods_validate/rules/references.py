@@ -13,11 +13,15 @@ from collections.abc import Iterator
 
 from ..findings import Finding, Severity
 from ..loader import FeedFile, Package, Row
-from ..schema import SPEC_URL, TABLES
+from ..schema import SPEC_URL, SPEC_VERSION, TABLES
 from . import ValidationContext, rule
 from .fields import parse_time
 
 _SUPPLEMENT_SECTION = f"{SPEC_URL}#supplement-files"
+# These rules resolve IDs against the companion GTFS "TODS-Supplemented GTFS",
+# a mechanism the v1.0.0 spec does not have (Supplement files were introduced
+# in v2.0.0-alpha.1). Restricted to v2.1.0; see docs/spec-versions.md.
+_V2_ONLY = (SPEC_VERSION,)
 
 
 def _rows(context: ValidationContext, filename: str) -> list[Row]:
@@ -26,15 +30,10 @@ def _rows(context: ValidationContext, filename: str) -> list[Row]:
 
 
 def _run_pairs(context: ValidationContext) -> set[tuple[str, str]]:
-    pairs = set()
-    feed = context.package.get("run_events.txt")
-    if feed is not None:
-        for row in feed.rows:
-            service_id = row.values.get("service_id", "")
-            run_id = row.values.get("run_id", "")
-            if service_id and run_id:
-                pairs.add((service_id, run_id))
-    return pairs
+    # Thin wrapper kept so call sites read the same as before; the set is
+    # derived once per validation and cached on the context (see
+    # ValidationContext.run_pairs / .events_by_run).
+    return context.run_pairs
 
 
 def _trips_available(context: ValidationContext) -> bool:
@@ -71,6 +70,7 @@ def _routes_available(context: ValidationContext) -> bool:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E301",
     severity=Severity.ERROR,
     title="Employee assignment points to a run that does not exist",
@@ -106,10 +106,16 @@ def employee_run_missing(context: ValidationContext) -> Iterator[Finding]:
                     "Check both IDs against run_events.txt; a run_id that exists under "
                     "a different service_id is a different run."
                 ),
+                data={
+                    "service_id": service_id,
+                    "run_id": run_id,
+                    "referenced": "run_events.(service_id,run_id)",
+                },
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W302",
     severity=Severity.WARNING,
     title="Referenced file is missing, references not checked",
@@ -141,13 +147,28 @@ def referenced_file_missing(context: ValidationContext) -> Iterator[Finding]:
         gtfs_needs: list[tuple[str, bool, str]] = [
             (
                 "run_events.txt",
-                _trips_available(context) or not _uses_trip_ids(package),
+                _trips_available(context) or not _uses_column(package, "run_events.txt", "trip_id"),
                 "trips.txt",
             ),
             ("run_events.txt", _stops_available(context), "stops.txt"),
             (
                 "run_events.txt",
                 _calendar_available(context),
+                "calendar.txt or calendar_dates.txt",
+            ),
+            # vehicle_assignments.txt resolves block_id into trips and service_id
+            # into the calendars (rules E311/E312). Without those companion files
+            # the checks quietly no-op, so disclose the gap here too.
+            (
+                "vehicle_assignments.txt",
+                _trips_available(context)
+                or not _uses_column(package, "vehicle_assignments.txt", "block_id"),
+                "trips.txt",
+            ),
+            (
+                "vehicle_assignments.txt",
+                _calendar_available(context)
+                or not _uses_column(package, "vehicle_assignments.txt", "service_id"),
                 "calendar.txt or calendar_dates.txt",
             ),
         ]
@@ -164,12 +185,13 @@ def referenced_file_missing(context: ValidationContext) -> Iterator[Finding]:
                 )
 
 
-def _uses_trip_ids(package: Package) -> bool:
-    feed = package.get("run_events.txt")
-    return feed is not None and any(row.values.get("trip_id", "") for row in feed.rows)
+def _uses_column(package: Package, filename: str, column: str) -> bool:
+    feed = package.get(filename)
+    return feed is not None and any(row.values.get(column, "") for row in feed.rows)
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E303",
     severity=Severity.ERROR,
     title="Vehicle assignment points to a vehicle that does not exist",
@@ -198,6 +220,7 @@ def vehicle_missing(context: ValidationContext) -> Iterator[Finding]:
                     f"{vehicle_id!r} is not defined in vehicles.txt."
                 ),
                 suggestion="Add the vehicle to vehicles.txt or correct the ID.",
+                data={"value": vehicle_id, "referenced": "vehicles.vehicle_id"},
             )
 
 
@@ -216,6 +239,7 @@ def _supplement_groups(
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E304",
     severity=Severity.ERROR,
     title="Supplement both deletes and redefines the same row",
@@ -256,10 +280,15 @@ def delete_and_readd(context: ValidationContext) -> Iterator[Finding]:
                     suggestion=(
                         "Keep one row: either delete the GTFS row, or update its values, not both."
                     ),
+                    data={
+                        "value": pretty,
+                        "referenced": f"{name}#L{deletes[0].line}",
+                    },
                 )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W305",
     severity=Severity.WARNING,
     title="Supplement updates the same row more than once",
@@ -299,6 +328,7 @@ def duplicate_supplement_update(context: ValidationContext) -> Iterator[Finding]
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W306",
     severity=Severity.WARNING,
     title="Deleted supplement row carries values that will be ignored",
@@ -339,6 +369,7 @@ def delete_with_values(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E307",
     severity=Severity.ERROR,
     title="Run event points to a trip that does not exist",
@@ -377,10 +408,12 @@ def run_event_trip_missing(context: ValidationContext) -> Iterator[Finding]:
                     "Correct the trip_id, or add the trip via trips_supplement.txt if "
                     "it is non-revenue service."
                 ),
+                data={"value": trip_id, "referenced": "trips.trip_id"},
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E308",
     severity=Severity.ERROR,
     title="Run uses a service that does not exist",
@@ -423,10 +456,12 @@ def run_event_service_missing(context: ValidationContext) -> Iterator[Finding]:
                     "calendar_dates_supplement.txt if the crew schedule uses its own "
                     "service days."
                 ),
+                data={"value": service_id, "referenced": "calendar.service_id"},
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E309",
     severity=Severity.ERROR,
     title="Run event starts or ends at a stop that does not exist",
@@ -464,10 +499,16 @@ def run_event_stop_missing(context: ValidationContext) -> Iterator[Finding]:
                     suggestion=(
                         "Add non-public locations such as garages via stops_supplement.txt."
                     ),
+                    data={
+                        "value": stop_id,
+                        "field": field_name,
+                        "referenced": "stops.stop_id",
+                    },
                 )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E310",
     severity=Severity.ERROR,
     title="Run event block disagrees with the trip's block",
@@ -501,10 +542,17 @@ def run_event_block_mismatch(context: ValidationContext) -> Iterator[Finding]:
                     f"{trip_id!r} belongs to block {trip_block!r} in the supplemented "
                     "GTFS feed. When both are set they must not be different."
                 ),
+                data={
+                    "value": block_id,
+                    "expected": trip_block,
+                    "trip_id": trip_id,
+                    "referenced": "trips.block_id",
+                },
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W315",
     severity=Severity.WARNING,
     title="Run event location does not match the trip's first or last stop",
@@ -559,6 +607,7 @@ def run_event_endpoint_mismatch(context: ValidationContext) -> Iterator[Finding]
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W316",
     severity=Severity.WARNING,
     title="Run event time does not match the trip's scheduled time",
@@ -622,6 +671,7 @@ def run_event_time_mismatch(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E311",
     severity=Severity.ERROR,
     title="Vehicle assignment points to a block that does not exist",
@@ -650,10 +700,12 @@ def vehicle_block_missing(context: ValidationContext) -> Iterator[Finding]:
                     "not used by any trip in the companion GTFS feed (after applying "
                     "trips_supplement.txt)."
                 ),
+                data={"value": block_id, "referenced": "trips.block_id"},
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E312",
     severity=Severity.ERROR,
     title="Vehicle assignment uses a service that does not exist",
@@ -682,10 +734,12 @@ def vehicle_service_missing(context: ValidationContext) -> Iterator[Finding]:
                     f"{service_id!r} is not defined in calendar.txt or "
                     "calendar_dates.txt (after applying supplements)."
                 ),
+                data={"value": service_id, "referenced": "calendar.service_id"},
             )
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-W313",
     severity=Severity.WARNING,
     title="Supplement deletes a row that is not in GTFS",
@@ -735,6 +789,7 @@ def delete_target_missing(context: ValidationContext) -> Iterator[Finding]:
 
 
 @rule(
+    spec_versions=_V2_ONLY,
     id="TODS-E314",
     severity=Severity.ERROR,
     title="Supplement row references a GTFS entity that does not exist",
@@ -822,4 +877,5 @@ def supplement_reference_missing(context: ValidationContext) -> Iterator[Finding
                         f"Correct the {field_name}, or add the missing record via the "
                         "matching supplement file."
                     ),
+                    data={"value": value, "field": field_name},
                 )

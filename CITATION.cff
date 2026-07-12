@@ -7,6 +7,6 @@ authors:
     given-names: Chelsea
 repository-code: "https://github.com/ChelseaKR/tods-validate"
 url: "https://github.com/ChelseaKR/tods-validate"
-version: 0.6.0
-date-released: 2026-06-29
+version: 0.7.0
+date-released: 2026-07-11
 license: Apache-2.0

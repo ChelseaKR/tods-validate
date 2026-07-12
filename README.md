@@ -111,8 +111,8 @@ Apply the auto fixes with: tods-validate fix PATH -o OUTPUT
 A suggestion is only offered when its proposed value is one the validator would
 accept and is reachable by adding leading zeros, a zero seconds field, or
 removing date separators, so it never changes what a value means. `--suggest`
-affects text and Markdown output; the JSON report is left unchanged so it stays
-a stable machine contract, and the same suggestions are available from the
+adds a prose block to text and Markdown output, and adds a structured
+`suggestions` array to JSON output. The same suggestions are available from the
 Python API as `tods_validate.suggest_fixes`.
 
 The `auto` suggestions are the ones `tods-validate fix` applies across a whole
@@ -156,6 +156,28 @@ References into GTFS are resolved after applying the supplement files, so a
 trip added by `trips_supplement.txt` is a valid target for
 `run_events.trip_id`, and a stop deleted by `stops_supplement.txt` is not.
 
+## Validating against an older spec version
+
+TODS changed shape substantially between v1.0.0 (2022) and the current
+v2.1.0: file names were added and removed, and `run_events.txt` itself has
+different, incompatible fields in each version. `tods-validate` defaults to
+v2.1.0; pass `--spec-version 1.0.0` to validate a feed against the older
+spec text instead:
+
+```sh
+tods-validate exports/tods/ --spec-version 1.0.0
+```
+
+Structure and field-value rules (required columns, required values, enum
+values, value formats, duplicate primary keys) run against whichever
+version's file/field inventory you asked for. Reference and semantic rules,
+and the opt-in coverage/advisory categories, assume v2.1.0-only mechanisms
+(the Supplement-file GTFS overlay; `vehicle_assignments.txt`) and are
+skipped under `--spec-version 1.0.0`, disclosed in the report the same way
+`--enable`-gated rules are. See [docs/spec-versions.md](docs/spec-versions.md)
+for the full file/field inventory, spec citations, and exactly what does and
+does not run under each version.
+
 ## Merging supplements into GTFS
 
 The spec says that GTFS plus the supplement files should form a valid GTFS
@@ -175,7 +197,7 @@ package first so the merge rests on clean inputs.
 A CI job that checks the merged feed with MobilityData's gtfs-validator:
 
 ```yaml
-- uses: ChelseaKR/tods-validate@v0.6.0
+- uses: ChelseaKR/tods-validate@v0.7.0
   with:
     path: feed/tods
     gtfs: feed/gtfs
@@ -189,6 +211,16 @@ A CI job that checks the merged feed with MobilityData's gtfs-validator:
     java -jar gtfs-validator.jar -i supplemented.zip -o validator-report
 ```
 
+`tods-validate doctor feed/tods --gtfs feed/gtfs --gtfs-validator-jar gtfs-validator.jar`
+runs that whole sequence — validate, merge, gtfs-validator on the merged
+feed, stats — as one command with a single combined report. gtfs-validator is
+never downloaded automatically: without java or a jar (`--gtfs-validator-jar`
+or `GTFS_VALIDATOR_JAR`) already available, that stage is labeled SKIPPED
+with the reason ("merged-feed GTFS validity NOT checked"), never silently
+treated as a pass. `doctor` exits non-zero on validate findings at
+`--fail-on` severity or a gtfs-validator stage that actually failed to run,
+not on one that was honestly skipped.
+
 ## Other subcommands
 
 - `tods-validate stats feed/ --gtfs gtfs/` prints descriptive metrics (run
@@ -201,11 +233,28 @@ A CI job that checks the merged feed with MobilityData's gtfs-validator:
 - `tods-validate diff old/ new/` validates two versions of a feed and reports
   which findings were fixed, newly introduced, or still present; it exits
   non-zero only on newly introduced errors, which is useful in review.
+- `tods-validate drift old-gtfs/ new-gtfs/ --tods feed/` diagnoses the "your
+  GTFS moved under your TODS" failure directly: given a TODS package and two
+  versions of its companion GTFS feed, it reports exactly which referenced
+  `trip_id`/`stop_id` values disappeared and which trips' `block_id` changed,
+  with a conservative rename guess when exactly one new GTFS ID is an
+  unambiguous close match (never applied automatically — a hint to review).
+  Exits non-zero if anything broke, so it can gate a GTFS update before it
+  reaches production.
 - `tods-validate batch a/ b/ c/` validates several feeds and prints a roll-up
-  table (`--format json` for tooling; `--format markdown --stamp` for a single
-  stamped fleet/portfolio compliance report — one artifact covering every
-  feed, with a pass/fail/error summary table, fleet totals, and a provenance
-  footer).
+  table (`--format json` for tooling).
+- `tods-validate batch a/ b/ --history .tods-history/` additionally appends
+  one schema-versioned summary record per feed to
+  `.tods-history/history.jsonl` (an append-only, artifact-shaped ledger —
+  plain files in the repo, no hosted service). `tods-validate trend --history
+  .tods-history/` then prints a text-first Markdown table, grouped by feed
+  ("agency"), showing each run's counts and any per-rule regression since the
+  same feed's previous run — "which agency regressed" answerable straight
+  from CI history. **Privacy:** a history record stores only counts and rule
+  IDs, never finding messages, since messages can carry stop, run, or
+  employee/vehicle identifiers; see the docstring in `workspace.py`. Set
+  `[workspace]` `history-dir` in `tods-validate.toml` to avoid repeating
+  `--history` in every job (CLI flag still wins over the config value).
 - `tods-validate anonymize feed/ -o feed-anon/` writes a copy with
   person-identifying fields (employee IDs, license plates, vehicle IDs)
   pseudonymized before sharing. This is pseudonymization, not guaranteed
@@ -255,11 +304,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ChelseaKR/tods-validate@v0.6.0
+      - uses: ChelseaKR/tods-validate@v0.7.0
         with:
           path: feed/tods
           gtfs: feed/gtfs        # omit if GTFS files sit next to the TODS files
 ```
+
+The action installs `tods-validate` from a hash-verified
+[`requirements-action.lock`](requirements-action.lock) (`pip install
+--require-hashes`) followed by a `--no-deps` install of the checked-out
+package itself, so no dependency is ever resolved unpinned from PyPI, and
+`actions/setup-python`'s `cache: pip` warms the wheel cache across runs. An
+alternative considered and dropped: run the published GHCR image pinned by
+digest. That needs registry credentials and a digest bump on every release,
+and only works on Linux runners, while the composite action above runs
+anywhere `actions/setup-python` does.
 
 ## Rules
 
@@ -269,8 +328,16 @@ The full catalog of checks, with IDs, severities, and spec citations, is in
 CI pipeline can safely filter or suppress specific IDs. The JSON report
 format is described by [docs/report.schema.json](docs/report.schema.json).
 
+For any one rule, `tods-validate explain RULE_ID` prints its full detail —
+description, spec citation, and a worked before/after example — offline, with
+`--format markdown` for pasting into an issue. It reads from the same rule
+registry as `docs/rules.md` and editor hovers, so all three describe a rule
+identically.
+
 Ambiguities in the spec discovered while building the validator are tracked
-in [docs/spec-questions.md](docs/spec-questions.md).
+in [docs/spec-questions.md](docs/spec-questions.md). What changed between
+spec versions, and what `--spec-version` does and does not check, is in
+[docs/spec-versions.md](docs/spec-versions.md).
 
 ## What this does not check
 

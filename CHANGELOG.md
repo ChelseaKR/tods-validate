@@ -7,13 +7,53 @@ new checks may be added in minor releases.
 
 Added:
 
-- `batch --format markdown`, alongside a new `batch --stamp` flag: renders one
-  stamped fleet/portfolio compliance report across every feed passed to
-  `batch`, instead of one report per feed. The report is a summary table
-  (source, errors, warnings, infos, pass/fail/error status) plus a fleet
-  totals line and, with `--stamp`, the same provenance footer (tool version,
-  spec version, UTC timestamp) as `validate --stamp` — a citable artifact,
-  not a hosted dashboard.
+- `--spec-version 1.0.0` validates against the TODS spec text as it stood
+  before v2.0.0-alpha.1 (deadheads.txt/ops_locations.txt/deadhead_times.txt,
+  runs_pieces.txt, and a differently-shaped run_events.txt), transcribed from
+  the last commit before v2 spec work began; see `docs/spec-versions.md` for
+  the full file/field delta, citations, and exactly which rule bands run
+  under each version (structure and field-value rules run against either
+  version's schema; reference/semantic/coverage/advisory rules, which assume
+  v2.1.0-only mechanisms, are skipped and disclosed via the coverage
+  manifest's new `skipped:spec_version` status). `--spec-version` previously
+  parsed and validated the flag but had no effect on which schema was
+  checked.
+- `tods-validate drift OLD_GTFS NEW_GTFS --tods FEED` (EXP-02): diagnoses the
+  "your GTFS moved under your TODS" failure directly, reporting exactly which
+  referenced `trip_id`/`stop_id` values disappeared and which trips'
+  `block_id` changed between two GTFS versions, with a conservative rename
+  guess offered only when exactly one new GTFS ID is an unambiguous close
+  match. `--format text|markdown|json`; exits non-zero on any break so it can
+  gate a GTFS update in CI.
+
+## v0.7.0 - 2026-07-11
+
+Findings now reach the editor (a language server with hovers and quick fixes,
+plus a thin VS Code client), reports state exactly which checks ran and which
+were skipped, and local severity policy is supported with mandatory
+disclosure. Also new: fix suggestions (`validate --suggest`), an offline
+`explain` command with worked examples, pytest helpers for exporters, and two
+run-continuity warnings (TODS-W316, TODS-W409).
+
+Added:
+
+- An architecture decision record log under `docs/adr/`: 0000 records the
+  practice, 0001–0005 backfill the decisions already in force (the Python 3.11
+  floor, the i18n N/A declaration, the nested `editor/vscode` project,
+  rules-as-registry, the uv/lockfile adoption). A committed `.python-version`
+  pins local development to 3.12, the same interpreter CI runs its gates on.
+  Closes CQ-01, CQ-26, CQ-44/45, and DOC-04/05 in `docs/CONFORMANCE-GAPS.md`.
+- A permanent per-rule web page for every rule ID, generated into `web/rules/`
+  by `scripts/generate_rules_doc.py` alongside `docs/rules.md`, plus a
+  `web/rules/index.html` catalog grouped by band. Deployed with the rest of
+  `web/` by `.github/workflows/pages.yml`. SARIF `helpUri` and the language
+  server's hover text now link to these stable URLs
+  (`https://chelseakr.github.io/tods-validate/rules/<RULE_ID>.html`) instead
+  of the spec section directly, so the link keeps resolving even if the spec
+  text moves; the spec citation itself is still carried in the SARIF rule's
+  `properties.specSection` and on the rule page. `scripts/generate_rules_doc.py
+  --check` now also fails CI if a committed rule page has drifted from the
+  registry.
 - TODS-W316: the time companion of W315. A run event that works a trip end to end
   should start at the trip's first scheduled departure and end at its last
   scheduled arrival; a mismatch is a warning, skipped for mid-trip events. Uses
@@ -54,13 +94,34 @@ Added:
 - A contributor guide for authoring rules (docs/authoring-rules.md): how to pick
   a severity and allocate an ID, the scheduler-grade message style, and the
   fixture/conformance contract CI enforces.
-- A curated read namespace, `tods_validate.read`, re-exporting `load_package`,
-  `Package`, `FeedFile`, `Row`, `PackageNotFoundError`, `CompanionGTFS`,
-  `build_companion`, and `merge_supplement`, plus a new pandas-free `to_rows`
-  helper (and `to_dataframe`, gated on the new `dataframe` extra) for callers
-  who want parsed feed data rather than validation findings. Kept as its own
-  submodule, not flattened into the top-level namespace, so the stability
-  promise stays bounded to what is re-exported. See docs/read-api.md.
+- Reports now state their own scope. Every run records a coverage manifest —
+  which rules ran, and which were skipped and why (no companion GTFS feed,
+  opt-in rule not enabled, or suppressed by `--ignore`) — so "no problems
+  found" is qualified by what was actually checked. The JSON report carries it
+  as an additive `coverage` block (report schema 1.2.0, documented in
+  docs/report.schema.json), SARIF records it under `invocations`, and the
+  text/Markdown/HTML reports add a one-line "Checks skipped: …" disclosure
+  (plus a coverage footer on stamped Markdown). Library callers can get the
+  manifest via the new `tods_validate.runner.run_with_coverage`; `run` is
+  unchanged.
+- Reference findings (TODS-E301/E303/E307/E308/E309/E310/E311/E312/E314) now
+  carry structured `data` parameters — the broken value and what it references
+  — and the SARIF output is enriched from the rule registry: each descriptor
+  gains the rule's title, description, and spec link (`helpUri`), and each
+  result carries its finding's structured data in `properties`.
+- `tods-validate explain RULE_ID`: an offline command that prints a rule's full
+  detail — description, spec citation, and a worked before/after example — with
+  `--format markdown` for pasting into an issue. Every core rule (and the
+  opt-in coverage/advisory rules) now ships a worked example, sourced from one
+  registry (`tods_validate.rules.EXAMPLES`) that `explain`, `docs/rules.md`,
+  and LSP hovers all render through the same `render_rule_detail()`, so the
+  three cannot drift from each other.
+- An optional `[severity]` table in `tods-validate.toml` remaps individual
+  rule severities to encode local policy, with a hard honesty constraint:
+  every remapped finding is disclosed in every report format (a "Local
+  policy" block plus a per-finding "(spec: ORIGINAL)" note), and downgrading
+  a rule the spec declares ERROR requires an explicit `acknowledged = true`.
+  The report schema (1.2.0) documents `findings[].severity_original`. (#25)
 
 Changed:
 
@@ -82,8 +143,18 @@ Fixed:
   hand-edited constant that had drifted to `0.4.0`.
 - The README and `merge`-recipe GitHub Action snippets now reference the current
   `@v0.6.0` instead of the stale `@v0.4.0` they were pinned at.
+- TODS-W302 now also discloses when `vehicle_assignments.txt` references could
+  not be checked: block_id resolution needs the companion feed's `trips.txt`
+  and service_id resolution needs `calendar.txt`/`calendar_dates.txt`; when a
+  used column's target file is missing, those checks used to no-op silently.
 
 Security / process (2026-07-05 standards-conformance remediation):
+
+- `make audit` (pip-audit) now audits the exact `uv.lock` pins minus the
+  project itself, so a release version bump (a version that is not on PyPI
+  until after the release publishes) cannot fail the gate; release tags are
+  SSH-signed and `verify.yml` verifies them against the committed
+  `.github/allowed_signers`.
 
 - The release pipeline (`pypi-publish.yml`, `docker.yml`, `release-corpus.yml`)
   no longer publishes anything without first re-running the full gate set

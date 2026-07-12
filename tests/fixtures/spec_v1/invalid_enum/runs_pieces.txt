@@ -1,0 +1,2 @@
+run_id,piece_id,start_type,start_trip_id,start_trip_position,end_type,end_trip_id,end_trip_position
+R1,P1,9,DH1,,1,T1,

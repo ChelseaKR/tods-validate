@@ -11,27 +11,42 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import NoReturn
+from typing import TYPE_CHECKING, NoReturn
 
 import click
 
 from . import __version__
-from .anonymize import anonymize_package
-from .baseline import diff_findings, load_baseline_identities, new_findings
+from .anonymize import AlreadyProtectedError, anonymize_package
+from .baseline import diff_findings, load_baseline_identities
 from .config import Config, ConfigError, load_config
+from .doctor import (
+    ValidatePayload,
+    doctor_to_dict,
+    render_doctor_markdown,
+    render_doctor_text,
+    run_doctor,
+)
+from .drift import analyze_drift, drift_to_dict, render_drift_markdown, render_drift_text
 from .findings import Finding, Severity
 from .fix import fix_package
-from .loader import PackageNotFoundError
+from .init import SHAPES, DestinationNotEmptyError
+from .init import scaffold as scaffold_package
+from .loader import PackageNotFoundError, load_package
 from .merge import merge_feeds
+from .policy import GatingPolicy
 from .report import (
     RENDERERS,
     render_batch_markdown,
+    render_github,
+    render_html,
+    render_json,
     render_markdown,
+    render_sarif,
     render_text,
     summarize,
 )
-from .rules import CATEGORIES, all_rules
-from .runner import run
+from .rules import CATEGORIES, RunCoverage, all_rules, render_rule_detail
+from .runner import run, run_with_coverage
 from .schema import SPEC_VERSION, SUPPORTED_SPEC_VERSIONS
 from .stats import (
     collect_cross_stats,
@@ -43,6 +58,17 @@ from .stats import (
     render_stats_text,
     stats_to_dict,
 )
+from .workspace import (
+    DEFAULT_HISTORY_DIR,
+    HistoryError,
+    append_record,
+    build_record,
+    load_history,
+    render_trend,
+)
+
+if TYPE_CHECKING:
+    from .suggest import Suggestion
 
 
 def _fail(message: str) -> NoReturn:
@@ -111,12 +137,37 @@ def _render(
     max_findings: int | None,
     quiet: bool,
     stamp: bool,
+    coverage: RunCoverage | None = None,
+    suggestions: list[Suggestion] | None = None,
+    spec_version: str = SPEC_VERSION,
 ) -> str:
     if output_format == "text":
-        return render_text(findings, source, max_findings=max_findings, quiet=quiet)
+        return render_text(
+            findings,
+            source,
+            max_findings=max_findings,
+            quiet=quiet,
+            coverage=coverage,
+            spec_version=spec_version,
+        )
     if output_format == "markdown":
-        return render_markdown(findings, source, stamp=stamp)
-    return RENDERERS[output_format](findings, source)
+        return render_markdown(
+            findings, source, stamp=stamp, coverage=coverage, spec_version=spec_version
+        )
+    if output_format == "json":
+        return render_json(
+            findings,
+            source,
+            coverage=coverage,
+            suggestions=suggestions,
+            spec_version=spec_version,
+        )
+    if output_format == "sarif":
+        return render_sarif(findings, source, coverage=coverage)
+    if output_format == "html":
+        return render_html(findings, source, coverage=coverage, spec_version=spec_version)
+    # github annotations carry no manifest; coverage is disclosed by the other formats.
+    return render_github(findings, source)
 
 
 class _DefaultToValidate(click.Group):
@@ -222,7 +273,7 @@ def main() -> None:
     help=(
         "After the report, list concrete fix suggestions for the mechanically-fixable "
         "findings, each marked 'auto' (safe; tods-validate fix applies it) or 'review'. "
-        "Text and Markdown output only."
+        "Text and Markdown print a prose block; JSON adds a structured 'suggestions' array."
     ),
 )
 @click.option(
@@ -277,38 +328,70 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
 
         config = _merge(_parse_data(PROFILES[profile], f"profile {profile!r}"), config)
 
-    ignore = tuple(ignore_ids) + config.ignore
     enable = tuple(enable_tokens) + config.enable
-    _check_rule_ids(ignore)
     _check_enable(enable)
-    effective_fail_on = fail_on or config.fail_on or "error"
     effective_max = max_findings if max_findings is not None else config.max_findings
     effective_encoding = encoding or config.encoding
     effective_spec = spec_version or config.spec_version or SPEC_VERSION
     _check_spec_version(effective_spec)
 
+    baseline_identities = None
+    if baseline_path is not None:
+        try:
+            baseline_identities = load_baseline_identities(baseline_path)
+        except (OSError, json.JSONDecodeError) as exc:
+            _fail(f"baseline {baseline_path} could not be read: {exc}")
+
+    policy = GatingPolicy.from_config(
+        fail_on=fail_on,
+        config=config,
+        ignore_ids=ignore_ids,
+        baseline_identities=baseline_identities,
+    )
+    _check_rule_ids(tuple(policy.ignore))
+    severity_remap = dict(config.severity_remap)
+
     def _validate_once() -> list[Finding]:
-        package, found = run(
-            path, gtfs_path, enabled=frozenset(enable), encoding=effective_encoding
+        package, found, coverage = run_with_coverage(
+            path,
+            gtfs_path,
+            enabled=frozenset(enable),
+            encoding=effective_encoding,
+            severity_remap=severity_remap,
+            spec_version=effective_spec,
         )
-        if ignore:
-            found = [f for f in found if f.rule_id not in ignore]
+        gate = policy.apply(found)
+        if gate.suppressed_ignored:
+            # Disclose that --ignore withheld these rules' findings, so a clean
+            # report still admits what it did not report.
+            coverage = coverage.with_ignored(policy.ignore)
+        machine_suggestions: list[Suggestion] | None = None
+        if suggest and output_format == "json":
+            from .suggest import suggest_for_findings
+
+            # Machine-form companion to the text/Markdown --suggest block below:
+            # a structured suggestions array in the report itself, so a
+            # dashboard need not parse prose to find current/proposed values.
+            machine_suggestions = suggest_for_findings(gate.kept, package)
         click.echo(
             _render(
                 output_format,
-                found,
+                gate.kept,
                 package.source,
                 max_findings=effective_max,
                 quiet=quiet,
                 stamp=stamp,
+                coverage=coverage,
+                suggestions=machine_suggestions,
+                spec_version=effective_spec,
             )
         )
         if suggest and output_format in ("text", "markdown"):
             from .suggest import render_suggestions, suggest_for_findings
 
             click.echo("")
-            click.echo(render_suggestions(suggest_for_findings(found, package), output_format))
-        return found
+            click.echo(render_suggestions(suggest_for_findings(gate.kept, package), output_format))
+        return gate.kept
 
     if watch:
         from .watch import watch as watch_feed
@@ -333,20 +416,11 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
         _fail(str(exc))
     _write_github_outputs(findings)
 
-    # The exit code considers only findings new since the baseline, if given.
-    gating = findings
-    if baseline_path is not None:
-        try:
-            baseline = load_baseline_identities(baseline_path)
-        except (OSError, json.JSONDecodeError) as exc:
-            _fail(f"baseline {baseline_path} could not be read: {exc}")
-        gating = new_findings(findings, baseline)
-
-    counts = summarize(gating)
-    failed = counts[Severity.ERROR] > 0 or (
-        effective_fail_on == "warning" and counts[Severity.WARNING] > 0
-    )
-    sys.exit(1 if failed else 0)
+    # The exit code considers only findings new since the baseline, if given
+    # (policy.apply already filtered `findings` for --ignore, so re-running it
+    # here just applies the baseline narrowing on top of the same kept list).
+    gate = policy.apply(findings)
+    sys.exit(1 if gate.failed else 0)
 
 
 @main.command()
@@ -356,27 +430,58 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
 @click.option(
     "--fail-on",
     type=click.Choice(["error", "warning"]),
-    default="error",
-    show_default=True,
-    help="Exit non-zero if newly introduced findings reach this severity.",
+    default=None,
+    help="Exit non-zero if newly introduced findings reach this severity.  [default: error]",
 )
-def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
+@click.option(
+    "--ignore",
+    "ignore_ids",
+    multiple=True,
+    metavar="RULE_ID",
+    help="Suppress a rule by ID (repeatable), e.g. --ignore TODS-W206.",
+)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Configuration file. Without this option, a tods-validate.toml in the "
+        "current directory is used if present."
+    ),
+)
+def diff(
+    old: str,
+    new: str,
+    gtfs_path: str | None,
+    fail_on: str | None,
+    ignore_ids: tuple[str, ...],
+    config_path: str | None,
+) -> None:
     """Compare validation of two feeds: OLD then NEW.
 
     Reports which findings were fixed, newly introduced, or still present, so a
-    change to a feed can be reviewed for regressions.
+    change to a feed can be reviewed for regressions. Honors the same
+    --config/--ignore/--fail-on policy as validate.
     """
+    config = _resolve_config(config_path)
+    policy = GatingPolicy.from_config(fail_on=fail_on, config=config, ignore_ids=ignore_ids)
+    _check_rule_ids(tuple(policy.ignore))
+    severity_remap = dict(config.severity_remap)
+
     try:
-        _, old_findings = run(old, gtfs_path)
-        _, new_findings_list = run(new, gtfs_path)
+        _, old_findings = run(old, gtfs_path, severity_remap=severity_remap)
+        _, new_findings_list = run(new, gtfs_path, severity_remap=severity_remap)
     except PackageNotFoundError as exc:
         _fail(str(exc))
 
-    result = diff_findings(old_findings, new_findings_list)
+    old_kept = policy.apply(old_findings).kept
+    new_kept = policy.apply(new_findings_list).kept
+    result = diff_findings(old_kept, new_kept)
     click.echo(f"tods-validate diff: {old} -> {new}")
     click.echo(
         f"  fixed: {len(result.fixed)}, introduced: {len(result.introduced)}, "
-        f"persisting: {len(result.persisting)}"
+        f"persisting: {len(result.persisting)}, moved: {len(result.moved)}"
     )
     for finding in result.introduced:
         loc = finding.location()
@@ -385,14 +490,80 @@ def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
             if loc
             else f"  + {finding.rule_id} {finding.message}"
         )
-    for rule_id, pointer, message in result.fixed:
-        click.echo(f"  - {rule_id} [{pointer}] {message}")
+    for finding in result.fixed:
+        loc = finding.location()
+        click.echo(
+            f"  - {finding.rule_id} [{loc}] {finding.message}"
+            if loc
+            else f"  - {finding.rule_id} {finding.message}"
+        )
+    for finding in result.moved:
+        loc = finding.location()
+        click.echo(
+            f"  ~ {finding.rule_id} [{loc}] {finding.message}"
+            if loc
+            else f"  ~ {finding.rule_id} {finding.message}"
+        )
 
-    introduced_counts = summarize(result.introduced)
-    failed = introduced_counts[Severity.ERROR] > 0 or (
-        fail_on == "warning" and introduced_counts[Severity.WARNING] > 0
-    )
-    sys.exit(1 if failed else 0)
+    gate = policy.apply(result.introduced)
+    sys.exit(1 if gate.failed else 0)
+
+
+@main.command()
+@click.argument("old_gtfs_path", metavar="OLD_GTFS", type=click.Path(exists=False))
+@click.argument("new_gtfs_path", metavar="NEW_GTFS", type=click.Path(exists=False))
+@click.option(
+    "--tods",
+    "tods_path",
+    required=True,
+    type=click.Path(exists=False),
+    help="The TODS package whose GTFS references are being checked.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json", "markdown"]),
+    default="text",
+    show_default=True,
+)
+@click.option("--encoding", default=None)
+def drift(
+    old_gtfs_path: str,
+    new_gtfs_path: str,
+    tods_path: str,
+    output_format: str,
+    encoding: str | None,
+) -> None:
+    """Diagnose which TODS references break moving OLD_GTFS to NEW_GTFS.
+
+    Given a TODS package (--tods) and two versions of its companion GTFS
+    feed, reports exactly which referenced trip_id/stop_id values disappear
+    and which trips' block_id changes -- the diagnosis behind the "your GTFS
+    moved under your TODS" failure (see TODS-W302/W313's root-cause hint).
+    Rename candidates are offered only when exactly one new GTFS ID is an
+    unambiguous close match; they are hints for a human to review, never
+    applied. Supplements from the TODS package are applied to both GTFS
+    versions before comparing, so a break reported here is one `validate`
+    against NEW_GTFS would also raise.
+
+    Exits 1 if any reference breaks or block_id changes were found, so this
+    can gate a GTFS-update PR before it reaches production; 0 if clean.
+    """
+    try:
+        old_gtfs = load_package(old_gtfs_path, encoding=encoding)
+        new_gtfs = load_package(new_gtfs_path, encoding=encoding)
+        tods = load_package(tods_path, encoding=encoding)
+    except PackageNotFoundError as exc:
+        _fail(str(exc))
+
+    report = analyze_drift(old_gtfs, new_gtfs, tods)
+    if output_format == "json":
+        click.echo(json.dumps(drift_to_dict(report), indent=2))
+    elif output_format == "markdown":
+        click.echo(render_drift_markdown(report))
+    else:
+        click.echo(render_drift_text(report))
+    sys.exit(1 if report.has_breaks else 0)
 
 
 @main.command()
@@ -408,8 +579,8 @@ def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
 @click.option(
     "--fail-on",
     type=click.Choice(["error", "warning"]),
-    default="error",
-    show_default=True,
+    default=None,
+    help="Exit non-zero if any feed has findings at or above this severity.  [default: error]",
 )
 @click.option(
     "--stamp",
@@ -419,44 +590,83 @@ def diff(old: str, new: str, gtfs_path: str | None, fail_on: str) -> None:
         "fleet/portfolio compliance artifact."
     ),
 )
+@click.option(
+    "--ignore",
+    "ignore_ids",
+    multiple=True,
+    metavar="RULE_ID",
+    help="Suppress a rule by ID (repeatable), e.g. --ignore TODS-W206.",
+)
+@click.option(
+    "--history",
+    "history_dir",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Append a schema-versioned summary record for each feed to "
+        "DIR/history.jsonl (counts and rule IDs only, never finding messages). "
+        "Also settable as [workspace] history-dir in tods-validate.toml."
+    ),
+)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Configuration file. Without this option, a tods-validate.toml in the "
+        "current directory is used if present."
+    ),
+)
 def batch(
     paths: tuple[str, ...],
     gtfs_path: str | None,
     output_format: str,
-    fail_on: str,
+    fail_on: str | None,
     stamp: bool,
+    ignore_ids: tuple[str, ...],
+    history_dir: str | None,
+    config_path: str | None,
 ) -> None:
     """Validate several feeds and print a roll-up table.
 
     Each PATH is validated independently; the shared --gtfs companion, if given,
-    is used for all of them. ``--format markdown`` produces a single stamped
-    multi-agency compliance report suitable for an issue or working-group
-    thread, rather than one report per feed.
+    is used for all of them. Honors the same --config/--ignore/--fail-on policy
+    as validate, applied identically to every feed.
     """
+    config = _resolve_config(config_path)
+    policy = GatingPolicy.from_config(fail_on=fail_on, config=config, ignore_ids=ignore_ids)
+    _check_rule_ids(tuple(policy.ignore))
+    effective_history = history_dir or config.history_dir
+    severity_remap = dict(config.severity_remap)
+
     rows: list[dict[str, object]] = []
     any_failed = False
     for path in paths:
         try:
-            package, findings = run(path, gtfs_path)
+            package, findings = run(path, gtfs_path, severity_remap=severity_remap)
         except PackageNotFoundError as exc:
             rows.append({"source": path, "error": str(exc)})
             any_failed = True
             continue
-        counts = summarize(findings)
-        failed = counts[Severity.ERROR] > 0 or (
-            fail_on == "warning" and counts[Severity.WARNING] > 0
-        )
+        gate = policy.apply(findings)
+        counts = gate.counts
         rows.append(
             {
                 "source": package.source,
-                "errors": counts[Severity.ERROR],
-                "warnings": counts[Severity.WARNING],
-                "infos": counts[Severity.INFO],
-                "status": "fail" if failed else "pass",
+                "errors": counts.get(Severity.ERROR, 0),
+                "warnings": counts.get(Severity.WARNING, 0),
+                "infos": counts.get(Severity.INFO, 0),
+                "status": "fail" if gate.failed else "pass",
             }
         )
-        if failed:
+        if gate.failed:
             any_failed = True
+        if effective_history is not None:
+            record = build_record(
+                gate.kept, package.source, tool_version=__version__, spec_version=SPEC_VERSION
+            )
+            append_record(Path(effective_history), record)
 
     if output_format == "json":
         click.echo(json.dumps({"feeds": rows}, indent=2))
@@ -517,6 +727,44 @@ def stats(
 
 
 @main.command()
+@click.option(
+    "--history",
+    "history_dir",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Directory containing history.jsonl written by `batch --history`. "
+        "Without this, the [workspace] history-dir from tods-validate.toml is "
+        "used, falling back to .tods-history/."
+    ),
+)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Configuration file. Without this option, a tods-validate.toml in the "
+        "current directory is used if present."
+    ),
+)
+def trend(history_dir: str | None, config_path: str | None) -> None:
+    """Print a Markdown trend table from the local run-history ledger.
+
+    Reads the append-only ledger written by `batch --history` and renders one
+    table per feed/source, so a regression between runs (more errors, a new
+    rule firing) is visible without re-running anything.
+    """
+    config = _resolve_config(config_path)
+    effective_history = history_dir or config.history_dir or str(DEFAULT_HISTORY_DIR)
+    try:
+        records = load_history(Path(effective_history))
+    except HistoryError as exc:
+        _fail(str(exc))
+    click.echo(render_trend(records))
+
+
+@main.command()
 @click.argument("path", type=click.Path(exists=False))
 @click.option(
     "-o",
@@ -532,19 +780,51 @@ def stats(
     help="Fixed salt for stable pseudonyms across runs (default: a random, single-use salt).",
 )
 @click.option("--encoding", default=None)
-def anonymize(path: str, output_path: str, salt: str | None, encoding: str | None) -> None:
+@click.option(
+    "--also",
+    "also_fields",
+    multiple=True,
+    metavar="FILE:FIELD",
+    help=("Pseudonymize an extra column, e.g. --also run_events.txt:job_type. Repeatable."),
+)
+def anonymize(
+    path: str,
+    output_path: str,
+    salt: str | None,
+    encoding: str | None,
+    also_fields: tuple[str, ...],
+) -> None:
     """Write a copy of the package with person-identifying fields pseudonymized.
 
-    employee_id, license_plate, and vehicle_id are replaced with stable
-    pseudonyms. This is pseudonymization, not guaranteed anonymity.
+    employee_id, license_plate, vehicle_label, and vehicle_id are replaced
+    with stable pseudonyms. Use --also FILE:FIELD to pseudonymize additional
+    extension columns (fails if FIELD is already protected by default).
+    This is pseudonymization, not guaranteed anonymity: after each run, a
+    "Carried through unprotected" table lists every remaining column that
+    still holds non-enum data, numeric or not, so the residual risk is
+    disclosed rather than silently passed through.
     """
+    also: list[tuple[str, str]] = []
+    for entry in also_fields:
+        if entry.count(":") != 1 or not all(entry.split(":")):
+            _fail(f"invalid --also value {entry!r}; expected FILE:FIELD, e.g. vehicles.txt:notes.")
+        fname, field_name = entry.split(":")
+        also.append((fname, field_name))
     try:
-        result = anonymize_package(path, Path(output_path), salt=salt, encoding=encoding)
+        result = anonymize_package(path, Path(output_path), salt=salt, encoding=encoding, also=also)
     except PackageNotFoundError as exc:
+        _fail(str(exc))
+    except AlreadyProtectedError as exc:
         _fail(str(exc))
     for target, count in sorted(result.replacements.items()):
         click.echo(f"{target}: {count} value(s) pseudonymized")
     click.echo(f"Wrote {len(result.written)} file(s) to {output_path}.")
+    click.echo("Carried through unprotected (not pseudonymized, still free text):")
+    if result.carried_through:
+        for fname, col in result.carried_through:
+            click.echo(f"  {fname}:{col}")
+    else:
+        click.echo("  (none)")
 
 
 @main.command()
@@ -676,6 +956,101 @@ def merge(path: str, gtfs_path: str | None, output_path: str, manifest: bool) ->
     click.echo(f"Wrote {len(result.written)} file(s) to {output_path}.")
 
 
+@main.command()
+@click.argument("path", type=click.Path(exists=False))
+@click.option(
+    "--gtfs",
+    "gtfs_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Companion GTFS feed (directory or .zip). Omit if the GTFS files sit "
+        "next to the TODS files."
+    ),
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "markdown", "json"]),
+    default="text",
+    show_default=True,
+    help="Report format for the combined pass.",
+)
+@click.option(
+    "--gtfs-validator-jar",
+    "gtfs_validator_jar",
+    type=click.Path(exists=False),
+    default=None,
+    envvar="GTFS_VALIDATOR_JAR",
+    help=(
+        "Path to MobilityData's gtfs-validator jar, to check the merged feed. Never "
+        "downloaded automatically; without java and this jar (or GTFS_VALIDATOR_JAR), "
+        "that stage is skipped and clearly labeled as such."
+    ),
+)
+@click.option(
+    "--encoding", default=None, help="Override UTF-8 decoding for non-conforming exports."
+)
+@click.option(
+    "--stamp",
+    is_flag=True,
+    help="Add a provenance footer (version, timestamp) to Markdown for a citable report.",
+)
+@click.option(
+    "--fail-on",
+    type=click.Choice(["error", "warning"]),
+    default=None,
+    help="Exit non-zero if validate findings reach this severity.  [default: error]",
+)
+def doctor(
+    path: str,
+    gtfs_path: str | None,
+    output_format: str,
+    gtfs_validator_jar: str | None,
+    encoding: str | None,
+    stamp: bool,
+    fail_on: str | None,
+) -> None:
+    """Run validate, merge, gtfs-validator, and stats as one pass on PATH.
+
+    One combined report covering the full publish-readiness sequence: validate
+    the TODS package, merge it against its companion GTFS feed, optionally
+    check that merged feed with MobilityData's gtfs-validator (only if java
+    and a jar are already available; never downloaded), and print feed stats.
+    Any stage that could not run is labeled SKIPPED with its reason, so a
+    skipped check can never be misread as a pass.
+    """
+    try:
+        report = run_doctor(
+            path,
+            gtfs_path,
+            jar_path=gtfs_validator_jar,
+            encoding=encoding,
+        )
+    except PackageNotFoundError as exc:
+        _fail(str(exc))
+
+    if output_format == "json":
+        click.echo(json.dumps(doctor_to_dict(report), indent=2))
+    elif output_format == "markdown":
+        click.echo(render_doctor_markdown(report, stamp=stamp))
+    else:
+        click.echo(render_doctor_text(report))
+
+    validate_stage = report.stage("validate")
+    validate_payload = validate_stage.payload if validate_stage is not None else None
+    findings = validate_payload.findings if isinstance(validate_payload, ValidatePayload) else []
+    counts = summarize(findings)
+    effective_fail_on = fail_on or "error"
+    failed = counts[Severity.ERROR] > 0 or (
+        effective_fail_on == "warning" and counts[Severity.WARNING] > 0
+    )
+    validator_stage = report.stage("gtfs-validator")
+    if validator_stage is not None and validator_stage.status == "failed":
+        failed = True
+    sys.exit(1 if failed else 0)
+
+
 @main.command(name="rules")
 @click.option(
     "--format",
@@ -709,6 +1084,65 @@ def rules_command(output_format: str) -> None:
         needs = " (needs companion GTFS)" if r.needs_gtfs else ""
         optin = "" if r.default_enabled else f" (opt-in: --enable {r.category})"
         click.echo(f"{r.id}  {r.severity.name:7}  {r.title}{needs}{optin}")
+
+
+@main.command(name="explain")
+@click.argument("rule_id", metavar="RULE_ID")
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "markdown"]),
+    default="text",
+    show_default=True,
+    help="Plain text for the terminal, or paste-ready Markdown.",
+)
+def explain(rule_id: str, output_format: str) -> None:
+    """Show RULE_ID's full detail: description, spec citation, and a worked example.
+
+    Offline - reads only the rule registry, no feed required. Rendering is
+    shared with docs/rules.md and editor hovers (see `tods-validate lsp`), so
+    the rule catalog, the terminal, and the editor cannot describe a rule
+    differently.
+    """
+    known = {r.id: r for r in all_rules()}
+    rule_def = known.get(rule_id)
+    if rule_def is None:
+        _fail(
+            f"unknown rule ID {rule_id!r}. Run `tods-validate rules` or see "
+            "docs/rules.md for the rule catalog."
+        )
+    click.echo(render_rule_detail(rule_def, output_format))
+
+
+@main.command(name="init")
+@click.argument("dest", type=click.Path(exists=False), default=".")
+@click.option(
+    "--shape",
+    type=click.Choice(sorted(SHAPES)),
+    default="runs",
+    show_default=True,
+    help="Which TODS files to scaffold: run events only, or runs plus vehicles.",
+)
+@click.option(
+    "--force",
+    is_flag=True,
+    help="Scaffold into DEST even if it already exists and is not empty.",
+)
+def init_command(dest: str, shape: str, force: bool) -> None:
+    """Scaffold a starter TODS package at DEST that validates clean.
+
+    Writes GTFS base files, TODS files, and a tods-validate.toml plus CI
+    workflow stub, all generated from schema.py so headers can never drift
+    and sample rows copied from a feed already known to validate clean. Run
+    `tods-validate DEST` afterward to see it pass.
+    """
+    try:
+        written = scaffold_package(Path(dest), shape, force=force)
+    except (ValueError, DestinationNotEmptyError) as exc:
+        _fail(str(exc))
+    click.echo(f"tods-validate init: wrote {len(written)} file(s) to {dest}")
+    for path in written:
+        click.echo(f"  {path}")
 
 
 @main.command(name="lsp")

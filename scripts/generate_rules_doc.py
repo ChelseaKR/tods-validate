@@ -1,21 +1,29 @@
 #!/usr/bin/env python3
-"""Generate docs/rules.md from the rule registry.
+"""Generate docs/rules.md and web/rules/ from the rule registry.
 
-Run with --check (as CI does) to fail if the committed file has drifted from
-the registry instead of rewriting it.
+docs/rules.md is a single Markdown catalog. web/rules/ is one permanent HTML
+page per rule ID (e.g. web/rules/TODS-1101.html) plus a web/rules/index.html
+catalog, deployed by .github/workflows/pages.yml; SARIF ``helpUri`` and LSP
+hovers link to these pages (see ``tods_validate.report.RULE_PAGE_BASE``).
+Rule IDs are never renumbered once released, so these URLs are permanent.
+
+Run with --check (as CI does) to fail if the committed files have drifted
+from the registry instead of rewriting them.
 """
 
 from __future__ import annotations
 
 import argparse
+import html
 import sys
 from pathlib import Path
 
 from tods_validate.findings import Severity
-from tods_validate.rules import all_rules
+from tods_validate.rules import EXAMPLES, Rule, all_rules, render_example_markdown
 from tods_validate.schema import SPEC_VERSION
 
 DOC_PATH = Path(__file__).parent.parent / "docs" / "rules.md"
+WEB_RULES_DIR = Path(__file__).parent.parent / "web" / "rules"
 
 _BANDS = {
     "1": "Package and file structure",
@@ -25,6 +33,36 @@ _BANDS = {
     "5": "Coverage (opt-in, informational)",
     "6": "Advisory (opt-in)",
 }
+
+_PAGE_STYLE = """\
+      :root { color-scheme: light dark; }
+      body {
+        font: 16px/1.5 system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+      }
+      h1 { margin-bottom: 0.25rem; font-size: 1.5rem; }
+      h2 { margin-top: 2rem; font-size: 1.1rem; }
+      .lede, .meta, .id { color: #666; }
+      .id { font-family: ui-monospace, monospace; margin: 0; }
+      .meta { margin: 0.5rem 0 1rem; }
+      .badge {
+        display: inline-block;
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 0.1rem 0.5rem;
+        border-radius: 999px;
+        border: 1px solid #888;
+        margin-right: 0.4rem;
+      }
+      nav a, .rule-list a { text-decoration: none; }
+      nav a:hover, .rule-list a:hover { text-decoration: underline; }
+      a { color: inherit; }
+      code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
+      ul.rule-list { list-style: none; padding-left: 0; }
+      ul.rule-list li { padding: 0.25rem 0; }
+"""
 
 
 def generate() -> str:
@@ -67,30 +105,170 @@ def generate() -> str:
             if r.interpretation:
                 lines.append(f"Interpretation: {r.interpretation}")
                 lines.append("")
-            if r.example:
-                lines.append(f"Example: {r.example}")
+            example = EXAMPLES.get(r.id)
+            if example is not None:
+                lines.extend(render_example_markdown(example))
                 lines.append("")
             lines.append(f"Spec reference: <{r.spec_section}>")
             lines.append("")
     return "\n".join(lines)
 
 
+def _rule_notes(r: Rule) -> str:
+    """The needs-GTFS / opt-in notes shared by docs/rules.md and the rule page."""
+    notes = []
+    if r.needs_gtfs:
+        notes.append("Needs a companion GTFS feed.")
+    if not r.default_enabled:
+        notes.append(
+            f"Opt-in: off by default, enable with --enable {r.category} or --enable {r.id}."
+        )
+    return " ".join(notes)
+
+
+def _rule_page_html(r: Rule) -> str:
+    """A self-contained, permanent HTML page for one rule.
+
+    No external assets (Pages/CSP-friendly): a single inline <style>, no
+    scripts, no fonts or images fetched over the network. All rule text is
+    HTML-escaped since it ultimately comes from source strings authored in
+    the rule modules.
+    """
+    esc = html.escape
+    severity = Severity[r.severity.name].name
+    notes = _rule_notes(r)
+    interpretation_html = (
+        f"    <p><strong>Interpretation:</strong> {esc(r.interpretation)}</p>\n"
+        if r.interpretation
+        else ""
+    )
+    notes_html = f"<p class='meta'>{esc(notes)}</p>\n    " if notes else ""
+    spec_href = esc(r.spec_section, quote=True)
+    spec_text = esc(r.spec_section)
+    return f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{esc(r.id)}: {esc(r.title)} — tods-validate rule catalog</title>
+    <style>
+{_PAGE_STYLE}    </style>
+  </head>
+  <body>
+    <nav><a href="index.html">&larr; All rules</a></nav>
+    <p class="id">{esc(r.id)}</p>
+    <h1>{esc(r.title)}</h1>
+    <p class="meta"><span class="badge">{esc(severity)}</span></p>
+    {notes_html}<p>{esc(r.description)}</p>
+{interpretation_html}    <p>Spec reference: <a href="{spec_href}">{spec_text}</a></p>
+  </body>
+</html>
+"""
+
+
+def _index_page_html(rules: list[Rule]) -> str:
+    """The web/rules/ catalog: every rule grouped by band, linking to its page."""
+    esc = html.escape
+    sections = []
+    for band, heading in _BANDS.items():
+        band_rules = [r for r in rules if r.id.split("-")[1][1] == band]
+        if not band_rules:
+            continue
+        items = []
+        for r in band_rules:
+            severity = Severity[r.severity.name].name
+            items.append(
+                "      <li>"
+                f'<a href="{esc(r.id)}.html"><code>{esc(r.id)}</code></a> '
+                f"&mdash; {esc(r.title)} "
+                f'<span class="badge">{esc(severity)}</span></li>'
+            )
+        sections.append(
+            f"    <h2>{esc(heading)} (TODS-x{esc(band)}xx)</h2>\n"
+            '    <ul class="rule-list">\n' + "\n".join(items) + "\n    </ul>\n"
+        )
+    body = "\n".join(sections)
+    return f"""<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>tods-validate rule catalog</title>
+    <style>
+{_PAGE_STYLE}    </style>
+  </head>
+  <body>
+    <h1>tods-validate rule catalog</h1>
+    <p class="lede">
+      Every rule tods-validate checks against TODS v{esc(SPEC_VERSION)}, one
+      permanent page per rule ID. These URLs are what SARIF <code>helpUri</code>,
+      editor hovers, and CI annotations link back to; rule IDs are never
+      renumbered once released, so a link made today keeps working.
+    </p>
+{body}  </body>
+</html>
+"""
+
+
+def generate_rule_pages() -> dict[str, str]:
+    """Render every web/rules/<RULE_ID>.html page plus web/rules/index.html.
+
+    Returns a mapping of filename to full file content so callers can either
+    write it to disk or diff it against the committed files (--check) without
+    duplicating the rendering logic.
+    """
+    rules = sorted(all_rules(), key=lambda r: r.id.split("-")[1][1:])
+    pages = {f"{r.id}.html": _rule_page_html(r) for r in rules}
+    pages["index.html"] = _index_page_html(rules)
+    return pages
+
+
+def _check_web_rules(pages: dict[str, str]) -> list[str]:
+    """Return a list of stale/missing/orphaned paths under web/rules/, if any."""
+    stale: list[str] = []
+    for name, content in sorted(pages.items()):
+        path = WEB_RULES_DIR / name
+        if not path.exists() or path.read_text(encoding="utf-8") != content:
+            stale.append(str(path))
+    if WEB_RULES_DIR.exists():
+        existing = {p.name for p in WEB_RULES_DIR.glob("*.html")}
+        for name in sorted(existing - set(pages)):
+            stale.append(f"{WEB_RULES_DIR / name} (orphaned: no matching rule)")
+    return stale
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--check", action="store_true", help="fail if docs/rules.md is stale")
+    parser.add_argument(
+        "--check", action="store_true", help="fail if docs/rules.md or web/rules/ are stale"
+    )
     args = parser.parse_args()
     content = generate()
+    pages = generate_rule_pages()
     if args.check:
+        stale = []
         if not DOC_PATH.exists() or DOC_PATH.read_text(encoding="utf-8") != content:
+            stale.append(str(DOC_PATH))
+        stale.extend(_check_web_rules(pages))
+        if stale:
             print(
-                "docs/rules.md is out of date; run scripts/generate_rules_doc.py",
+                "Generated docs are out of date; run scripts/generate_rules_doc.py. "
+                "Stale or missing:",
                 file=sys.stderr,
             )
+            for path in stale:
+                print(f"  {path}", file=sys.stderr)
             return 1
-        print("docs/rules.md is up to date")
+        print("docs/rules.md and web/rules/ are up to date")
         return 0
     DOC_PATH.write_text(content, encoding="utf-8")
-    print(f"wrote {DOC_PATH}")
+    WEB_RULES_DIR.mkdir(parents=True, exist_ok=True)
+    existing = {p.name for p in WEB_RULES_DIR.glob("*.html")} if WEB_RULES_DIR.exists() else set()
+    for name, page_content in pages.items():
+        (WEB_RULES_DIR / name).write_text(page_content, encoding="utf-8")
+    for orphaned in existing - set(pages):
+        (WEB_RULES_DIR / orphaned).unlink()
+    print(f"wrote {DOC_PATH} and {len(pages)} file(s) in {WEB_RULES_DIR}")
     return 0
 
 

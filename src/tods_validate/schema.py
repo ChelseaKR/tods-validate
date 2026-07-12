@@ -1,14 +1,33 @@
-"""Table and field definitions for TODS v2.1.0.
+"""Table and field definitions for TODS v2.1.0, plus the superseded v1.0.0.
 
-Transcribed by hand from the spec reference at https://tods-transit.org/spec/
-(source: https://github.com/MobilityData/transit-operational-data-standard,
+v2.1.0 was transcribed by hand from the spec reference at
+https://tods-transit.org/spec/ (source:
+https://github.com/MobilityData/transit-operational-data-standard,
 docs/en/spec/index.md, "last updated on 2025-04-16 (v2.1.0)").
 
 The standard was known as the Operational Data Standard (ODS) before v2.0;
 rule IDs in this validator keep the TODS- prefix.
 
+v1.0.0 ("last updated on April 14, 2022 (v1.0)" per its own spec page) is no
+longer published at a live URL -- the current site only hosts the current
+spec text, and v1's files (deadheads.txt, ops_locations.txt,
+deadhead_times.txt) were removed from the spec in v2.0.0-alpha.1 (2024-06-20,
+per https://tods-transit.org/spec/revision-history/). Its field/file
+inventory below is transcribed from the last commit before v2 work began on
+the spec source, a reproducible historical snapshot:
+https://github.com/MobilityData/transit-operational-data-standard/blob/27d3694c8f73cbcf0ee349d8a9155d9d115b278e/docs/spec/index.md
+("rename duplicate `to_deadhead_id` field", 2022-10-18, the last commit
+touching the spec text before the first v2-oriented commit on 2024-02-27).
+v1.0.0 declares no "Primary Key" for any file (that convention appears only
+starting with v2's field tables) and no Supplement-file mechanism (introduced
+in v2.0.0-alpha.1) -- both are left as the spec leaves them, not guessed at.
+The one stated exception is `runs_pieces.txt:piece_id`, whose field
+description explicitly says "must be unique", so that is encoded as a
+single-field primary key.
+
 Each definition carries a citation to the spec section it came from. If the
-spec and this file disagree, the spec wins; please open an issue.
+spec and this file disagree, the spec wins; please open an issue (v2.1.0) or
+see docs/spec-versions.md (v1.0.0, historical).
 """
 
 from __future__ import annotations
@@ -17,11 +36,19 @@ from dataclasses import dataclass
 from enum import Enum
 
 SPEC_VERSION = "2.1.0"
-# Spec versions this validator can be asked to target via --spec-version. Only
-# 2.1.0 is implemented today; the flag exists so feeds and CI can be explicit
-# and so a mismatch fails loudly rather than validating against the wrong text.
-SUPPORTED_SPEC_VERSIONS = ("2.1.0",)
+SPEC_VERSION_V1 = "1.0.0"
+# Spec versions this validator can be asked to target via --spec-version.
+# 2.1.0 is the current spec and the default. 1.0.0 is the last spec version
+# before the Supplement-file mechanism and the current TODS-specific files
+# were introduced; see docs/spec-versions.md for the file/field deltas.
+SUPPORTED_SPEC_VERSIONS = (SPEC_VERSION_V1, SPEC_VERSION)
 SPEC_URL = "https://tods-transit.org/spec/"
+# v1.0.0 has no live spec URL (see module docstring); cite the historical
+# commit instead so every v1 finding still points at real spec text.
+SPEC_URL_V1 = (
+    "https://github.com/MobilityData/transit-operational-data-standard/blob/"
+    "27d3694c8f73cbcf0ee349d8a9155d9d115b278e/docs/spec/index.md"
+)
 
 
 class FieldType(Enum):
@@ -31,6 +58,10 @@ class FieldType(Enum):
     TIME = "Time"
     DATE = "Date"
     NON_NEGATIVE_INTEGER = "Non-negative integer"
+    # v1.0.0 only (ops_locations.txt); no v2.1.0 field uses these.
+    LATITUDE = "Latitude"
+    LONGITUDE = "Longitude"
+    NON_NEGATIVE_FLOAT = "Non-negative float"
 
 
 class Presence(Enum):
@@ -57,14 +88,18 @@ class FieldSpec:
 class TableSpec:
     filename: str
     kind: str  # "supplement" | "tods"
-    # Spec section anchor under SPEC_URL.
+    # Spec section anchor. Under SPEC_URL for spec_version == SPEC_VERSION;
+    # under SPEC_URL_V1 for spec_version == SPEC_VERSION_V1. See spec_link().
     spec_anchor: str
     # Primary key field names. None means the spec defines no uniqueness
-    # constraint (spec: employee_run_dates.txt "Primary Key: *").
+    # constraint (spec: employee_run_dates.txt "Primary Key: *"; all of
+    # v1.0.0 except runs_pieces.txt, which states "must be unique" in prose).
     primary_key: tuple[str, ...] | None = None
     fields: tuple[FieldSpec, ...] = ()
     # For supplement files: the GTFS file this supplements.
     gtfs_base: str | None = None
+    # Which --spec-version this table belongs to.
+    spec_version: str = SPEC_VERSION
 
 
 # ---------------------------------------------------------------------------
@@ -313,6 +348,171 @@ TABLES: dict[str, TableSpec] = {
     )
 }
 
+# ---------------------------------------------------------------------------
+# v1.0.0 files. See the module docstring for the source citation. v1 predates
+# both the Supplement-file mechanism and the "Primary Key" convention, so
+# every table below is kind="tods" and (except runs_pieces.txt) has no
+# primary_key. "String"-typed fields are represented as FieldType.TEXT, the
+# same free-text type v2.1.0 uses for its own "Text" fields -- the two names
+# are synonymous, not a modeling difference.
+# ---------------------------------------------------------------------------
+
+DEADHEADS_V1 = TableSpec(
+    filename="deadheads.txt",
+    kind="tods",
+    spec_anchor="#deadheadstxt",
+    spec_version=SPEC_VERSION_V1,
+    fields=(
+        FieldSpec("deadhead_id", FieldType.ID, Presence.REQUIRED),
+        FieldSpec("service_id", FieldType.ID, Presence.REQUIRED, references="calendar.service_id"),
+        FieldSpec("block_id", FieldType.ID, Presence.REQUIRED),
+        FieldSpec("shape_id", FieldType.ID, Presence.OPTIONAL, references="shapes.shape_id"),
+        FieldSpec("to_trip_id", FieldType.ID, Presence.CONDITIONAL, references="trips.trip_id"),
+        FieldSpec("from_trip_id", FieldType.ID, Presence.CONDITIONAL, references="trips.trip_id"),
+        FieldSpec(
+            "to_deadhead_id",
+            FieldType.ID,
+            Presence.CONDITIONAL,
+            references="deadheads.deadhead_id",
+        ),
+        FieldSpec(
+            "from_deadhead_id",
+            FieldType.ID,
+            Presence.CONDITIONAL,
+            references="deadheads.deadhead_id",
+        ),
+    ),
+)
+
+OPS_LOCATIONS_V1 = TableSpec(
+    filename="ops_locations.txt",
+    kind="tods",
+    spec_anchor="#ops_locationstxt",
+    spec_version=SPEC_VERSION_V1,
+    fields=(
+        FieldSpec("ops_location_id", FieldType.ID, Presence.REQUIRED),
+        FieldSpec("ops_location_code", FieldType.TEXT, Presence.OPTIONAL),
+        FieldSpec("ops_location_name", FieldType.TEXT, Presence.REQUIRED),
+        FieldSpec("ops_location_desc", FieldType.TEXT, Presence.OPTIONAL),
+        FieldSpec("ops_location_lat", FieldType.LATITUDE, Presence.REQUIRED),
+        FieldSpec("ops_location_lon", FieldType.LONGITUDE, Presence.REQUIRED),
+    ),
+)
+
+DEADHEAD_TIMES_V1 = TableSpec(
+    filename="deadhead_times.txt",
+    kind="tods",
+    spec_anchor="#deadhead_timestxt",
+    spec_version=SPEC_VERSION_V1,
+    fields=(
+        FieldSpec(
+            "deadhead_id",
+            FieldType.ID,
+            Presence.REQUIRED,
+            references="deadheads.deadhead_id",
+        ),
+        FieldSpec("arrival_time", FieldType.TIME, Presence.REQUIRED),
+        FieldSpec("departure_time", FieldType.TIME, Presence.REQUIRED),
+        FieldSpec(
+            "ops_location_id",
+            FieldType.ID,
+            Presence.CONDITIONAL,
+            references="ops_locations.ops_location_id",
+        ),
+        FieldSpec("stop_id", FieldType.ID, Presence.CONDITIONAL, references="stops.stop_id"),
+        FieldSpec("location_sequence", FieldType.NON_NEGATIVE_INTEGER, Presence.REQUIRED),
+        FieldSpec("shape_dist_traveled", FieldType.NON_NEGATIVE_FLOAT, Presence.OPTIONAL),
+    ),
+)
+
+RUNS_PIECES_V1 = TableSpec(
+    filename="runs_pieces.txt",
+    kind="tods",
+    spec_anchor="#runs_piecestxt",
+    spec_version=SPEC_VERSION_V1,
+    # Spec: "The piece_id field must be unique." -- the only place a v1.0.0
+    # field description states a uniqueness constraint in so many words.
+    primary_key=("piece_id",),
+    fields=(
+        FieldSpec("run_id", FieldType.ID, Presence.REQUIRED),
+        FieldSpec("piece_id", FieldType.ID, Presence.REQUIRED),
+        # 0 Deadhead, 1 Trip, 2 Event.
+        FieldSpec("start_type", FieldType.ENUM, Presence.REQUIRED, enum_values=("0", "1", "2")),
+        # References deadheads.deadhead_id or trips.trip_id, per which start_type.
+        FieldSpec("start_trip_id", FieldType.ID, Presence.REQUIRED),
+        FieldSpec("start_trip_position", FieldType.NON_NEGATIVE_INTEGER, Presence.OPTIONAL),
+        FieldSpec("end_type", FieldType.ENUM, Presence.REQUIRED, enum_values=("0", "1", "2")),
+        FieldSpec("end_trip_id", FieldType.ID, Presence.REQUIRED),
+        FieldSpec("end_trip_position", FieldType.NON_NEGATIVE_INTEGER, Presence.OPTIONAL),
+    ),
+)
+
+RUN_EVENTS_V1 = TableSpec(
+    filename="run_events.txt",
+    kind="tods",
+    spec_anchor="#run_eventstxt",
+    spec_version=SPEC_VERSION_V1,
+    fields=(
+        FieldSpec("run_event_id", FieldType.ID, Presence.REQUIRED),
+        FieldSpec("piece_id", FieldType.ID, Presence.REQUIRED, references="runs_pieces.piece_id"),
+        # 0 Report Time, 1 Pre-Trip Activity, 2 Post-Trip Activity, 3 Fueling,
+        # 4 Break, 5 Availability, 6 Activity, 7 Other.
+        FieldSpec(
+            "event_type",
+            FieldType.ENUM,
+            Presence.REQUIRED,
+            enum_values=("0", "1", "2", "3", "4", "5", "6", "7"),
+        ),
+        FieldSpec("event_name", FieldType.TEXT, Presence.OPTIONAL),
+        FieldSpec("event_time", FieldType.TIME, Presence.REQUIRED),
+        FieldSpec("event_duration", FieldType.NON_NEGATIVE_INTEGER, Presence.REQUIRED),
+        # 0 Operational Location, 1 Stop.
+        FieldSpec(
+            "event_from_location_type",
+            FieldType.ENUM,
+            Presence.OPTIONAL,
+            enum_values=("", "0", "1"),
+        ),
+        # References ops_locations.ops_location_id or stops.stop_id.
+        FieldSpec("event_from_location_id", FieldType.ID, Presence.OPTIONAL),
+        FieldSpec(
+            "event_to_location_type",
+            FieldType.ENUM,
+            Presence.OPTIONAL,
+            enum_values=("", "0", "1"),
+        ),
+        FieldSpec("event_to_location_id", FieldType.ID, Presence.OPTIONAL),
+    ),
+)
+
+# Spec (v1.0.0), "Dataset Files": all five files, all optional.
+TABLES_V1: dict[str, TableSpec] = {
+    t.filename: t
+    for t in (
+        DEADHEADS_V1,
+        OPS_LOCATIONS_V1,
+        DEADHEAD_TIMES_V1,
+        RUNS_PIECES_V1,
+        RUN_EVENTS_V1,
+    )
+}
+
+# Selects the table inventory to validate against for a given --spec-version.
+TABLES_BY_VERSION: dict[str, dict[str, TableSpec]] = {
+    SPEC_VERSION_V1: TABLES_V1,
+    SPEC_VERSION: TABLES,
+}
+
+
+def tables_for_version(spec_version: str) -> dict[str, TableSpec]:
+    """The file/field inventory to validate against for ``spec_version``.
+
+    Raises KeyError for an unsupported version; callers should validate
+    against SUPPORTED_SPEC_VERSIONS first (the CLI does, in _check_spec_version).
+    """
+    return TABLES_BY_VERSION[spec_version]
+
+
 # GTFS files that may sit alongside TODS files in the same package. Their
 # presence is normal and they are never validated here.
 GTFS_FILENAMES: frozenset[str] = frozenset(
@@ -354,7 +554,8 @@ GTFS_FILENAMES: frozenset[str] = frozenset(
 
 
 def spec_link(table: TableSpec) -> str:
-    return f"{SPEC_URL}{table.spec_anchor}"
+    base = SPEC_URL_V1 if table.spec_version == SPEC_VERSION_V1 else SPEC_URL
+    return f"{base}{table.spec_anchor}"
 
 
 __all__ = [
@@ -362,12 +563,17 @@ __all__ = [
     "GTFS_FILENAMES",
     "GTFS_PRIMARY_KEYS",
     "SPEC_URL",
+    "SPEC_URL_V1",
     "SPEC_VERSION",
+    "SPEC_VERSION_V1",
     "SUPPORTED_SPEC_VERSIONS",
     "TABLES",
+    "TABLES_BY_VERSION",
+    "TABLES_V1",
     "FieldSpec",
     "FieldType",
     "Presence",
     "TableSpec",
     "spec_link",
+    "tables_for_version",
 ]

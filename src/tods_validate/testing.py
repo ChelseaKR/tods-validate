@@ -33,7 +33,9 @@ from pathlib import Path
 
 from .api import ValidationResult, validate_feed
 from .findings import Severity
+from .policy import GatingPolicy
 from .report import render_text
+from .schema import SPEC_VERSION
 
 _SEVERITY_BY_NAME = {
     "error": Severity.ERROR,
@@ -61,6 +63,7 @@ def assert_feed_valid(
     encoding: str | None = None,
     fail_on: str | Severity = "error",
     ignore: Iterable[str] = (),
+    spec_version: str = SPEC_VERSION,
 ) -> ValidationResult:
     """Assert the TODS feed at ``path`` validates with no blocking findings.
 
@@ -74,9 +77,10 @@ def assert_feed_valid(
     """
     __tracebackhide__ = True
     threshold = _coerce_severity(fail_on)
-    ignored = frozenset(ignore)
-    result = validate_feed(path, gtfs, enable=enable, encoding=encoding)
-    blocking = [f for f in result.findings if f.severity >= threshold and f.rule_id not in ignored]
+    policy = GatingPolicy(fail_on=threshold.name.lower(), ignore=frozenset(ignore))
+    result = validate_feed(path, gtfs, enable=enable, encoding=encoding, spec_version=spec_version)
+    gate = policy.apply(result.findings)
+    blocking = [f for f in gate.gating if f.severity >= threshold]
     if blocking:
         raise AssertionError(
             f"{result.source}: expected no findings at or above {threshold.name}, "
@@ -93,6 +97,7 @@ def assert_feed_produces(
     enable: Iterable[str] = (),
     encoding: str | None = None,
     exactly: bool = False,
+    spec_version: str = SPEC_VERSION,
 ) -> ValidationResult:
     """Assert that validating ``path`` produces (at least) the ``expected`` rules.
 
@@ -106,7 +111,7 @@ def assert_feed_produces(
     """
     __tracebackhide__ = True
     wanted = frozenset({expected} if isinstance(expected, str) else expected)
-    result = validate_feed(path, gtfs, enable=enable, encoding=encoding)
+    result = validate_feed(path, gtfs, enable=enable, encoding=encoding, spec_version=spec_version)
     produced = {f.rule_id for f in result.findings}
     missing = wanted - produced
     extra = (produced - wanted) if exactly else frozenset()

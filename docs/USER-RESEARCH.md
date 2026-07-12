@@ -168,7 +168,7 @@ The domain and stakeholder model are grounded in:
 - **Goal:** triage a report of findings without relying on color or on seeing the
   terminal.
 - **Values today:** severity is spelled out as `ERROR`/`WARNING`/`INFO` in the text
-  (no color-only signaling — a stated quality bar in `CLAUDE.md`), and the report
+  (no color-only signaling — a stated quality bar for this project), and the report
   stays readable piped to a file; `--quiet` and `--max-findings` keep the output
   bounded; every finding carries a stable machine `location` pointer
   (`run_events.txt#L4/end_time`) she can script against; `--format json` (validated

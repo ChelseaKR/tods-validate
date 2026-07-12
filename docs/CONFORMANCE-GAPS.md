@@ -16,7 +16,8 @@ table and here.
 
 Last regenerated: 2026-07-05 (conformance remediation pass, see
 `../audit-2026-07-05/tods-validate-REMEDIATION.md` in the sibling portfolio
-checkout for the full audit trail this is built from).
+checkout for the full audit trail this is built from). Updated 2026-07-09:
+ADR-log closures recorded in the code-quality and documentation sections.
 
 ## code-quality
 
@@ -37,24 +38,21 @@ per-file in `pyproject.toml`; complexity findings carry a coded
 runs `uv sync --frozen` (lockfile-drift check for free); `CODEOWNERS` added
 (`.github/CODEOWNERS`).
 
+**Closed 2026-07-09:** the ADR log exists — `docs/adr/0000` (the practice)
+plus backfills 0001 (3.11 floor, closing **CQ-44/45**'s first item and, with
+the committed `.python-version` pinned to CI's 3.12 gate version, **CQ-01**),
+0002 (i18n N/A), 0003 (`editor/vscode` nesting, closing **CQ-26**),
+0004 (rules-as-registry), 0005 (uv/lockfile adoption).
+
 **Still open:**
-- **CQ-01** — `requires-python = ">=3.11"` (not `>=3.12`), no
-  `.python-version`. This is a deliberate adoption-reach choice (README
-  states it), but it has never had an ADR. No ADR log exists yet (see
-  CQ-44/45 below); writing one is the actual fix, not lowering the floor.
-- **CQ-26** — `editor/vscode/` is a nested npm project with no declaring
-  ADR. Same root cause as above: no ADR log yet.
 - **CQ-27** — dev deps still live in `[project.optional-dependencies].dev`,
-  not PEP 735 `[dependency-groups]`. `uv` (adopted today) reads
+  not PEP 735 `[dependency-groups]`. `uv` (adopted 2026-07-05) reads
   `dependency-groups` natively, so this is a clean follow-up, not urgent.
 - **CQ-37–43** — no committed branch-ruleset artifact (PR-required, stale-
   review dismissal, required status checks, linear history, no
   force-push, no admin bypass). ⛔ **Needs a live GitHub Settings change**
   this remediation pass intentionally did not make (see ci-cd below for the
   exact ruleset and the reasoning).
-- **CQ-44/45** — no `docs/adr/` log. Not built this pass; at least three
-  decisions are ADR-worthy today (the 3.11 floor, the I18N N/A declaration,
-  the `editor/vscode` nesting).
 - **CQ-47** — mutation kill-rate on the rules engine is ~65% (advisory,
   weekly), below the 70% target. Unchanged this pass; ratchet, don't jump.
 
@@ -178,7 +176,9 @@ response SLA (3 business days ack; 30/90-day fix-or-mitigate by severity).
   created annotated and signed. **⛔ Manual action for the next release:**
   `git tag -s vX.Y.Z -m "release: vX.Y.Z"` (requires a configured GPG or SSH
   signing key) instead of `git tag vX.Y.Z`, then push the tag before
-  creating the GitHub release. The historical tags were **not** rewritten
+  creating the GitHub release. Since v0.7.0 release tags are SSH-signed with
+  the key listed in `.github/allowed_signers`, and `verify.yml` verifies the
+  signature against that file. The historical tags were **not** rewritten
   (rewriting published tags retroactively is destructive to anyone who
   already fetched them, and out of scope for a file-edit-only remediation
   pass).
@@ -234,9 +234,12 @@ was pre-wired and needed no change). `SECURITY.md` gained supported-versions
 The README Standards Conformance table (this file's parent) now exists.
 README status line (`Status: Beta`) added.
 
-**Still open:** DOC-04/05 (no `docs/adr/` — same gap as CQ-44/45 above);
-DOC-08 (no `cffconvert --validate` CI step); DOC-15 (no currency stamps on
-`getting-started.md`/`api.md`, no `check_staleness.py` wiring).
+**Closed 2026-07-09:** DOC-04/05 — `docs/adr/` exists (0000 + backfills
+0001–0005; same closure as CQ-44/45 above).
+
+**Still open:** DOC-08 (no `cffconvert --validate` CI step); DOC-15 (no
+currency stamps on `getting-started.md`/`api.md`, no `check_staleness.py`
+wiring).
 
 ## responsible-tech
 
