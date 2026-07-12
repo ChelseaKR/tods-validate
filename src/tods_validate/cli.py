@@ -31,7 +31,7 @@ from .findings import Finding, Severity
 from .fix import fix_package
 from .init import SHAPES, DestinationNotEmptyError
 from .init import scaffold as scaffold_package
-from .loader import PackageNotFoundError, load_package
+from .loader import Package, PackageNotFoundError, load_package
 from .merge import merge_feeds
 from .policy import GatingPolicy
 from .report import (
@@ -140,6 +140,8 @@ def _render(
     coverage: RunCoverage | None = None,
     suggestions: list[Suggestion] | None = None,
     spec_version: str = SPEC_VERSION,
+    package: Package | None = None,
+    timeline: bool = False,
 ) -> str:
     if output_format == "text":
         return render_text(
@@ -165,7 +167,13 @@ def _render(
     if output_format == "sarif":
         return render_sarif(findings, source, coverage=coverage)
     if output_format == "html":
-        return render_html(findings, source, coverage=coverage, spec_version=spec_version)
+        return render_html(
+            findings,
+            source,
+            coverage=coverage,
+            spec_version=spec_version,
+            timeline_package=package if timeline else None,
+        )
     # github annotations carry no manifest; coverage is disclosed by the other formats.
     return render_github(findings, source)
 
@@ -214,6 +222,11 @@ def main() -> None:
     default="text",
     show_default=True,
     help="Report format: text, JSON, Markdown, GitHub annotations, SARIF, or HTML.",
+)
+@click.option(
+    "--timeline",
+    is_flag=True,
+    help="Include accessible per-run timelines in HTML output (requires --format html).",
 )
 @click.option(
     "--fail-on",
@@ -303,6 +316,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
     path: str,
     gtfs_path: str | None,
     output_format: str,
+    timeline: bool,
     fail_on: str | None,
     ignore_ids: tuple[str, ...],
     enable_tokens: tuple[str, ...],
@@ -322,6 +336,9 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
     PATH is a directory or .zip file containing the TODS .txt files, with or
     without the GTFS feed alongside them.
     """
+    if timeline and output_format != "html":
+        _fail("--timeline requires --format html.")
+
     config = _resolve_config(config_path)
     if profile is not None:
         config = _merge(_profile_config(profile), config)
@@ -382,6 +399,8 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
                 coverage=coverage,
                 suggestions=machine_suggestions,
                 spec_version=effective_spec,
+                package=package,
+                timeline=timeline,
             )
         )
         if suggest and output_format in ("text", "markdown"):

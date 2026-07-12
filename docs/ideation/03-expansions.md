@@ -85,6 +85,16 @@ sample rows lifted from `examples/sample-feed/`. **Effort:** S.
 command, and the generated workflow uses the pinned Action from FIX-11.
 
 ### EXP-06 — Accessible run timeline in the HTML report
+**Status: done (2026-07-11).** `--format html --timeline` renders one
+collapsible dispatch-board-style time rail per `(service_id, run_id)`, with
+each event on its own lane so overlaps remain readable. Findings anchored to a
+`run_events.txt` row add both a dashed bar and diamond marker. The SVG is
+`aria-hidden`; a sequence-ordered table immediately below it repeats every
+event's times, work, movement, and finding severity/ID. Invalid or missing
+times remain in the table even when they cannot be plotted. TODS v1 reports an
+explicit unavailable note because v1 models pieces and events differently.
+The renderer stays deterministic, dependency-free, and single-file.
+
 **Pitch:** an opt-in visual timeline per run (SVG, inline, no assets) showing
 events on a time axis with findings anchored to them — with a full text/table
 equivalent so it adds nothing color- or vision-dependent.

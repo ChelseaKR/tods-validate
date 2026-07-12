@@ -87,7 +87,8 @@ Other output formats:
 - `--format github` prints GitHub Actions workflow annotations.
 - `--format sarif` prints SARIF for GitHub code-scanning and security
   dashboards.
-- `--format html` prints a standalone, shareable report.
+- `--format html` prints a standalone, shareable report. Add `--timeline` to
+  include a visual time rail and equivalent event table for each run.
 
 On large feeds, `--max-findings N` caps how many findings are listed (the
 summary is unaffected) and `--quiet` prints only the summary. Text and Markdown
@@ -367,7 +368,11 @@ non-color users.
 - The `--format html` report declares its language and a responsive viewport,
   uses `header`/`main` landmarks, gives the findings table a caption and
   column-scoped headers, and uses severity colors that clear WCAG AA contrast
-  (4.5:1) on its background. It ships as a single file with no external assets.
+  (4.5:1) on its background. Opt-in run timelines hide their decorative SVGs
+  from assistive technology and repeat the full event sequence, times,
+  locations, and findings in a table. They use a dashed outline and diamond
+  marker in addition to color. The report ships as a single file with no
+  external assets.
 
 If you hit an output that is hard to read with assistive technology, that is a
 bug — please report it.
