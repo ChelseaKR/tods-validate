@@ -7,6 +7,9 @@ new checks may be added in minor releases.
 
 Added:
 
+- The VS Code client now packages reproducibly from its lockfile in CI, includes
+  its Apache-2.0 license, uploads a reviewable VSIX artifact, and offers a setup
+  guide when `tods-validate-lsp` is not available on `PATH`.
 - `--format html --timeline` adds an opt-in visual time rail for each
   `(service_id, run_id)`. Event rows with findings use a dashed bar and
   diamond marker, and every rail has a complete sequence-ordered table with

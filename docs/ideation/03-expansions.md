@@ -189,6 +189,16 @@ state-DOT-shaped consumer can produce a quarter-over-quarter Markdown
 compliance table from CI artifacts alone.
 
 ### EXP-10 — Ship the editor story: publish the VS Code extension
+**Status: packaging complete; publication blocked (2026-07-11).** The nested
+extension now ships its Apache-2.0 license, a narrow `.vscodeignore` package
+boundary, lockfile-backed type-check/package scripts, and a SHA-pinned CI
+workflow that uploads the VSIX artifact. Server startup failures offer a
+setup-guide action, and the guide
+documents `pipx`, `PATH`, and the explicit `tods-validate.serverPath` fallback.
+Marketplace and Open VSX publication still require maintainer-owned publisher
+accounts, credentials, and acceptance of external terms, so they remain an
+explicit human gate rather than an agent-completed claim.
+
 **Pitch:** publish `editor/vscode/` to the Marketplace and Open VSX, with
 bundled server discovery (find `tods-validate-lsp` on PATH, offer pipx
 install guidance when missing).

@@ -1,0 +1,55 @@
+name: VS Code extension
+
+on:
+  pull_request:
+    paths:
+      - "editor/vscode/**"
+      - ".github/workflows/vscode-extension.yml"
+  push:
+    branches: [main]
+    paths:
+      - "editor/vscode/**"
+      - ".github/workflows/vscode-extension.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  package:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: editor/vscode
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: editor/vscode/package-lock.json
+      - name: Install locked dependencies
+        run: npm ci --ignore-scripts
+      - name: Type-check
+        run: npm run check
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+      - name: Package VSIX
+        run: npm run package
+      - name: Verify VSIX contents
+        run: |
+          set -eu
+          vsix="$(find . -maxdepth 1 -name 'tods-validate-*.vsix' -print -quit)"
+          test -n "$vsix"
+          unzip -Z1 "$vsix" | grep -Fx 'extension/LICENSE.txt'
+          unzip -Z1 "$vsix" | grep -Fx 'extension/out/extension.js'
+      - name: Upload VSIX
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: tods-validate-vsix
+          path: editor/vscode/tods-validate-*.vsix
+          if-no-files-found: error
+          retention-days: 14

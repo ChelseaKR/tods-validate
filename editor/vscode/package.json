@@ -9,6 +9,17 @@
     "type": "git",
     "url": "https://github.com/ChelseaKR/tods-validate"
   },
+  "homepage": "https://github.com/ChelseaKR/tods-validate/tree/main/editor/vscode",
+  "bugs": {
+    "url": "https://github.com/ChelseaKR/tods-validate/issues"
+  },
+  "keywords": [
+    "transit",
+    "TODS",
+    "ODS",
+    "GTFS",
+    "validator"
+  ],
   "engines": {
     "vscode": "^1.75.0"
   },
@@ -28,7 +39,7 @@
         "tods-validate.serverPath": {
           "type": "string",
           "default": "tods-validate-lsp",
-          "description": "Path to the tods-validate-lsp executable. Install it with: pip install 'tods-validate[lsp]'."
+          "description": "Path to the tods-validate-lsp executable. Install it with pipx install 'tods-validate[lsp]', or provide its full path here."
         }
       }
     }
@@ -36,6 +47,7 @@
   "scripts": {
     "vscode:prepublish": "npm run compile",
     "compile": "tsc -p ./",
+    "check": "tsc -p ./ --noEmit",
     "watch": "tsc -watch -p ./",
     "package": "vsce package"
   },

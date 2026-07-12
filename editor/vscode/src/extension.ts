@@ -5,7 +5,7 @@
 // real work: it re-validates the whole feed on open and save and returns
 // diagnostics, hovers, and quick fixes. This file only wires the two together.
 
-import { workspace, ExtensionContext, window } from "vscode";
+import { commands, workspace, ExtensionContext, Uri, window } from "vscode";
 import {
   LanguageClient,
   LanguageClientOptions,
@@ -28,6 +28,10 @@ const TODS_FILENAMES = [
 ];
 
 let client: LanguageClient | undefined;
+
+const SETUP_GUIDE = Uri.parse(
+  "https://github.com/ChelseaKR/tods-validate/tree/main/editor/vscode#prerequisites",
+);
 
 export function activate(context: ExtensionContext): void {
   const serverPath = workspace
@@ -55,11 +59,18 @@ export function activate(context: ExtensionContext): void {
   );
 
   client.start().catch((error) => {
-    window.showErrorMessage(
-      `TODS Validate could not start '${serverPath}'. Install it with ` +
-        `"pip install 'tods-validate[lsp]'" and set tods-validate.serverPath if ` +
-        `it is not on your PATH. (${error})`,
-    );
+    void window
+      .showErrorMessage(
+        `TODS Validate could not start '${serverPath}'. Install it with ` +
+          `"pipx install 'tods-validate[lsp]'" and set tods-validate.serverPath ` +
+          `to the executable's full path if it is not on your PATH. (${error})`,
+        "Open setup guide",
+      )
+      .then((selection) => {
+        if (selection === "Open setup guide") {
+          void commands.executeCommand("vscode.open", SETUP_GUIDE);
+        }
+      });
   });
 }
 
