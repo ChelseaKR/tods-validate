@@ -7,6 +7,11 @@ new checks may be added in minor releases.
 
 Added:
 
+- `--format html --timeline` adds an opt-in visual time rail for each
+  `(service_id, run_id)`. Event rows with findings use a dashed bar and
+  diamond marker, and every rail has a complete sequence-ordered table with
+  the same times, work, movement, and finding IDs for screen-reader and
+  non-visual use.
 - The browser playground is deployed at
   <https://chelseakr.github.io/tods-validate/> and linked from the README.
   Feed files remain in the browser during validation.

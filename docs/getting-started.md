@@ -20,7 +20,9 @@ docker run --rm -v "$PWD:/work:ro" ghcr.io/chelseakr/tods-validate \
   the `--gtfs` part.
 
 For a quick shareable summary, add `--format html > report.html` and open the
-file in a browser, or `--format markdown` to paste into an email or issue.
+file in a browser, or `--format markdown` to paste into an email or issue. Add
+`--timeline` with HTML to include a time rail and text-equivalent event table
+for each run.
 
 ## What the result means
 

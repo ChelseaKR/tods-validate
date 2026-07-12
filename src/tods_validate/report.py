@@ -21,7 +21,9 @@ from typing import cast
 
 from . import __version__
 from .findings import Finding, Severity
+from .loader import Package
 from .rules import REGISTRY, RunCoverage
+from .run_events import _Event, events_by_run, parse_events
 from .schema import SPEC_VERSION
 from .suggest import Suggestion
 
@@ -593,12 +595,197 @@ def _html_row(f: Finding, esc: Callable[[str], str]) -> str:
     )
 
 
+def _timeline_time(seconds: int) -> str:
+    hours, remainder = divmod(seconds, 3600)
+    minutes = remainder // 60
+    return f"{hours:02d}:{minutes:02d}"
+
+
+def _timeline_event_label(event: _Event) -> str:
+    values = event.row.values
+    work = values.get("event_type", "")
+    job = values.get("job_type", "")
+    if job and work and job != work:
+        return f"{job}: {work}"
+    return work or job or event.trip_id or "Event"
+
+
+def _timeline_svg(
+    events: list[_Event],
+    finding_rows: dict[int, list[Finding]],
+    esc: Callable[[str], str],
+) -> str:
+    timed = [
+        event
+        for event in events
+        if event.start is not None and event.end is not None and event.end >= event.start
+    ]
+    if not timed:
+        return (
+            "<p class='timeline-note'>No events with valid start and end times can be plotted. "
+            "The event table still lists every row.</p>"
+        )
+
+    start = min(event.start for event in timed if event.start is not None)
+    end = max(event.end for event in timed if event.end is not None)
+    span = max(end - start, 1)
+    width, label_width, right, top, row_height = 960, 124, 24, 42, 34
+    plot_width = width - label_width - right
+    height = top + len(timed) * row_height + 22
+
+    ticks = []
+    for index in range(5):
+        ratio = index / 4
+        x = label_width + ratio * plot_width
+        seconds = round(start + ratio * span)
+        ticks.append(
+            f"<line class='timeline-grid' x1='{x:.1f}' y1='28' x2='{x:.1f}' "
+            f"y2='{height - 14}'/>"
+            f"<text class='timeline-tick' x='{x:.1f}' y='18' "
+            f"text-anchor='middle'>{_timeline_time(seconds)}</text>"
+        )
+
+    bars = []
+    for index, event in enumerate(timed):
+        start_seconds, end_seconds = event.start, event.end
+        if start_seconds is None or end_seconds is None:
+            continue
+        y = top + index * row_height
+        x = label_width + (start_seconds - start) / span * plot_width
+        bar_width = max((end_seconds - start_seconds) / span * plot_width, 4)
+        event_findings = finding_rows.get(event.row.line, [])
+        issue_class = " has-finding" if event_findings else ""
+        sequence = str(event.sequence) if event.sequence is not None else "?"
+        label = _timeline_event_label(event)
+        visual_label = label if len(label) <= 12 else label[:11] + "…"
+        bars.append(
+            f"<text class='timeline-label' x='{label_width - 10}' y='{y + 16}' "
+            f"text-anchor='end'>#{esc(sequence)} {esc(visual_label)}</text>"
+            f"<rect class='event-bar{issue_class}' x='{x:.1f}' y='{y + 3}' "
+            f"width='{bar_width:.1f}' height='18' rx='3'>"
+            f"<title>{esc(label)}, {_timeline_time(start_seconds)} to "
+            f"{_timeline_time(end_seconds)}</title></rect>"
+            + (
+                f"<text class='issue-marker' x='{min(x + bar_width + 9, width - 8):.1f}' "
+                f"y='{y + 17}'>◆</text>"
+                if event_findings
+                else ""
+            )
+        )
+
+    return (
+        "<div class='timeline-scroll' tabindex='0' "
+        "aria-label='Scrollable visual run timeline'>"
+        f"<svg class='timeline-chart' aria-hidden='true' focusable='false' "
+        f"viewBox='0 0 {width} {height}'>" + "".join(ticks) + "".join(bars) + "</svg></div>"
+    )
+
+
+def _timeline_table(
+    events: list[_Event],
+    finding_rows: dict[int, list[Finding]],
+    esc: Callable[[str], str],
+) -> str:
+    rows = []
+    ordered = sorted(
+        events,
+        key=lambda event: (
+            event.sequence is None,
+            event.sequence if event.sequence is not None else 0,
+            event.row.line,
+        ),
+    )
+    for event in ordered:
+        values = event.row.values
+        sequence = str(event.sequence) if event.sequence is not None else "-"
+        start = values.get("start_time", "") or "-"
+        end = values.get("end_time", "") or "-"
+        movement = f"{event.start_location or '-'} → {event.end_location or '-'}"
+        event_findings = finding_rows.get(event.row.line, [])
+        finding_html = " ".join(
+            f"<span class='finding-tag sev-{_HTML_SEVERITY_LABEL[f.severity]}'>"
+            f"{f.severity.name} {esc(f.rule_id)}</span>"
+            for f in event_findings
+        )
+        rows.append(
+            "<tr>"
+            f"<td>{esc(sequence)}</td>"
+            f"<td><time>{esc(start)}</time>–<time>{esc(end)}</time></td>"
+            f"<td>{esc(_timeline_event_label(event))}</td>"
+            f"<td>{esc(movement)}</td>"
+            f"<td>{finding_html or 'None'}</td>"
+            "</tr>"
+        )
+    return (
+        "<div class='table-scroll' tabindex='0' aria-label='Scrollable event table'>"
+        "<table class='timeline-table'>"
+        "<caption>Run events in sequence order. This table is the text equivalent "
+        "of the visual timeline.</caption>"
+        "<thead><tr><th scope='col'>Sequence</th><th scope='col'>Time</th>"
+        "<th scope='col'>Work</th><th scope='col'>Movement</th>"
+        "<th scope='col'>Findings on row</th></tr></thead>"
+        f"<tbody>{''.join(rows)}</tbody></table></div>"
+    )
+
+
+def _timelines_html(
+    package: Package,
+    findings: list[Finding],
+    spec_version: str,
+    esc: Callable[[str], str],
+) -> str:
+    intro = (
+        "<section class='timelines' aria-labelledby='timelines-heading'>"
+        "<h2 id='timelines-heading'>Run timelines</h2>"
+        "<p>Each visual rail places run events on a time axis. A dashed bar and diamond "
+        "mark an event row with findings. The table under each rail contains the same "
+        "information in sequence order.</p>"
+    )
+    if spec_version != SPEC_VERSION:
+        return (
+            intro + f"<p>Timelines are not available for TODS v{esc(spec_version)} because that "
+            "version models runs and events with a different file structure.</p></section>"
+        )
+
+    runs = events_by_run(parse_events(package))
+    if not runs:
+        return intro + "<p>No complete service_id/run_id pairs are available to plot.</p></section>"
+
+    findings_by_row: dict[int, list[Finding]] = {}
+    for finding in findings:
+        if finding.file == "run_events.txt" and finding.row is not None:
+            findings_by_row.setdefault(finding.row, []).append(finding)
+
+    cards = []
+    for (service_id, run_id), events in sorted(runs.items()):
+        ordered = sorted(
+            events,
+            key=lambda event: (
+                event.sequence is None,
+                event.sequence if event.sequence is not None else 0,
+                event.row.line,
+            ),
+        )
+        finding_count = sum(len(findings_by_row.get(event.row.line, [])) for event in ordered)
+        finding_label = f", {finding_count} finding{'s' if finding_count != 1 else ''}"
+        cards.append(
+            "<details class='run-timeline' open>"
+            f"<summary>Service {esc(service_id)} · run {esc(run_id)} — "
+            f"{len(ordered)} events{finding_label}</summary>"
+            + _timeline_svg(ordered, findings_by_row, esc)
+            + _timeline_table(ordered, findings_by_row, esc)
+            + "</details>"
+        )
+    return intro + "".join(cards) + "</section>"
+
+
 def render_html(
     findings: list[Finding],
     source: str,
     *,
     coverage: RunCoverage | None = None,
     spec_version: str = SPEC_VERSION,
+    timeline_package: Package | None = None,
 ) -> str:
     """A self-contained, shareable HTML report. No external assets.
 
@@ -637,6 +824,11 @@ def render_html(
     )
     rule_counts = by_rule(findings).most_common()
     total = len(findings)
+    timelines = (
+        _timelines_html(timeline_package, findings, spec_version, esc)
+        if timeline_package is not None
+        else ""
+    )
 
     breakdown = ", ".join(f"{esc(rule_id)} ×{count}" for rule_id, count in rule_counts)
 
@@ -650,10 +842,12 @@ def render_html(
             groups.append(
                 "<details class='rule-group' open>"
                 f"<summary>{esc(rule_id)} - {count} finding{plural}</summary>"
+                f"<div class='table-scroll' tabindex='0' "
+                f"aria-label='Scrollable findings table for {esc(rule_id)}'>"
                 "<table><caption>Findings, ordered by file, then row, then rule ID.</caption>"
                 "<thead><tr><th scope='col'>Severity</th><th scope='col'>Rule</th>"
                 "<th scope='col'>Location</th><th scope='col'>Message</th></tr></thead>"
-                f"<tbody>{rows}</tbody></table></details>"
+                f"<tbody>{rows}</tbody></table></div></details>"
             )
         rule_options = "".join(
             f"<option value='{esc(rule_id)}'>{esc(rule_id)} ({count})</option>"
@@ -735,10 +929,31 @@ def render_html(
         "padding:.5rem .75rem;margin:.75rem 0}"
         "details.rule-group summary{cursor:pointer;font-weight:600}"
         ".filters{display:flex;flex-wrap:wrap;gap:1rem;margin:1rem 0}"
-        ".filters label{display:flex;flex-direction:column;gap:.25rem;font-size:.85rem}"
+        ".filters label{display:flex;flex:1 1 10rem;min-width:0;flex-direction:column;"
+        "gap:.25rem;font-size:.85rem}"
         ".filters select,.filters input{font:inherit;padding:.3rem .5rem;"
-        "border:1px solid #bbb;border-radius:4px}"
+        "border:1px solid #bbb;border-radius:4px;box-sizing:border-box;max-width:100%;width:100%}"
         "#shown-count{font-weight:600}"
+        ".timelines{margin-top:2.5rem;padding-top:1.25rem;border-top:3px solid #355c7d}"
+        ".run-timeline{border:1px solid #c8d2dc;border-radius:6px;"
+        "padding:.65rem .8rem;margin:1rem 0}"
+        ".run-timeline summary{cursor:pointer;font-weight:700}"
+        ".timeline-scroll,.table-scroll{max-width:100%;overflow-x:auto;margin-top:.75rem}"
+        ".timeline-scroll:focus-visible,.table-scroll:focus-visible{"
+        "outline:3px solid #355c7d;outline-offset:2px}"
+        ".timeline-chart{display:block;width:100%;min-width:46rem;background:#f8fafc;"
+        "border:1px solid #c8d2dc;border-radius:4px}"
+        ".timeline-grid{stroke:#64748b;stroke-width:1}"
+        ".timeline-tick,.timeline-label{fill:#1f2933;font-family:ui-monospace,monospace;"
+        "font-size:11px}"
+        ".event-bar{fill:#355c7d}"
+        ".event-bar.has-finding{fill:#9a3412;stroke:#7c2d12;stroke-width:2;"
+        "stroke-dasharray:5 3}"
+        ".issue-marker{fill:#9a3412;font-size:13px}"
+        ".timeline-table{min-width:44rem}"
+        ".finding-tag{display:inline-block;border:1px solid currentColor;border-radius:3px;"
+        "padding:.05rem .3rem;margin:.08rem;font-size:.78rem;font-weight:700}"
+        ".timeline-note{font-style:italic}"
         "@media (prefers-color-scheme: dark){"
         "body{background:#121212;color:#e8e8e8}"
         "th,td{border-color:#444}"
@@ -746,14 +961,24 @@ def render_html(
         "details.rule-group{border-color:#444}"
         ".filters select,.filters input{border-color:#555;background:#1e1e1e;color:#e8e8e8}"
         ".sev-error{color:#ff6b6b}.sev-warning{color:#e0a530}.sev-info{color:#3ddc84}"
+        ".timelines{border-top-color:#83b6dd}"
+        ".run-timeline,.timeline-chart{border-color:#52606d}"
+        ".timeline-chart{background:#18212b}"
+        ".timeline-grid{stroke:#9fb3c8}"
+        ".timeline-tick,.timeline-label{fill:#e8e8e8}"
+        ".event-bar{fill:#83b6dd}"
+        ".event-bar.has-finding{fill:#b4532a;stroke:#ffb07c}"
+        ".issue-marker{fill:#ffb07c}"
+        ".timeline-scroll:focus-visible,.table-scroll:focus-visible{outline-color:#83b6dd}"
         "}"
+        "@media (max-width:600px){body{margin:1rem}.filters{gap:.65rem}}"
         "</style></head><body>"
         "<header>"
         "<h1>TODS validation report</h1>"
         f"<p>Source: <code>{esc(source)}</code> · TODS v{spec_version} · "
         f"tods-validate {__version__}</p>"
         "</header>"
-        f"<main>{body}</main>"
+        f"<main>{body}{timelines}</main>"
         "</body></html>"
     )
 
