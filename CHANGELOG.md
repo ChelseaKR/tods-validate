@@ -7,6 +7,9 @@ new checks may be added in minor releases.
 
 Added:
 
+- The browser playground is deployed at
+  <https://chelseakr.github.io/tods-validate/> and linked from the README.
+  Feed files remain in the browser during validation.
 - An `ingest-ready` named profile for CAD/AVL import gates. It fails on
   warnings, enables coverage and advisory checks, and adds no ignored rules;
   select it with `--profile ingest-ready` or `profile = "ingest-ready"` in

@@ -18,6 +18,14 @@ def test_playground_references_the_public_api() -> None:
     assert "micropip.install" in html  # installs the published wheel in-browser
 
 
+def test_playground_version_target_exists_before_initialization() -> None:
+    html = _HTML.read_text()
+    target = 'id="footer-version"'
+    assignment = "footerVersion.textContent ="
+    assert target in html
+    assert html.index(target) < html.index(assignment)
+
+
 def test_playground_api_symbols_exist() -> None:
     from tods_validate.api import validate_feed
     from tods_validate.report import render_html

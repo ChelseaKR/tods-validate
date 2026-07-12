@@ -22,11 +22,13 @@ with problems to confirm findings render. If Pyodide fails to load, update the
 version in the `<script src=".../pyodide/vX.Y.Z/...">` tag to the current
 [Pyodide release](https://github.com/pyodide/pyodide/releases).
 
-## Deploy
+## Deployment
 
-In **Settings → Pages**, set the source to **GitHub Actions**, then run the
-**Deploy playground** workflow (`.github/workflows/pages.yml`). It publishes this
-folder. Once it is live and verified, add the URL to the project README.
+The playground is published at
+<https://chelseakr.github.io/tods-validate/>. GitHub Pages uses the GitHub
+Actions build source; the manually dispatched **Deploy playground** workflow
+(`.github/workflows/pages.yml`) publishes this folder. Verify the live page
+after each deployment before sharing it.
 
 ## rules/
 
