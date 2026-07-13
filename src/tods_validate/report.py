@@ -431,6 +431,19 @@ def _escape_annotation(text: str) -> str:
     return text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
 
 
+def _escape_annotation_property(text: str) -> str:
+    """Escape a workflow-command *property value* (e.g. ``file=``).
+
+    Per GitHub's workflow-command spec, property values need two extra
+    escapes beyond the message escaping in :func:`_escape_annotation`: ``,``
+    (the property separator) and ``:`` (the key/value separator). Without
+    this, a feed file whose name is attacker-chosen (surfaced verbatim by,
+    e.g., TODS-I102 for any unrecognized file in the package) can inject
+    extra ``file=``/``line=``/``title=`` properties into the annotation.
+    """
+    return _escape_annotation(text).replace(",", "%2C").replace(":", "%3A")
+
+
 def render_github(findings: list[Finding], source: str) -> str:
     """Workflow command format; one annotation per finding.
 
@@ -441,7 +454,7 @@ def render_github(findings: list[Finding], source: str) -> str:
         command = _GITHUB_COMMANDS[f.severity]
         properties = []
         if f.file:
-            properties.append(f"file={_escape_annotation(f.file)}")
+            properties.append(f"file={_escape_annotation_property(f.file)}")
         if f.row is not None:
             properties.append(f"line={f.row}")
         properties.append(f"title={f.rule_id}")

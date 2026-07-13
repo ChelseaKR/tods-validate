@@ -92,9 +92,33 @@ def _identity_from_dict(d: dict[str, object]) -> Identity:
 
 
 def load_baseline_identities(path: str | Path) -> set[Identity]:
-    """Read the finding identities from a JSON report file."""
+    """Read the finding identities from a JSON report file.
+
+    Raises ``ValueError`` (alongside the ``OSError``/``json.JSONDecodeError``
+    a caller already expects from a missing file or invalid JSON) when the
+    parsed JSON is not shaped like a report: a truncated or hand-edited
+    ``--baseline`` file is plausible input, and it should fail with a clear
+    message rather than an ``AttributeError``/``TypeError`` from treating a
+    list, string, or malformed ``findings`` entry as a finding dict.
+    """
     data = json.loads(Path(path).read_text(encoding="utf-8"))
-    return {_identity_from_dict(f) for f in data.get("findings", [])}
+    if not isinstance(data, dict):
+        raise ValueError(
+            f"{path}: expected a JSON object with a 'findings' array, got {type(data).__name__}."
+        )
+    if "findings" not in data:
+        raise ValueError(f"{path}: expected a JSON report with a 'findings' array.")
+    findings = data["findings"]
+    if not isinstance(findings, list):
+        raise ValueError(f"{path}: 'findings' must be an array, got {type(findings).__name__}.")
+    identities: set[Identity] = set()
+    for item in findings:
+        if not isinstance(item, dict):
+            raise ValueError(
+                f"{path}: each entry in 'findings' must be an object, got {type(item).__name__}."
+            )
+        identities.add(_identity_from_dict(item))
+    return identities
 
 
 def new_findings(findings: Iterable[Finding], baseline: set[Identity]) -> list[Finding]:

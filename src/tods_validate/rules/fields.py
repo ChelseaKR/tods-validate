@@ -167,7 +167,11 @@ def invalid_format(context: ValidationContext) -> Iterator[Finding]:
                         ),
                         data={"value": value, "field": f.name, "expected": "YYYYMMDD"},
                     )
-                elif f.type is FieldType.NON_NEGATIVE_INTEGER and not value.isdigit():
+                elif f.type is FieldType.NON_NEGATIVE_INTEGER and not (
+                    # isascii() too: isdigit() alone accepts non-ASCII digits
+                    # ("²", "１２３") that are not valid spec integers.
+                    value.isascii() and value.isdigit()
+                ):
                     yield Finding(
                         rule_id="TODS-E203",
                         severity=Severity.ERROR,

@@ -23,7 +23,7 @@ from .loader import Package, Row
 # Kept as a private copy of tods_validate.rules.fields.parse_time (which
 # re-exports this one) rather than imported from it, to avoid the circular
 # import described above.
-_TIME_RE = re.compile(r"^(\d+):([0-5]\d):([0-5]\d)$")
+_TIME_RE = re.compile(r"^([0-9]+):([0-5][0-9]):([0-5][0-9])$")
 
 
 def parse_time(value: str) -> int | None:
@@ -31,8 +31,30 @@ def parse_time(value: str) -> int | None:
     m = _TIME_RE.match(value)
     if m is None:
         return None
-    hours, minutes, seconds = (int(g) for g in m.groups())
+    try:
+        hours, minutes, seconds = (int(g) for g in m.groups())
+    except ValueError:
+        # The hour field is uncapped ([0-9]+), so an absurdly long digit run can
+        # exceed CPython's int-conversion limit (sys.int_info.str_digits_
+        # check_threshold); treat it as not a valid time, not a crash.
+        return None
     return hours * 3600 + minutes * 60 + seconds
+
+
+def _parse_sequence(value: str) -> int | None:
+    """Parse event_sequence as a non-negative integer, or None if malformed.
+
+    ``str.isdigit`` alone is not a safe guard for ``int()``: it accepts
+    non-ASCII digits such as ``"²"`` that ``int()`` rejects, and ``int()``
+    itself refuses digit runs past CPython's conversion limit. Both used to
+    crash the loader on untrusted feed input.
+    """
+    if not (value.isascii() and value.isdigit()):
+        return None
+    try:
+        return int(value)
+    except ValueError:
+        return None
 
 
 @dataclass(frozen=True)
@@ -65,7 +87,7 @@ def parse_events(package: Package) -> list[_Event]:
                 row=row,
                 service_id=row.values.get("service_id", ""),
                 run_id=row.values.get("run_id", ""),
-                sequence=int(sequence_raw) if sequence_raw.isdigit() else None,
+                sequence=_parse_sequence(sequence_raw),
                 trip_id=row.values.get("trip_id", ""),
                 start=parse_time(row.values.get("start_time", "")),
                 end=parse_time(row.values.get("end_time", "")),
