@@ -23,13 +23,21 @@ def feed_signature(path: str | Path) -> Signature:
     """
     target = Path(path)
     if target.is_dir():
-        return frozenset(
-            (str(f.relative_to(target)), f.stat().st_mtime_ns)
-            for f in target.rglob("*")
-            if f.is_file()
-        )
-    if target.is_file():
-        return frozenset({(target.name, target.stat().st_mtime_ns)})
+        entries: set[tuple[str, int]] = set()
+        for f in target.rglob("*"):
+            try:
+                if f.is_file():
+                    entries.add((str(f.relative_to(target)), f.stat().st_mtime_ns))
+            except OSError:
+                # The file vanished between listing and stat (a feed being
+                # regenerated); it will show up as a change on the next poll.
+                continue
+        return frozenset(entries)
+    try:
+        if target.is_file():
+            return frozenset({(target.name, target.stat().st_mtime_ns)})
+    except OSError:
+        pass
     return frozenset()
 
 

@@ -130,7 +130,13 @@ def _normalize_time(value: str) -> str | None:
         return None
     if not (hours.isdigit() and minutes.isdigit() and seconds.isdigit()):
         return None
-    candidate = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+    try:
+        candidate = f"{int(hours):02d}:{int(minutes):02d}:{int(seconds):02d}"
+    except ValueError:
+        # isdigit() accepts non-ASCII digits (e.g. "²") that int() rejects,
+        # and int() refuses digit runs past CPython's conversion limit; both
+        # mean the value is not mechanically fixable, not a crash.
+        return None
     if parse_time(candidate) is None:
         return None
     return candidate
@@ -222,7 +228,9 @@ def _strip_zero_padding(value: str) -> str:
     Used only to detect zero-padding as the sole difference between two IDs,
     never to change a value that will actually be applied.
     """
-    return _DIGIT_RUN.sub(lambda m: str(int(m.group())), value)
+    # lstrip, not int(): int() raises on digit runs past CPython's conversion
+    # limit, and this runs on arbitrary feed values.
+    return _DIGIT_RUN.sub(lambda m: m.group().lstrip("0") or "0", value)
 
 
 def _levenshtein_at_most_one(a: str, b: str) -> bool:
