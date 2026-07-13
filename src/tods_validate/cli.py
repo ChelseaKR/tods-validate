@@ -354,7 +354,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
     if baseline_path is not None:
         try:
             baseline_identities = load_baseline_identities(baseline_path)
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
             _fail(f"baseline {baseline_path} could not be read: {exc}")
 
     policy = GatingPolicy.from_config(

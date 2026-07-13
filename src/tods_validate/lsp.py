@@ -277,7 +277,13 @@ def _publish(
             lsp.PublishDiagnosticsParams(uri=uri, diagnostics=diagnostics)
         )
     root_prefix = uris.from_fs_path(str(root)) or ""
-    stale = {u for u in server.diagnostics_by_uri if u.startswith(root_prefix) and u not in current}
+    # A trailing "/" makes this a path-boundary match, not a bare string
+    # prefix: without it, a root like ".../feed" would also match
+    # ".../feed2/x.txt" (a sibling feed directory whose name happens to
+    # extend this one's), incorrectly clearing that unrelated feed's live
+    # diagnostics whenever two such feed roots are open in the same session.
+    boundary = root_prefix if root_prefix.endswith("/") else root_prefix + "/"
+    stale = {u for u in server.diagnostics_by_uri if u.startswith(boundary) and u not in current}
     for uri in stale:
         server.text_document_publish_diagnostics(
             lsp.PublishDiagnosticsParams(uri=uri, diagnostics=[])

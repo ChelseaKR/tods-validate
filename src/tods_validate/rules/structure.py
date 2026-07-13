@@ -259,7 +259,13 @@ def unknown_column_supplement(context: ValidationContext) -> Iterator[Finding]:
             continue
         known = {f.name for f in table.fields}
         for column in feed.headers:
-            if column and column not in known:
+            # A TODS_-prefixed column is, by the naming convention itself, a
+            # TODS-only extension field (see the rule's own description and
+            # its worked example in rules/__init__.py's EXAMPLES, which fixes
+            # an unknown column precisely by adding this prefix) -- it should
+            # not be flagged as unrecognized just because it isn't literally
+            # one of this table's declared fields.
+            if column and column not in known and not column.startswith("TODS_"):
                 yield Finding(
                     rule_id="TODS-I108",
                     severity=Severity.INFO,
