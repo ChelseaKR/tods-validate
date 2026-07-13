@@ -106,7 +106,9 @@ def load_baseline_identities(path: str | Path) -> set[Identity]:
         raise ValueError(
             f"{path}: expected a JSON object with a 'findings' array, got {type(data).__name__}."
         )
-    findings = data.get("findings", [])
+    if "findings" not in data:
+        raise ValueError(f"{path}: expected a JSON report with a 'findings' array.")
+    findings = data["findings"]
     if not isinstance(findings, list):
         raise ValueError(f"{path}: 'findings' must be an array, got {type(findings).__name__}.")
     identities: set[Identity] = set()

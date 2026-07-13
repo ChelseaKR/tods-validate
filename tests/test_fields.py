@@ -44,9 +44,26 @@ def test_parse_time_accepts_gtfs_times(value: str, seconds: int) -> None:
     assert parse_time(value) == seconds
 
 
-@pytest.mark.parametrize("value", ["", "9am", "09:75:00", "09:00", "09:00:0", "-1:00:00"])
+@pytest.mark.parametrize(
+    "value",
+    [
+        "",
+        "9am",
+        "09:75:00",
+        "09:00",
+        "09:00:0",
+        "-1:00:00",
+        "１２:34:56",
+        "12:３４:56",
+        "12:34:５６",
+    ],
+)
 def test_parse_time_rejects_bad_times(value: str) -> None:
     assert parse_time(value) is None
+
+
+def test_parse_time_rejects_absurdly_long_hour_without_crashing() -> None:
+    assert parse_time(f"{'9' * 100_000}:00:00") is None
 
 
 def test_duplicate_primary_key_reports_both_rows() -> None:

@@ -12,6 +12,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from tods_validate.baseline import (
     diff_findings,
     load_baseline_identities,
@@ -92,6 +94,14 @@ def test_inserted_row_does_not_churn_baseline(tmp_path: Path) -> None:
     # them all; content is unchanged.
     new = [_finding(5, "trip-1"), _finding(11, "trip-2"), _finding(21, "trip-3")]
     assert new_findings(new, baseline) == []
+
+
+def test_baseline_report_requires_findings_array(tmp_path: Path) -> None:
+    baseline_path = tmp_path / "malformed.json"
+    baseline_path.write_text("{}", encoding="utf-8")
+
+    with pytest.raises(ValueError, match="'findings' array"):
+        load_baseline_identities(baseline_path)
 
 
 def test_legacy_baseline_without_data_still_matches() -> None:

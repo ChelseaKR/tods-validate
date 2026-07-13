@@ -23,7 +23,7 @@ from .loader import Package, Row
 # Kept as a private copy of tods_validate.rules.fields.parse_time (which
 # re-exports this one) rather than imported from it, to avoid the circular
 # import described above.
-_TIME_RE = re.compile(r"^(\d+):([0-5]\d):([0-5]\d)$")
+_TIME_RE = re.compile(r"^([0-9]+):([0-5][0-9]):([0-5][0-9])$")
 
 
 def parse_time(value: str) -> int | None:
@@ -34,7 +34,7 @@ def parse_time(value: str) -> int | None:
     try:
         hours, minutes, seconds = (int(g) for g in m.groups())
     except ValueError:
-        # The hour field is uncapped (\d+), so an absurdly long digit run can
+        # The hour field is uncapped ([0-9]+), so an absurdly long digit run can
         # exceed CPython's int-conversion limit (sys.int_info.str_digits_
         # check_threshold); treat it as not a valid time, not a crash.
         return None
