@@ -7,6 +7,11 @@ new checks may be added in minor releases.
 
 Added:
 
+- TODS-E203 now checks Latitude, Longitude, and Non-negative float fields, not
+  only Time, Date, and Non-negative integer. An out-of-range `ops_location_lat`
+  or `ops_location_lon` (outside -90..90 / -180..180) and a negative or
+  non-numeric `shape_dist_traveled` are now reported instead of passing
+  silently. Messages for the existing field types are unchanged.
 - The VS Code client now packages reproducibly from its lockfile in CI, includes
   its Apache-2.0 license, uploads a reviewable VSIX artifact, and offers a setup
   guide when `tods-validate-lsp` is not available on `PATH`.

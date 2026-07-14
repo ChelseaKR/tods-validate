@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
+import math
 import re
-from collections.abc import Iterator
+from collections.abc import Callable, Iterator
 
 from ..findings import Finding, Severity
 from ..loader import FeedFile
@@ -25,6 +26,30 @@ def _is_valid_date(value: str) -> bool:
     from ..gtfs_companion import parse_gtfs_date
 
     return _DATE_RE.match(value) is not None and parse_gtfs_date(value) is not None
+
+
+# Spec Latitude/Longitude/Non-negative float are plain decimal degrees/numbers:
+# an optional sign, digits, and a single decimal point. No exponent, underscore,
+# whitespace, or the special float tokens inf/nan (which float() would accept).
+_DECIMAL_RE = re.compile(r"^[+-]?(\d+(\.\d*)?|\.\d+)$")
+
+
+def _parse_decimal(value: str) -> float | None:
+    if _DECIMAL_RE.match(value) is None:
+        return None
+    number = float(value)
+    # A very long digit run parses to inf without raising; reject it too.
+    return number if math.isfinite(number) else None
+
+
+def _in_range(value: str, low: float, high: float) -> bool:
+    number = _parse_decimal(value)
+    return number is not None and low <= number <= high
+
+
+def _is_non_negative(value: str) -> bool:
+    number = _parse_decimal(value)
+    return number is not None and number >= 0.0
 
 
 def _tods_tables(context: ValidationContext) -> Iterator[tuple[TableSpec, FeedFile]]:
@@ -112,14 +137,56 @@ def invalid_enum(context: ValidationContext) -> Iterator[Finding]:
                     )
 
 
+# Each entry maps a typed field to (is-value-valid predicate, message detail,
+# expected-value label). Keeping it a table rather than an if/elif chain lets a
+# new typed field be enforced by adding one row. isascii() guards the integer
+# check because isdigit() alone accepts non-ASCII digits ("²", "１２３").
+_FORMAT_CHECKS: dict[FieldType, tuple[Callable[[str], bool], str, str]] = {
+    FieldType.TIME: (
+        lambda v: parse_time(v) is not None,
+        "which is not a valid time. Use HH:MM:SS, e.g. '09:45:00' "
+        "or '25:10:00' for 1:10 AM the next service day.",
+        "HH:MM:SS",
+    ),
+    FieldType.DATE: (
+        _is_valid_date,
+        "which is not a valid date. Use YYYYMMDD, e.g. '20260315'.",
+        "YYYYMMDD",
+    ),
+    FieldType.NON_NEGATIVE_INTEGER: (
+        lambda v: v.isascii() and v.isdigit(),
+        "which is not a non-negative whole number.",
+        "non-negative integer",
+    ),
+    FieldType.LATITUDE: (
+        lambda v: _in_range(v, -90.0, 90.0),
+        "which is not a valid latitude. Use a decimal degree between -90 and 90, e.g. '38.5449'.",
+        "latitude -90..90",
+    ),
+    FieldType.LONGITUDE: (
+        lambda v: _in_range(v, -180.0, 180.0),
+        "which is not a valid longitude. Use a decimal degree "
+        "between -180 and 180, e.g. '-121.7405'.",
+        "longitude -180..180",
+    ),
+    FieldType.NON_NEGATIVE_FLOAT: (
+        _is_non_negative,
+        "which is not a non-negative decimal number, e.g. '1250.5'.",
+        "non-negative decimal",
+    ),
+}
+
+
 @rule(
     id="TODS-E203",
     severity=Severity.ERROR,
     title="Value has the wrong format",
     description=(
         "A value does not match its field type: times must be HH:MM:SS (hours may "
-        "exceed 24 for service after midnight), dates must be YYYYMMDD, and "
-        "event_sequence must be a non-negative whole number."
+        "exceed 24 for service after midnight), dates must be YYYYMMDD, "
+        "event_sequence must be a non-negative whole number, latitudes must be a "
+        "decimal degree in -90..90, longitudes a decimal degree in -180..180, and "
+        "shape_dist_traveled a non-negative decimal number."
     ),
     spec_section=SPEC_URL,
     interpretation=(
@@ -129,65 +196,24 @@ def invalid_enum(context: ValidationContext) -> Iterator[Finding]:
 )
 def invalid_format(context: ValidationContext) -> Iterator[Finding]:
     for table, feed in _tods_tables(context):
-        typed = [
-            f
-            for f in table.fields
-            if f.type in (FieldType.TIME, FieldType.DATE, FieldType.NON_NEGATIVE_INTEGER)
-            and f.name in feed.headers
-        ]
+        typed = [f for f in table.fields if f.type in _FORMAT_CHECKS and f.name in feed.headers]
         for row in feed.rows:
             for f in typed:
                 value = row.values.get(f.name, "")
                 if value == "":
                     continue  # emptiness is TODS-E201's concern
-                if f.type is FieldType.TIME and parse_time(value) is None:
-                    yield Finding(
-                        rule_id="TODS-E203",
-                        severity=Severity.ERROR,
-                        file=table.filename,
-                        row=row.line,
-                        field=f.name,
-                        message=(
-                            f"{table.filename} row {row.line}: {f.name} is {value!r}, "
-                            "which is not a valid time. Use HH:MM:SS, e.g. '09:45:00' "
-                            "or '25:10:00' for 1:10 AM the next service day."
-                        ),
-                        data={"value": value, "field": f.name, "expected": "HH:MM:SS"},
-                    )
-                elif f.type is FieldType.DATE and not _is_valid_date(value):
-                    yield Finding(
-                        rule_id="TODS-E203",
-                        severity=Severity.ERROR,
-                        file=table.filename,
-                        row=row.line,
-                        field=f.name,
-                        message=(
-                            f"{table.filename} row {row.line}: {f.name} is {value!r}, "
-                            "which is not a valid date. Use YYYYMMDD, e.g. '20260315'."
-                        ),
-                        data={"value": value, "field": f.name, "expected": "YYYYMMDD"},
-                    )
-                elif f.type is FieldType.NON_NEGATIVE_INTEGER and not (
-                    # isascii() too: isdigit() alone accepts non-ASCII digits
-                    # ("²", "１２３") that are not valid spec integers.
-                    value.isascii() and value.isdigit()
-                ):
-                    yield Finding(
-                        rule_id="TODS-E203",
-                        severity=Severity.ERROR,
-                        file=table.filename,
-                        row=row.line,
-                        field=f.name,
-                        message=(
-                            f"{table.filename} row {row.line}: {f.name} is {value!r}, "
-                            "which is not a non-negative whole number."
-                        ),
-                        data={
-                            "value": value,
-                            "field": f.name,
-                            "expected": "non-negative integer",
-                        },
-                    )
+                is_valid, detail, expected = _FORMAT_CHECKS[f.type]
+                if is_valid(value):
+                    continue
+                yield Finding(
+                    rule_id="TODS-E203",
+                    severity=Severity.ERROR,
+                    file=table.filename,
+                    row=row.line,
+                    field=f.name,
+                    message=f"{table.filename} row {row.line}: {f.name} is {value!r}, {detail}",
+                    data={"value": value, "field": f.name, "expected": expected},
+                )
 
 
 @rule(

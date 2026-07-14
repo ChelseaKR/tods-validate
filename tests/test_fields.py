@@ -102,6 +102,35 @@ def test_impossible_calendar_date_is_flagged(tmp_path: Path) -> None:
     assert "20260231" in e203[0].message
 
 
+def test_out_of_range_latitude_is_flagged_and_valid_longitude_is_not(tmp_path: Path) -> None:
+    # ops_locations.txt is a v1.0.0 table; ops_location_lat/lon are the spec
+    # Latitude/Longitude types. A latitude of 200 is out of the -90..90 range and
+    # must trip TODS-E203, while the valid longitude beside it must stay silent.
+    (tmp_path / "ops_locations.txt").write_text(
+        "ops_location_id,ops_location_code,ops_location_name,ops_location_desc,"
+        "ops_location_lat,ops_location_lon\n"
+        "GARAGE,G1,Main Garage,,200.0,-121.7405\n"
+    )
+    _, findings = run(tmp_path, spec_version="1.0.0")
+    e203 = [f for f in findings if f.rule_id == "TODS-E203"]
+    assert [f.field for f in e203] == ["ops_location_lat"]
+    assert "200.0" in e203[0].message
+
+
+def test_negative_non_negative_float_is_flagged(tmp_path: Path) -> None:
+    # shape_dist_traveled on deadhead_times.txt is a Non-negative float; a negative
+    # distance must trip TODS-E203, and a non-numeric one likewise.
+    (tmp_path / "deadhead_times.txt").write_text(
+        "deadhead_id,arrival_time,departure_time,ops_location_id,stop_id,"
+        "location_sequence,shape_dist_traveled\n"
+        "DH1,07:30:00,07:45:00,GARAGE,,1,-5.0\n"
+        "DH2,07:30:00,07:45:00,GARAGE,,2,abc\n"
+    )
+    _, findings = run(tmp_path, spec_version="1.0.0")
+    e203 = [f for f in findings if f.rule_id == "TODS-E203" and f.field == "shape_dist_traveled"]
+    assert {f.row for f in e203} == {2, 3}
+
+
 def test_enum_message_lists_allowed_values() -> None:
     findings = [f for f in run_invalid_fixture("TODS-E202") if f.rule_id == "TODS-E202"]
     assert len(findings) == 1
