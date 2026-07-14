@@ -41,6 +41,12 @@ Added:
   match. `--format text|markdown|json`; exits non-zero on any break so it can
   gate a GTFS update in CI.
 
+Fixed:
+
+- The README standards table now uses the canonical Security & Supply-Chain,
+  AI Evaluation, and Responsible-Tech Framework labels consumed by the
+  portfolio conformance checker.
+
 ## v0.7.0 - 2026-07-11
 
 Findings now reach the editor (a language server with hovers and quick fixes,
