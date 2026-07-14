@@ -259,7 +259,7 @@ Spec reference: <https://tods-transit.org/spec/>
 
 Severity: ERROR.
 
-A value does not match its field type: times must be HH:MM:SS (hours may exceed 24 for service after midnight), dates must be YYYYMMDD, and event_sequence must be a non-negative whole number.
+A value does not match its field type: times must be HH:MM:SS (hours may exceed 24 for service after midnight), dates must be YYYYMMDD, event_sequence must be a non-negative whole number, latitudes must be a decimal degree in -90..90, longitudes a decimal degree in -180..180, and shape_dist_traveled a non-negative decimal number.
 
 Interpretation: permissive: GTFS time syntax with hours beyond 24:00:00 is accepted, though the spec's Time type does not state it explicitly (spec-questions #5).
 
