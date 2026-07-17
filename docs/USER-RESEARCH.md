@@ -13,6 +13,12 @@
 > is tracked as the v1.0 gate in [`docs/roadmap.md`](roadmap.md) ("the rule set
 > proving out against multiple production feeds"). **Last assembled: 2026-06-30.**
 
+> **Maintainer update, 2026-07-16:** the no-real-feed assumption in this
+> historical synthetic panel is superseded. Multiple real, non-synthetic feed
+> exports have been used privately; see
+> [`production-feed-validation.md`](production-feed-validation.md). The persona
+> text remains unchanged where it records the panel's original hypothesis.
+
 ## Why do this at all
 
 `tods-validate` sits between several audiences who never share a vocabulary: a
@@ -350,11 +356,12 @@ The domain and stakeholder model are grounded in:
 
 ## Cross-cutting themes (what the cast agrees on)
 
-1. **No real production feed is the recurring blocker.** P2, P4, P6, P7, P9, and P11
+1. **At assembly time, no real production feed was treated as the recurring blocker.** P2, P4, P6, P7, P9, and P11
    all hit the same wall from different sides: the validator's rules, the corpus,
    adoption, and v1.0 are all gated on feeds nobody has yet shared. This re-confirms
    the existing roadmap — proving against production feeds is *the* keystone, and
-   most other wants are downstream of it.
+   most other wants are downstream of it. The 2026-07-16 maintainer update above
+   supersedes that access assumption; regression capture is now the remaining work.
 2. **Spec ambiguity is shared pain, and resolving it upstream is the highest-leverage
    contribution.** P4, P6, and P7 independently care that the eight items in
    `spec-questions.md` get decided, because the validator, the exporters, and the
