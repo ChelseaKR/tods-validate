@@ -1,9 +1,9 @@
 # Reference
 
 A trimmed fixture copy of the TODS spec's "TODS-Specific File Definitions"
-section, used by `tests/test_spec_watch.py`. Field definitions here are kept
-byte-for-byte consistent with `tods_validate.schema.TABLES` so that running
-`spec_watch.py` against this file reports zero drift.
+section, used by `tests/test_spec_watch.py`. Presence cells and conditional
+phrases preserve the upstream wording so the fixture exercises the same
+parsing boundary as the live spec; unrelated description prose is shortened.
 
 ## TODS-Specific File Definitions
 
@@ -56,6 +56,6 @@ Primary Key: `(date, block_id, service_id)`
 | Field Name | Type | Required | Description |
 |---|---|---|---|
 | `date` | Date | Required | |
-| `service_id` | ID referencing `calendar.service_id` | Conditionally required | Required if `block_id`s are repeated between different `service_id`s. |
+| `service_id` | ID referencing `calendar.service_id` | Optional | Required if `block_id`s are repeated between different `service_id`s. |
 | `block_id` | ID referencing `trips.block_id` | Required | Identifies the block. |
 | `vehicle_id` | ID referencing `vehicles.vehicle_id` | Required | Refers to a specific vehicle in the transit fleet. |

@@ -168,13 +168,23 @@ def _normalize_type(cell: str) -> FieldType:
     raise SpecParseError(f"unrecognized field type {cell!r}")
 
 
-def _normalize_presence(cell: str) -> Presence:
+def _normalize_presence(cell: str, description: str = "") -> Presence:
+    """Map the spec's Required cell and conditional prose to ``Presence``.
+
+    The ``vehicle_assignments.service_id`` row is labeled ``Optional`` in the
+    table, then narrowed by its description: "Required if ``block_id``s are
+    repeated between different ``service_id``s."  Preserve that semantic
+    condition so the parsed spec can be compared with ``schema.py`` without
+    weakening the dedicated TODS-E205 check.
+    """
     low = re.sub(r"[`*]", "", cell).strip().lower()
     if "conditional" in low:
         return Presence.CONDITIONAL
     if low.startswith("required"):
         return Presence.REQUIRED
     if low.startswith("optional"):
+        if re.search(r"\brequired\s+if\b", description, re.IGNORECASE):
+            return Presence.CONDITIONAL
         return Presence.OPTIONAL
     raise SpecParseError(f"unrecognized presence {cell!r}")
 
@@ -255,8 +265,10 @@ def parse_spec_tables(text: str) -> dict[str, SpecTable]:
                             break
                         name = _strip_code(_cell(row_cells, col_idx, "name"))
                         field_type = _normalize_type(_cell(row_cells, col_idx, "type"))
-                        presence = _normalize_presence(_cell(row_cells, col_idx, "presence"))
                         description = _cell(row_cells, col_idx, "description")
+                        presence = _normalize_presence(
+                            _cell(row_cells, col_idx, "presence"), description
+                        )
                         enum_values = (
                             _extract_enum_values(description)
                             if field_type is FieldType.ENUM

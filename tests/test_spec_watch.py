@@ -174,6 +174,13 @@ def test_normalize_type_handles_prose_and_annotations(spec_watch) -> None:
 def test_normalize_presence(spec_watch) -> None:
     assert spec_watch._normalize_presence("Required") is Presence.REQUIRED
     assert spec_watch._normalize_presence("Optional") is Presence.OPTIONAL
+    assert (
+        spec_watch._normalize_presence(
+            "Optional",
+            "Required if `block_id`s are repeated between different `service_id`s.",
+        )
+        is Presence.CONDITIONAL
+    )
     assert spec_watch._normalize_presence("Conditionally required") is Presence.CONDITIONAL
     with pytest.raises(spec_watch.SpecParseError):
         spec_watch._normalize_presence("Sometimes")
