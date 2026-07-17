@@ -29,7 +29,11 @@ attaches `tods-conformance-corpus.zip`: every fixture above, plus an
 `expectations.json` mapping each fixture to the rule IDs it should produce, so
 another validator can run the corpus and diff against expectations without
 cloning this repo. Changes to expected outcomes are reviewed in source control
-alongside the rule or fixture that motivates them. Build the same archive
+alongside the rule or fixture that motivates them. In the archive, `valid/`
+holds the TODS and companion GTFS files in one flat directory, so each fixture
+validates with a bare `tods-validate validate <fixture>/` plus the opt-in
+category flags; the README inside the archive lists the exact commands. The
+archive is byte-for-byte reproducible from the same source tree. Build it
 locally with:
 
 ```sh
