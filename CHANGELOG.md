@@ -5,6 +5,13 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+## v0.8.0 - 2026-07-16
+
+This release broadens compatibility and makes operational changes easier to
+inspect: TODS v1 feeds can be validated directly, GTFS changes can be checked
+for broken TODS references, and HTML reports can include accessible run
+timelines. It also tightens field-format and conformance-corpus safeguards.
+
 Added:
 
 - TODS-E203 now checks Latitude, Longitude, and Non-negative float fields, not
@@ -48,6 +55,14 @@ Added:
 
 Fixed:
 
+- Malformed feed values and baseline files now produce validator findings or
+  clear input errors instead of uncaught exceptions. Numeric parsing requires
+  ASCII digits, GitHub annotation properties are escaped, LSP diagnostics stay
+  within the validated feed, and baseline documents must contain a findings
+  array.
+- GHCR release builds now use the lowercase image reference created by Docker
+  metadata when running the blocking Trivy scan. The Docker workflow can also
+  rebuild an existing signed release tag through `workflow_dispatch`.
 - The advisory spec watcher now recognizes a field labeled Optional whose
   description makes it conditionally required. This stops
   `vehicle_assignments.service_id` from opening a false spec-drift issue while
