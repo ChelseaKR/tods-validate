@@ -12,6 +12,11 @@ on:
       - ".github/workflows/vscode-extension.yml"
   workflow_dispatch:
 
+# Cancel superseded runs of the same ref (CICD §11c).
+concurrency:
+  group: vscode-extension-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 

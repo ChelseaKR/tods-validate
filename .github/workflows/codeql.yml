@@ -4,12 +4,17 @@ name: CodeQL
 # actions (the 6 workflows + action.yml, for the injection/permission classes
 # CodeQL's actions query pack understands).
 
+# CICD §11e trigger shape: PRs into main + weekly schedule. No push trigger —
+# the pull_request run already analyzed the same changes before merge.
 on:
-  push:
-    branches: [main]
   pull_request:
   schedule:
     - cron: "17 6 * * 1" # weekly, Monday 06:17 UTC
+
+# Cancel superseded runs of the same ref (CICD §11c).
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read

@@ -18,6 +18,11 @@ on:
       - ".github/workflows/**"
       - "action.yml"
 
+# Cancel superseded runs of the same ref (CICD §11c).
+concurrency:
+  group: zizmor-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
