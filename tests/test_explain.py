@@ -29,9 +29,9 @@ def test_explain_known_rule_shows_title_spec_and_example() -> None:
 
 
 def test_explain_shows_interpretation_when_present() -> None:
-    rule_def = next(r for r in all_rules() if r.id == "TODS-W206")
+    rule_def = next(r for r in all_rules() if r.id == "TODS-E401")
     assert rule_def.interpretation is not None  # sanity: this rule has one
-    result = invoke("explain", "TODS-W206")
+    result = invoke("explain", "TODS-E401")
     assert result.exit_code == 0
     assert rule_def.interpretation in result.output
 

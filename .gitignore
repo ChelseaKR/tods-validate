@@ -13,6 +13,7 @@ htmlcov/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+node_modules/
 .DS_Store
 
 # mutmut writes the mutated copy of the tree and its stats here

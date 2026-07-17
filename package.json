@@ -1,0 +1,10 @@
+{
+  "name": "tods-validate-accessibility-gates",
+  "private": true,
+  "scripts": {
+    "a11y": "bash scripts/run-a11y.sh"
+  },
+  "devDependencies": {
+    "pa11y-ci": "4.1.1"
+  }
+}

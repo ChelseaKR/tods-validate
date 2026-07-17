@@ -80,3 +80,6 @@ a transfer or co-maintenance path have been offered to the TODS Board in
 [MobilityData/transit-operational-data-standard#153](https://github.com/MobilityData/transit-operational-data-standard/issues/153).
 Until the Board decides whether and where to adopt it, this remains a
 downstream, validator-specific corpus rather than an official TODS suite.
+The maintainer's privacy-preserving evidence policy for feeds already used in
+development is documented in
+[`production-feed-validation.md`](production-feed-validation.md).

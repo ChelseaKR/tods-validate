@@ -1,0 +1,107 @@
+{
+  "contractVersion": "v1-candidate-1",
+  "cliExitCodes": {
+    "clean": 0,
+    "findingsAtOrAboveThreshold": 1,
+    "usageOrInputError": 2
+  },
+  "supportedSpecVersions": [
+    "1.0.0",
+    "2.1.0"
+  ],
+  "jsonReport": {
+    "reportVersion": "1.3.0",
+    "requiredTopLevel": [
+      "validator",
+      "specVersion",
+      "source",
+      "summary",
+      "findings"
+    ],
+    "requiredFindingFields": [
+      "rule_id",
+      "severity",
+      "file",
+      "row",
+      "field",
+      "location",
+      "data",
+      "message",
+      "suggestion",
+      "caused_by",
+      "fingerprint",
+      "severity_original"
+    ]
+  },
+  "pythonExports": {
+    "tods_validate": [
+      "Finding",
+      "Severity",
+      "Suggestion",
+      "ValidationResult",
+      "__version__",
+      "suggest_fixes",
+      "validate_feed"
+    ],
+    "tods_validate.read": [
+      "CompanionGTFS",
+      "FeedFile",
+      "Package",
+      "PackageNotFoundError",
+      "Row",
+      "build_companion",
+      "load_package",
+      "merge_supplement",
+      "to_dataframe",
+      "to_rows"
+    ],
+    "tods_validate.testing": [
+      "assert_feed_produces",
+      "assert_feed_valid"
+    ]
+  },
+  "rules": [
+    ["TODS-W101", "WARNING", "core"],
+    ["TODS-I102", "INFO", "core"],
+    ["TODS-E103", "ERROR", "core"],
+    ["TODS-E104", "ERROR", "core"],
+    ["TODS-E105", "ERROR", "core"],
+    ["TODS-E106", "ERROR", "core"],
+    ["TODS-W107", "WARNING", "core"],
+    ["TODS-I108", "INFO", "core"],
+    ["TODS-E201", "ERROR", "core"],
+    ["TODS-E202", "ERROR", "core"],
+    ["TODS-E203", "ERROR", "core"],
+    ["TODS-E204", "ERROR", "core"],
+    ["TODS-E205", "ERROR", "core"],
+    ["TODS-W206", "WARNING", "core"],
+    ["TODS-E301", "ERROR", "core"],
+    ["TODS-W302", "WARNING", "core"],
+    ["TODS-E303", "ERROR", "core"],
+    ["TODS-E304", "ERROR", "core"],
+    ["TODS-W305", "WARNING", "core"],
+    ["TODS-W306", "WARNING", "core"],
+    ["TODS-E307", "ERROR", "core"],
+    ["TODS-E308", "ERROR", "core"],
+    ["TODS-E309", "ERROR", "core"],
+    ["TODS-E310", "ERROR", "core"],
+    ["TODS-E311", "ERROR", "core"],
+    ["TODS-E312", "ERROR", "core"],
+    ["TODS-W313", "WARNING", "core"],
+    ["TODS-E314", "ERROR", "core"],
+    ["TODS-W315", "WARNING", "core"],
+    ["TODS-W316", "WARNING", "core"],
+    ["TODS-E401", "ERROR", "core"],
+    ["TODS-E402", "ERROR", "core"],
+    ["TODS-W403", "WARNING", "core"],
+    ["TODS-W404", "WARNING", "core"],
+    ["TODS-E405", "ERROR", "core"],
+    ["TODS-W406", "WARNING", "core"],
+    ["TODS-W407", "WARNING", "core"],
+    ["TODS-W408", "WARNING", "core"],
+    ["TODS-W409", "WARNING", "core"],
+    ["TODS-I501", "INFO", "coverage"],
+    ["TODS-I502", "INFO", "coverage"],
+    ["TODS-I601", "INFO", "advisory"]
+  ]
+}

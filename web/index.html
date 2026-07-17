@@ -17,17 +17,33 @@
     />
     <title>tods-validate playground</title>
     <style>
-      :root { color-scheme: light dark; }
+      :root {
+        color-scheme: light dark;
+        --background: #ffffff;
+        --foreground: #111827;
+        --muted: #4b5563;
+        --border: #9ca3af;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --background: #111827;
+          --foreground: #f9fafb;
+          --muted: #d1d5db;
+          --border: #6b7280;
+        }
+      }
       body {
         font: 16px/1.5 system-ui, sans-serif;
         max-width: 56rem;
         margin: 2rem auto;
         padding: 0 1rem;
+        color: var(--foreground);
+        background: var(--background);
       }
       h1 { margin-bottom: 0.25rem; }
-      .lede { color: #555; margin-top: 0; }
+      .lede { color: var(--muted); margin-top: 0; }
       .panel {
-        border: 1px solid #ccc;
+        border: 1px solid var(--border);
         border-radius: 8px;
         padding: 1rem;
         margin: 1rem 0;
@@ -39,12 +55,13 @@
         border: 1px solid #888;
         cursor: pointer;
       }
-      button:disabled { opacity: 0.5; cursor: progress; }
-      #status { color: #555; }
+      button:disabled { opacity: 0.65; cursor: progress; }
+      :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+      #status { color: var(--muted); }
       iframe#report {
         width: 100%;
         min-height: 24rem;
-        border: 1px solid #ccc;
+        border: 1px solid var(--border);
         border-radius: 8px;
         margin-top: 1rem;
       }
@@ -52,25 +69,33 @@
     </style>
   </head>
   <body>
-    <h1>tods-validate playground</h1>
-    <p class="lede">
-      Validate a Transit Operational Data Standard (TODS) feed in your browser.
-      Nothing is uploaded: the validator runs entirely on your machine via
-      Pyodide (WebAssembly), so it is safe for non-public operational data.
-    </p>
+    <main>
+      <h1>tods-validate playground</h1>
+      <p class="lede">
+        Validate a Transit Operational Data Standard (TODS) feed in your browser.
+        Nothing is uploaded: the validator runs entirely on your machine via
+        Pyodide (WebAssembly), so it is safe for non-public operational data.
+      </p>
 
-    <div class="panel">
-      <p>
+      <div class="panel">
+        <p id="files-help">
         Choose your TODS <code>.txt</code> files, and the companion GTFS files if
         you have them (select them all together):
-      </p>
-      <input type="file" id="files" multiple />
-      <button id="run" disabled>Validate</button>
-      <p id="status" role="status">Loading Python (this takes a few seconds the first time)…</p>
-    </div>
+        </p>
+        <label for="files"><strong>Feed files</strong></label>
+        <input type="file" id="files" aria-describedby="files-help" multiple />
+        <button id="run" disabled>Validate</button>
+        <p id="status" role="status">Loading Python (this takes a few seconds the first time)…</p>
+      </div>
 
-    <h2 id="report-heading" tabindex="-1">Validation report</h2>
-    <iframe id="report" title="Validation report" sandbox="allow-same-origin"></iframe>
+      <h2 id="report-heading" tabindex="-1">Validation report</h2>
+      <iframe
+        id="report"
+        title="Validation report"
+        sandbox="allow-same-origin"
+        srcdoc="<p>Validation results will appear here after you select feed files.</p>"
+      ></iframe>
+    </main>
 
     <footer>
       <p id="footer-version"></p>
@@ -158,9 +183,13 @@ render_html(result.findings, "your feed")
         }
       });
 
-      boot().catch((err) => {
-        status.textContent = "Failed to load Python: " + err;
-      });
+      if (new URLSearchParams(window.location.search).has("a11y-static")) {
+        status.textContent = "Static accessibility audit mode.";
+      } else {
+        boot().catch((err) => {
+          status.textContent = "Failed to load Python: " + err;
+        });
+      }
     </script>
   </body>
 </html>

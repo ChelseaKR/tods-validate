@@ -9,7 +9,16 @@ from collections.abc import Callable, Iterator
 from ..findings import Finding, Severity
 from ..loader import FeedFile
 from ..run_events import parse_time as parse_time
-from ..schema import SPEC_URL, SPEC_VERSION, FieldSpec, FieldType, Presence, TableSpec, spec_link
+from ..schema import (
+    GTFS_REQUIRED_FIELDS,
+    SPEC_URL,
+    SPEC_VERSION,
+    FieldSpec,
+    FieldType,
+    Presence,
+    TableSpec,
+    spec_link,
+)
 from . import ValidationContext, rule
 
 # GTFS Time: H:MM:SS or HH:MM:SS; hours may exceed 24 for service past midnight
@@ -66,22 +75,51 @@ def _required_fields(table: TableSpec) -> tuple[FieldSpec, ...]:
     return tuple(f for f in table.fields if f.presence is Presence.REQUIRED)
 
 
+def _is_added_supplement_row(
+    context: ValidationContext, table: TableSpec, row_values: dict[str, str]
+) -> bool:
+    """Return whether a supplement row is known to add a GTFS row.
+
+    A companion feed is required to distinguish an addition from an update.
+    Without one, stay permissive rather than assuming every supplement row is
+    an addition. Delete rows never need the added-row fields.
+    """
+    if (
+        table.kind != "supplement"
+        or table.gtfs_base is None
+        or context.gtfs is None
+        or row_values.get("TODS_delete", "") == "1"
+    ):
+        return False
+    primary_key = table.primary_key or ()
+    key = tuple(row_values.get(name, "") for name in primary_key)
+    if not key or not all(key):
+        return False
+    return key not in context.gtfs.base_keys.get(table.gtfs_base, set())
+
+
 @rule(
     id="TODS-E201",
     severity=Severity.ERROR,
     title="Required value is missing",
     description=(
-        "A field the spec marks Required is empty (for supplement files: a primary-key "
-        "field, without which the row cannot be matched to GTFS)."
+        "A field the spec marks Required is empty. Supplement primary-key fields are "
+        "always required; a row that adds a new GTFS entry must also provide every "
+        "field GTFS marks Required for that file."
     ),
     spec_section=SPEC_URL,
 )
 def missing_required_value(context: ValidationContext) -> Iterator[Finding]:
     for table, feed in _tods_tables(context):
-        required = [f for f in _required_fields(table) if f.name in feed.headers]
         for row in feed.rows:
+            required = [f for f in _required_fields(table) if f.name in feed.headers]
+            added_row = _is_added_supplement_row(context, table, row.values)
+            if added_row and table.gtfs_base is not None:
+                required_names = set(GTFS_REQUIRED_FIELDS[table.gtfs_base])
+                required = [f for f in table.fields if f.name in required_names]
             for f in required:
                 if row.values.get(f.name, "") == "":
+                    added_detail = f" for an added {table.gtfs_base} row" if added_row else ""
                     yield Finding(
                         rule_id="TODS-E201",
                         severity=Severity.ERROR,
@@ -89,7 +127,8 @@ def missing_required_value(context: ValidationContext) -> Iterator[Finding]:
                         row=row.line,
                         field=f.name,
                         message=(
-                            f"{table.filename} row {row.line}: {f.name!r} is required but empty."
+                            f"{table.filename} row {row.line}: {f.name!r} is required"
+                            f"{added_detail} but empty."
                         ),
                         suggestion=f"See {spec_link(table)}.",
                         data={"value": "", "field": f.name},
@@ -189,10 +228,6 @@ _FORMAT_CHECKS: dict[FieldType, tuple[Callable[[str], bool], str, str]] = {
         "shape_dist_traveled a non-negative decimal number."
     ),
     spec_section=SPEC_URL,
-    interpretation=(
-        "permissive: GTFS time syntax with hours beyond 24:00:00 is accepted, though "
-        "the spec's Time type does not state it explicitly (spec-questions #5)."
-    ),
 )
 def invalid_format(context: ValidationContext) -> Iterator[Finding]:
     for table, feed in _tods_tables(context):
@@ -223,6 +258,7 @@ def invalid_format(context: ValidationContext) -> Iterator[Finding]:
     description=(
         "Two rows in a TODS-specific file share the same primary key "
         "(run_events: service_id + run_id + event_sequence; vehicles: vehicle_id; "
+        "employee_run_dates: date + service_id + run_id + employee_id; "
         "vehicle_assignments: date + block_id + service_id). Consumers cannot tell "
         "the rows apart."
     ),
@@ -266,6 +302,11 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
                         f"({pretty}) already used on row {seen[key]}. Each "
                         f"({', '.join(table.primary_key)}) combination may appear once."
                     ),
+                    suggestion=(
+                        "Remove the duplicate assignment row."
+                        if table.filename == "employee_run_dates.txt"
+                        else None
+                    ),
                     data={
                         "value": pretty,
                         "field": ",".join(table.primary_key),
@@ -290,10 +331,6 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
     # companion GTFS (trips.txt). Without it the check cannot run, so depend on
     # GTFS rather than silently passing.
     needs_gtfs=True,
-    interpretation=(
-        "per-row reading: fires only for rows whose block_id is ambiguous, not for "
-        "every row once any block is shared (spec-questions #8)."
-    ),
     # vehicle_assignments.txt does not exist in TODS v1.0.0 (added in v2.1.0).
     spec_versions=(SPEC_VERSION,),
 )
@@ -339,10 +376,6 @@ def vehicle_assignment_ambiguous(context: ValidationContext) -> Iterator[Finding
         "records they reference, and consumers are not required to trim them."
     ),
     spec_section=SPEC_URL,
-    interpretation=(
-        "strict: values are compared exactly; the spec defines no trimming rule, so "
-        "padded example values are flagged rather than silently trimmed (spec-questions #3)."
-    ),
     example=('Before: `stop_id` value is `"  1234  "`. After: trim on export — `1234`.'),
 )
 def padded_value(context: ValidationContext) -> Iterator[Finding]:

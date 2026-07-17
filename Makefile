@@ -1,9 +1,9 @@
 # make verify reproduces the full merge-blocking gate set locally, byte-for-
 # byte with CI (CICD-27). Run it before opening a PR; the release workflows
 # re-run it at the tagged commit before anything publishes (REL-14/15).
-.PHONY: verify lint format typecheck test docs-check i18n-check audit secrets
+.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit secrets a11y
 
-verify: lint format typecheck test docs-check i18n-check audit secrets
+verify: lint format typecheck test docs-check contract-check i18n-check audit secrets a11y
 	@echo "make verify: all gates passed."
 
 lint:
@@ -20,6 +20,9 @@ test:
 
 docs-check:
 	python scripts/generate_rules_doc.py --check
+
+contract-check:
+	python scripts/check_public_contract.py
 
 i18n-check:
 	python scripts/check_i18n.py
@@ -42,3 +45,10 @@ audit:
 # CI job installs it explicitly rather than via the license-gated Action.
 secrets:
 	gitleaks detect --source . --redact --exit-code 1
+
+# Blocking WCAG 2.1 AA automation for the browser playground and a generated
+# HTML report. npm ci must have been run first; CI and the reusable release
+# verification workflow both install from package-lock.json.
+a11y:
+	npm audit --audit-level=high
+	npm run a11y

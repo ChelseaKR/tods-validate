@@ -211,7 +211,7 @@ Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
 Severity: ERROR.
 
-A field the spec marks Required is empty (for supplement files: a primary-key field, without which the row cannot be matched to GTFS).
+A field the spec marks Required is empty. Supplement primary-key fields are always required; a row that adds a new GTFS entry must also provide every field GTFS marks Required for that file.
 
 Example (`run_events.txt`):
 
@@ -261,8 +261,6 @@ Severity: ERROR.
 
 A value does not match its field type: times must be HH:MM:SS (hours may exceed 24 for service after midnight), dates must be YYYYMMDD, event_sequence must be a non-negative whole number, latitudes must be a decimal degree in -90..90, longitudes a decimal degree in -180..180, and shape_dist_traveled a non-negative decimal number.
 
-Interpretation: permissive: GTFS time syntax with hours beyond 24:00:00 is accepted, though the spec's Time type does not state it explicitly (spec-questions #5).
-
 Example (`run_events.txt`):
 
 Before:
@@ -285,7 +283,7 @@ Spec reference: <https://tods-transit.org/spec/>
 
 Severity: ERROR.
 
-Two rows in a TODS-specific file share the same primary key (run_events: service_id + run_id + event_sequence; vehicles: vehicle_id; vehicle_assignments: date + block_id + service_id). Consumers cannot tell the rows apart.
+Two rows in a TODS-specific file share the same primary key (run_events: service_id + run_id + event_sequence; vehicles: vehicle_id; employee_run_dates: date + service_id + run_id + employee_id; vehicle_assignments: date + block_id + service_id). Consumers cannot tell the rows apart.
 
 Example (`vehicles.txt`):
 
@@ -313,8 +311,6 @@ Severity: ERROR. Needs a companion GTFS feed.
 
 service_id in vehicle_assignments.txt is required when the same block_id is used by more than one service. Without it, the assignment cannot be matched to a single block.
 
-Interpretation: per-row reading: fires only for rows whose block_id is ambiguous, not for every row once any block is shared (spec-questions #8).
-
 Example (`vehicle_assignments.txt`):
 
 Before:
@@ -338,8 +334,6 @@ Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 Severity: WARNING.
 
 A value is padded with spaces. IDs with stray spaces will not match the records they reference, and consumers are not required to trim them.
-
-Interpretation: strict: values are compared exactly; the spec defines no trimming rule, so padded example values are flagged rather than silently trimmed (spec-questions #3).
 
 Example (`vehicles.txt`):
 
@@ -758,7 +752,7 @@ Severity: ERROR.
 
 A run event's end_time is earlier than its start_time. Equal times are fine (the spec allows zero-duration events such as a report time); for work past midnight, use hours of 24 or more rather than wrapping around.
 
-Interpretation: the spec is silent on end<start; this treats it as an error and equal times as valid (spec-questions #5).
+Interpretation: the spec is silent on end<start; this treats it as an error and equal times as valid.
 
 Example (`run_events.txt`):
 
@@ -932,9 +926,7 @@ Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 
 Severity: WARNING.
 
-Two rows in employee_run_dates.txt are exactly identical (same date, service, run, and employee). Multiple employees per run are fine; the same employee twice is usually an export bug.
-
-Interpretation: permissive: the spec's 'Primary Key: *' is read as not forbidding an exact duplicate row, so this is a warning rather than an error (spec-questions #6).
+Compatibility signal for an exact duplicate in employee_run_dates.txt. TODS-E204 now reports the same row as a primary-key error; this warning is retained so existing machine consumers do not lose the earlier rule ID.
 
 Example (`employee_run_dates.txt`):
 

@@ -92,8 +92,8 @@ class TableSpec:
     # under SPEC_URL_V1 for spec_version == SPEC_VERSION_V1. See spec_link().
     spec_anchor: str
     # Primary key field names. None means the spec defines no uniqueness
-    # constraint (spec: employee_run_dates.txt "Primary Key: *"; all of
-    # v1.0.0 except runs_pieces.txt, which states "must be unique" in prose).
+    # constraint (all of v1.0.0 except runs_pieces.txt, which states "must be
+    # unique" in prose).
     primary_key: tuple[str, ...] | None = None
     fields: tuple[FieldSpec, ...] = ()
     # For supplement files: the GTFS file this supplements.
@@ -108,8 +108,9 @@ class TableSpec:
 # Supplement files carry "fields match those defined in the corresponding
 # file's GTFS specification" (spec, "Supplement Files > Structure"), plus the
 # TODS_-prefixed fields below. Field name lists transcribed from the GTFS
-# reference, https://gtfs.org/documentation/schedule/reference/ — names only;
-# this validator does not re-validate GTFS semantics.
+# reference, https://gtfs.org/documentation/schedule/reference/ (revised
+# 2026-04-27, checked 2026-07-16) — names only; this validator does not
+# otherwise re-validate GTFS semantics.
 #
 # Primary keys per https://gtfs.org/documentation/schedule/reference/#dataset-attributes,
 # which the spec cites for supplement row matching.
@@ -128,6 +129,8 @@ GTFS_FIELDS: dict[str, tuple[str, ...]] = {
         "wheelchair_accessible",
         "bikes_allowed",
         "cars_allowed",
+        "safe_duration_factor",
+        "safe_duration_offset",
     ),
     "stops.txt": (
         "stop_id",
@@ -145,6 +148,7 @@ GTFS_FIELDS: dict[str, tuple[str, ...]] = {
         "wheelchair_boarding",
         "level_id",
         "platform_code",
+        "stop_access",
     ),
     "stop_times.txt": (
         "trip_id",
@@ -180,6 +184,7 @@ GTFS_FIELDS: dict[str, tuple[str, ...]] = {
         "continuous_pickup",
         "continuous_drop_off",
         "network_id",
+        "cemv_support",
     ),
     "calendar.txt": (
         "service_id",
@@ -207,6 +212,31 @@ GTFS_PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "routes.txt": ("route_id",),
     "calendar.txt": ("service_id",),
     "calendar_dates.txt": ("service_id", "date"),
+}
+
+# Fields whose Presence is exactly Required in the current GTFS Schedule
+# reference. Conditionally Required fields are intentionally excluded: whether
+# they apply depends on values and relationships outside this TODS clarification.
+# The TODS supplement guidance requires these fields only when a supplement row
+# adds a new GTFS row, not when it updates or deletes an existing one.
+GTFS_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
+    "trips.txt": ("route_id", "service_id", "trip_id"),
+    "stops.txt": ("stop_id",),
+    "stop_times.txt": ("trip_id", "stop_sequence"),
+    "routes.txt": ("route_id", "route_type"),
+    "calendar.txt": (
+        "service_id",
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+        "start_date",
+        "end_date",
+    ),
+    "calendar_dates.txt": ("service_id", "date", "exception_type"),
 }
 
 # Spec, "Supplement Files > TODS-Specific Fields".
@@ -271,9 +301,9 @@ EMPLOYEE_RUN_DATES = TableSpec(
     filename="employee_run_dates.txt",
     kind="tods",
     spec_anchor="#employee_run_datestxt",
-    # Spec: "Primary Key: *" — runs may legitimately appear multiple times
-    # (multiple employees on the same run on the same date).
-    primary_key=None,
+    # Multiple employees may share a run and date; employee_id distinguishes
+    # those assignments in the four-field primary key.
+    primary_key=("date", "service_id", "run_id", "employee_id"),
     fields=(
         FieldSpec("date", FieldType.DATE, Presence.REQUIRED),
         FieldSpec(
@@ -562,6 +592,7 @@ __all__ = [
     "GTFS_FIELDS",
     "GTFS_FILENAMES",
     "GTFS_PRIMARY_KEYS",
+    "GTFS_REQUIRED_FIELDS",
     "SPEC_URL",
     "SPEC_URL_V1",
     "SPEC_VERSION",

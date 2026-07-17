@@ -8,6 +8,7 @@ from conftest import rule_ids, run_invalid_fixture
 from tods_validate.findings import Finding
 from tods_validate.rules.fields import parse_time
 from tods_validate.runner import run
+from tods_validate.schema import GTFS_FIELDS, GTFS_REQUIRED_FIELDS
 
 RULES = (
     "TODS-E201",
@@ -86,6 +87,91 @@ def test_duplicate_primary_key_detects_blank_optional_key(tmp_path: Path) -> Non
     e204 = [f for f in findings if f.rule_id == "TODS-E204"]
     assert len(e204) == 1
     assert e204[0].row == 3
+
+
+def test_employee_assignment_duplicate_is_primary_key_error() -> None:
+    findings = run_invalid_fixture("TODS-W408")
+    e204 = [f for f in findings if f.rule_id == "TODS-E204"]
+    assert len(e204) == 1
+    assert e204[0].row == 3
+    assert "employee_id='emp-1'" in e204[0].message
+    assert e204[0].suggestion == "Remove the duplicate assignment row."
+
+
+def _write_routes_pair(tmp_path: Path, supplement_row: str) -> tuple[Path, Path]:
+    tods = tmp_path / "tods"
+    gtfs = tmp_path / "gtfs"
+    tods.mkdir()
+    gtfs.mkdir()
+    (tods / "routes_supplement.txt").write_text(
+        f"route_id,route_long_name,route_type,TODS_delete\n{supplement_row}\n",
+        encoding="utf-8",
+    )
+    (gtfs / "routes.txt").write_text(
+        "route_id,route_short_name,route_type\nexisting,10,3\n",
+        encoding="utf-8",
+    )
+    return tods, gtfs
+
+
+def test_added_supplement_row_requires_gtfs_required_fields(tmp_path: Path) -> None:
+    tods, gtfs = _write_routes_pair(tmp_path, "new-route,New Route,,")
+    _, findings = run(tods, gtfs)
+    e201 = [f for f in findings if f.rule_id == "TODS-E201"]
+    assert [(f.row, f.field) for f in e201] == [(2, "route_type")]
+    assert "added routes.txt row" in e201[0].message
+
+
+@pytest.mark.parametrize(
+    "supplement_row",
+    [
+        "existing,Updated Name,,",
+        "existing,,,1",
+    ],
+)
+def test_update_or_delete_does_not_require_added_row_fields(
+    tmp_path: Path, supplement_row: str
+) -> None:
+    tods, gtfs = _write_routes_pair(tmp_path, supplement_row)
+    _, findings = run(tods, gtfs)
+    assert not [f for f in findings if f.rule_id == "TODS-E201"]
+
+
+def test_added_row_check_stays_permissive_without_companion_gtfs(tmp_path: Path) -> None:
+    (tmp_path / "routes_supplement.txt").write_text(
+        "route_id,route_long_name\nnew-route,New Route\n",
+        encoding="utf-8",
+    )
+    _, findings = run(tmp_path)
+    assert not [f for f in findings if f.rule_id == "TODS-E201"]
+
+
+def test_gtfs_required_field_inventory_matches_current_reference() -> None:
+    assert GTFS_REQUIRED_FIELDS == {
+        "trips.txt": ("route_id", "service_id", "trip_id"),
+        "stops.txt": ("stop_id",),
+        "stop_times.txt": ("trip_id", "stop_sequence"),
+        "routes.txt": ("route_id", "route_type"),
+        "calendar.txt": (
+            "service_id",
+            "monday",
+            "tuesday",
+            "wednesday",
+            "thursday",
+            "friday",
+            "saturday",
+            "sunday",
+            "start_date",
+            "end_date",
+        ),
+        "calendar_dates.txt": ("service_id", "date", "exception_type"),
+    }
+
+
+def test_current_optional_gtfs_fields_are_allowed_in_supplements() -> None:
+    assert {"safe_duration_factor", "safe_duration_offset"} <= set(GTFS_FIELDS["trips.txt"])
+    assert "stop_access" in GTFS_FIELDS["stops.txt"]
+    assert "cemv_support" in GTFS_FIELDS["routes.txt"]
 
 
 def test_impossible_calendar_date_is_flagged(tmp_path: Path) -> None:

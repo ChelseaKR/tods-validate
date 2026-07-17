@@ -38,8 +38,7 @@ _V2_ONLY = (SPEC_VERSION,)
     ),
     spec_section=_RUN_EVENTS_SECTION,
     interpretation=(
-        "the spec is silent on end<start; this treats it as an error and equal "
-        "times as valid (spec-questions #5)."
+        "the spec is silent on end<start; this treats it as an error and equal times as valid."
     ),
 )
 def event_ends_before_start(context: ValidationContext) -> Iterator[Finding]:
@@ -375,15 +374,11 @@ def vehicle_assignment_outside_service(context: ValidationContext) -> Iterator[F
     severity=Severity.WARNING,
     title="Identical employee assignment appears twice",
     description=(
-        "Two rows in employee_run_dates.txt are exactly identical (same date, "
-        "service, run, and employee). Multiple employees per run are fine; the same "
-        "employee twice is usually an export bug."
+        "Compatibility signal for an exact duplicate in employee_run_dates.txt. "
+        "TODS-E204 now reports the same row as a primary-key error; this warning is "
+        "retained so existing machine consumers do not lose the earlier rule ID."
     ),
     spec_section=f"{SPEC_URL}#employee_run_datestxt",
-    interpretation=(
-        "permissive: the spec's 'Primary Key: *' is read as not forbidding an exact "
-        "duplicate row, so this is a warning rather than an error (spec-questions #6)."
-    ),
 )
 def duplicate_assignment(context: ValidationContext) -> Iterator[Finding]:
     assignments = context.package.get("employee_run_dates.txt")

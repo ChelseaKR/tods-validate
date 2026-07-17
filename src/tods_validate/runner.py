@@ -15,14 +15,17 @@ from .loader import Package, load_package
 from .rules import RunCoverage, ValidationContext, validate
 from .schema import GTFS_FILENAMES, SPEC_VERSION
 
-# Rule ID that marks a structural "root cause" row, and the rule IDs whose
-# findings on that same row are downstream echoes of it rather than
-# independent data problems. A ragged row (TODS-E104) can leave trailing
-# required fields blank simply because the short row has nothing to put
-# there, which also trips TODS-E201 on that row -- a real finding, but not
-# separate news. See _link_causality.
-_CASCADE_ROOT_RULE = "TODS-E104"
-_CASCADE_ECHO_RULES = frozenset({"TODS-E201"})
+# Root rule IDs and the rule IDs whose findings on that same row are downstream
+# echoes rather than independent data problems. A ragged row (TODS-E104) can
+# leave required fields blank and also trip TODS-E201; an exact employee
+# assignment duplicate now trips E204 while retaining W408 for compatibility.
+# See _link_causality.
+_CASCADE_LINKS: dict[str, frozenset[str]] = {
+    "TODS-E104": frozenset({"TODS-E201"}),
+    # W408 is kept as a machine-compatible alias for the now-explicit E204
+    # employee assignment primary-key violation. Human reports collapse it.
+    "TODS-E204": frozenset({"TODS-W408"}),
+}
 
 
 def _apply_severity_remap(
@@ -107,17 +110,18 @@ def _link_causality(findings: list[Finding]) -> list[Finding]:
     is wrong, not on what else that implies, and this pass runs once findings
     from every rule are known.
     """
-    roots: dict[tuple[str | None, int | None], str] = {}
+    roots: dict[tuple[str | None, int | None, str], str] = {}
     for f in findings:
-        if f.rule_id == _CASCADE_ROOT_RULE:
+        if f.rule_id in _CASCADE_LINKS:
             pointer = f.pointer()
             if pointer is not None:
-                roots.setdefault((f.file, f.row), pointer)
+                for echo_rule in _CASCADE_LINKS[f.rule_id]:
+                    roots.setdefault((f.file, f.row, echo_rule), pointer)
     if not roots:
         return findings
     return [
-        replace(f, caused_by=roots[(f.file, f.row)])
-        if f.rule_id in _CASCADE_ECHO_RULES and (f.file, f.row) in roots
+        replace(f, caused_by=roots[(f.file, f.row, f.rule_id)])
+        if (f.file, f.row, f.rule_id) in roots
         else f
         for f in findings
     ]
