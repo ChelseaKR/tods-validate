@@ -13,8 +13,14 @@ The contract enforced in CI (`tests/test_conformance.py`):
 
 1. There is exactly one fixture directory per registered rule, and vice versa.
 2. Each `TODS-XXXX` fixture, validated with all opt-in categories enabled,
-   produces a finding with rule ID `TODS-XXXX`.
+   produces the exact rule-ID set recorded in the committed
+   `tests/fixtures/expectations.json` oracle. Cascading findings are therefore
+   explicit and reviewed rather than silently accepted.
 3. The valid feed produces no findings, even with opt-in rules enabled.
+
+The release builder checks current results against that committed oracle and
+refuses to build the archive if they differ. It does not generate expected
+outcomes from the validator under test.
 
 ## Download
 
@@ -22,7 +28,9 @@ Each [GitHub release](https://github.com/ChelseaKR/tods-validate/releases)
 attaches `tods-conformance-corpus.zip`: every fixture above, plus an
 `expectations.json` mapping each fixture to the rule IDs it should produce, so
 another validator can run the corpus and diff against expectations without
-cloning this repo. Build the same archive locally with:
+cloning this repo. Changes to expected outcomes are reviewed in source control
+alongside the rule or fixture that motivates them. Build the same archive
+locally with:
 
 ```sh
 python scripts/build_conformance_corpus.py dist/tods-conformance-corpus.zip

@@ -48,6 +48,13 @@ Added:
 
 Fixed:
 
+- The advisory spec watcher now recognizes a field labeled Optional whose
+  description makes it conditionally required. This stops
+  `vehicle_assignments.service_id` from opening a false spec-drift issue while
+  preserving TODS-E205's conditional requirement.
+- Conformance-corpus expectations are now a committed, reviewed oracle. CI and
+  the release builder compare every fixture's exact rule-ID set against it
+  instead of regenerating expected outcomes from the validator under test.
 - The README standards table now uses the canonical Security & Supply-Chain,
   AI Evaluation, and Responsible-Tech Framework labels consumed by the
   portfolio conformance checker.
