@@ -1,0 +1,146 @@
+{
+  "invalid/TODS-E103": [
+    "TODS-E103"
+  ],
+  "invalid/TODS-E104": [
+    "TODS-E104"
+  ],
+  "invalid/TODS-E105": [
+    "TODS-E105"
+  ],
+  "invalid/TODS-E106": [
+    "TODS-E106"
+  ],
+  "invalid/TODS-E201": [
+    "TODS-E201"
+  ],
+  "invalid/TODS-E202": [
+    "TODS-E202"
+  ],
+  "invalid/TODS-E203": [
+    "TODS-E203"
+  ],
+  "invalid/TODS-E204": [
+    "TODS-E204"
+  ],
+  "invalid/TODS-E205": [
+    "TODS-E205",
+    "TODS-I501"
+  ],
+  "invalid/TODS-E301": [
+    "TODS-E301"
+  ],
+  "invalid/TODS-E303": [
+    "TODS-E303"
+  ],
+  "invalid/TODS-E304": [
+    "TODS-E304"
+  ],
+  "invalid/TODS-E307": [
+    "TODS-E307",
+    "TODS-I501",
+    "TODS-W302"
+  ],
+  "invalid/TODS-E308": [
+    "TODS-E308",
+    "TODS-W302"
+  ],
+  "invalid/TODS-E309": [
+    "TODS-E309",
+    "TODS-W302"
+  ],
+  "invalid/TODS-E310": [
+    "TODS-E310",
+    "TODS-I502",
+    "TODS-W302"
+  ],
+  "invalid/TODS-E311": [
+    "TODS-E311",
+    "TODS-I501",
+    "TODS-I502",
+    "TODS-W302"
+  ],
+  "invalid/TODS-E312": [
+    "TODS-E312",
+    "TODS-I501"
+  ],
+  "invalid/TODS-E314": [
+    "TODS-E314",
+    "TODS-I501"
+  ],
+  "invalid/TODS-E401": [
+    "TODS-E401"
+  ],
+  "invalid/TODS-E402": [
+    "TODS-E402"
+  ],
+  "invalid/TODS-E405": [
+    "TODS-E405",
+    "TODS-W302"
+  ],
+  "invalid/TODS-I102": [
+    "TODS-I102"
+  ],
+  "invalid/TODS-I108": [
+    "TODS-I108"
+  ],
+  "invalid/TODS-I501": [
+    "TODS-I501",
+    "TODS-I502"
+  ],
+  "invalid/TODS-I502": [
+    "TODS-I501",
+    "TODS-I502"
+  ],
+  "invalid/TODS-I601": [
+    "TODS-I601"
+  ],
+  "invalid/TODS-W101": [
+    "TODS-W101"
+  ],
+  "invalid/TODS-W107": [
+    "TODS-W107"
+  ],
+  "invalid/TODS-W206": [
+    "TODS-W206"
+  ],
+  "invalid/TODS-W302": [
+    "TODS-W302"
+  ],
+  "invalid/TODS-W305": [
+    "TODS-W305"
+  ],
+  "invalid/TODS-W306": [
+    "TODS-W306"
+  ],
+  "invalid/TODS-W313": [
+    "TODS-W313"
+  ],
+  "invalid/TODS-W315": [
+    "TODS-W315"
+  ],
+  "invalid/TODS-W316": [
+    "TODS-W316"
+  ],
+  "invalid/TODS-W403": [
+    "TODS-W403"
+  ],
+  "invalid/TODS-W404": [
+    "TODS-W404"
+  ],
+  "invalid/TODS-W406": [
+    "TODS-W302",
+    "TODS-W406"
+  ],
+  "invalid/TODS-W407": [
+    "TODS-I501",
+    "TODS-W407"
+  ],
+  "invalid/TODS-W408": [
+    "TODS-W408"
+  ],
+  "invalid/TODS-W409": [
+    "TODS-W409"
+  ],
+  "valid": []
+}

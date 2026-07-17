@@ -5,6 +5,8 @@ import json
 import zipfile
 from pathlib import Path
 
+import pytest
+
 _SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "build_conformance_corpus.py"
 
 
@@ -40,3 +42,12 @@ def test_corpus_has_one_fixture_per_rule(tmp_path: Path) -> None:
     expectations = builder.build(tmp_path / "corpus.zip")
     invalid = {k.removeprefix("invalid/") for k in expectations if k.startswith("invalid/")}
     assert invalid == {r.id for r in all_rules()}
+
+
+def test_corpus_build_rejects_unreviewed_expectation_drift(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    builder = _load_builder()
+    monkeypatch.setattr(builder, "_rule_ids", lambda path, gtfs=None: [])
+    with pytest.raises(RuntimeError, match="expectations.json"):
+        builder.build(tmp_path / "corpus.zip")

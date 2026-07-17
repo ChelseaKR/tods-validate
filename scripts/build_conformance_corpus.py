@@ -22,6 +22,7 @@ from tods_validate.runner import run
 
 _ROOT = Path(__file__).resolve().parent.parent
 _FIXTURES = _ROOT / "tests" / "fixtures"
+_EXPECTATIONS = _FIXTURES / "expectations.json"
 _ALL_CATEGORIES = frozenset(CATEGORIES)
 
 
@@ -30,21 +31,50 @@ def _rule_ids(path: Path, gtfs: Path | None = None) -> list[str]:
     return sorted({f.rule_id for f in findings})
 
 
+def load_expectations() -> dict[str, list[str]]:
+    """Load the reviewed conformance oracle committed with the fixtures."""
+    raw = json.loads(_EXPECTATIONS.read_text(encoding="utf-8"))
+    if not isinstance(raw, dict) or not all(
+        isinstance(key, str)
+        and isinstance(value, list)
+        and all(isinstance(rule_id, str) for rule_id in value)
+        for key, value in raw.items()
+    ):
+        raise ValueError(f"invalid conformance expectations in {_EXPECTATIONS}")
+    return raw
+
+
+def actual_expectations() -> dict[str, list[str]]:
+    """Run every fixture and return its current exact rule-ID set."""
+    actual: dict[str, list[str]] = {}
+    for fixture in sorted((_FIXTURES / "invalid").iterdir()):
+        if fixture.is_dir():
+            actual[f"invalid/{fixture.name}"] = _rule_ids(fixture)
+
+    valid_tods, valid_gtfs = _FIXTURES / "valid" / "tods", _FIXTURES / "valid" / "gtfs"
+    actual["valid"] = _rule_ids(valid_tods, valid_gtfs)
+    return actual
+
+
 def build(out: Path) -> dict[str, list[str]]:
-    """Write the corpus zip to ``out`` and return the expectations mapping."""
-    expectations: dict[str, list[str]] = {}
+    """Write the corpus zip after checking it against the committed oracle."""
+    expectations = load_expectations()
+    actual = actual_expectations()
+    if actual != expectations:
+        raise RuntimeError(
+            "conformance results differ from tests/fixtures/expectations.json; "
+            "review the behavior change and update the oracle explicitly"
+        )
+
     members: list[tuple[str, Path]] = []
 
     for fixture in sorted((_FIXTURES / "invalid").iterdir()):
         if not fixture.is_dir():
             continue
-        expectations[f"invalid/{fixture.name}"] = _rule_ids(fixture)
         for file in sorted(fixture.iterdir()):
             if file.is_file():
                 members.append((f"invalid/{fixture.name}/{file.name}", file))
 
-    valid_tods, valid_gtfs = _FIXTURES / "valid" / "tods", _FIXTURES / "valid" / "gtfs"
-    expectations["valid"] = _rule_ids(valid_tods, valid_gtfs)
     for sub in ("tods", "gtfs"):
         for file in sorted((_FIXTURES / "valid" / sub).iterdir()):
             if file.is_file():
@@ -54,14 +84,14 @@ def build(out: Path) -> dict[str, list[str]]:
     with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
         for arcname, file in members:
             zf.write(file, arcname)
-        zf.writestr("expectations.json", json.dumps(expectations, indent=2, sort_keys=True))
+        zf.write(_EXPECTATIONS, "expectations.json")
         zf.writestr(
             "README.md",
             "# TODS conformance corpus\n\n"
             "Each `invalid/<RULE-ID>/` directory is a minimal feed that should produce "
             "that rule; `valid/` should produce nothing. `expectations.json` maps each "
-            "fixture to its expected rule IDs. Built from tods-validate with all opt-in "
-            "categories enabled.\n",
+            "fixture to its reviewed exact rule-ID set. The release build checks the "
+            "fixtures against this committed oracle with all opt-in categories enabled.\n",
         )
     return expectations
 
