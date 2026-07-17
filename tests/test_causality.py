@@ -1,4 +1,4 @@
-"""Finding causality: TODS-E201 echoes of a TODS-E104 ragged row link back to it.
+"""Finding causality: follow-on findings link back to their root problem.
 
 Uses a hand-built package in ``tmp_path`` rather than the shared conformance
 corpus (``tests/fixtures/invalid/``) because every directory there must trip
@@ -92,3 +92,20 @@ def test_finding_silent_by_default_has_no_causal_link() -> None:
     f = Finding(rule_id="TODS-E999", severity=Severity.ERROR, message="unrelated")
     assert f.caused_by is None
     assert f.to_dict()["caused_by"] is None
+
+
+def test_legacy_employee_duplicate_warning_links_to_primary_key_error(tmp_path: Path) -> None:
+    (tmp_path / "employee_run_dates.txt").write_text(
+        "date,service_id,run_id,employee_id\n20260106,daily,1,emp-1\n20260106,daily,1,emp-1\n",
+        encoding="utf-8",
+    )
+    _, findings = run(tmp_path)
+    error = next(f for f in findings if f.rule_id == "TODS-E204")
+    warning = next(f for f in findings if f.rule_id == "TODS-W408")
+    assert error.pointer() == "employee_run_dates.txt#L3"
+    assert warning.caused_by == error.pointer()
+
+    text = render_text(findings, str(tmp_path))
+    assert "ERROR TODS-E204" in text
+    assert "WARNING TODS-W408" not in text
+    assert "and 1 follow-on finding" in text

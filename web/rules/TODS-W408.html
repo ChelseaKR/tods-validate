@@ -39,8 +39,7 @@
     <p class="id">TODS-W408</p>
     <h1>Identical employee assignment appears twice</h1>
     <p class="meta"><span class="badge">WARNING</span></p>
-    <p>Two rows in employee_run_dates.txt are exactly identical (same date, service, run, and employee). Multiple employees per run are fine; the same employee twice is usually an export bug.</p>
-    <p><strong>Interpretation:</strong> permissive: the spec&#x27;s &#x27;Primary Key: *&#x27; is read as not forbidding an exact duplicate row, so this is a warning rather than an error (spec-questions #6).</p>
+    <p>Compatibility signal for an exact duplicate in employee_run_dates.txt. TODS-E204 now reports the same row as a primary-key error; this warning is retained so existing machine consumers do not lose the earlier rule ID.</p>
     <p>Spec reference: <a href="https://tods-transit.org/spec/#employee_run_datestxt">https://tods-transit.org/spec/#employee_run_datestxt</a></p>
   </body>
 </html>

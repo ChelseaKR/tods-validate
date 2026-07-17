@@ -103,7 +103,7 @@ def test_html_report_is_accessible() -> None:
     # The findings table is navigable: a caption plus column-scoped headers.
     assert "<caption>" in out
     assert out.count("scope='col'") == 4
-    assert "tabindex='0' aria-label='Scrollable findings table for TODS-E307'" in out
+    assert "role='region' tabindex='0' aria-label='Scrollable findings table for TODS-E307'" in out
     # Severity reaches a screen reader as a word, not color alone.
     assert ">ERROR<" in out
 

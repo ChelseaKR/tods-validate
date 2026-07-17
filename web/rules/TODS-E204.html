@@ -39,7 +39,7 @@
     <p class="id">TODS-E204</p>
     <h1>Duplicate primary key</h1>
     <p class="meta"><span class="badge">ERROR</span></p>
-    <p>Two rows in a TODS-specific file share the same primary key (run_events: service_id + run_id + event_sequence; vehicles: vehicle_id; vehicle_assignments: date + block_id + service_id). Consumers cannot tell the rows apart.</p>
+    <p>Two rows in a TODS-specific file share the same primary key (run_events: service_id + run_id + event_sequence; vehicles: vehicle_id; employee_run_dates: date + service_id + run_id + employee_id; vehicle_assignments: date + block_id + service_id). Consumers cannot tell the rows apart.</p>
     <p>Spec reference: <a href="https://tods-transit.org/spec/">https://tods-transit.org/spec/</a></p>
   </body>
 </html>

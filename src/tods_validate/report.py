@@ -193,9 +193,11 @@ def render_text(  # noqa: C901 - causality grouping and severity disclosure add 
     counts = summarize(findings)
     if not quiet:
         shown, hidden = _max_findings(findings, max_findings)
+        follow_on_counts = Counter(f.caused_by for f in shown if f.caused_by is not None)
         for severity in (Severity.ERROR, Severity.WARNING, Severity.INFO):
             group = [f for f in shown if f.severity == severity]
-            if not group:
+            roots = [f for f in group if f.caused_by is None]
+            if not roots:
                 continue
             # Findings with caused_by are downstream echoes of a root finding
             # on the same row (e.g. TODS-E201 fired only because a TODS-E104
@@ -207,10 +209,7 @@ def render_text(  # noqa: C901 - causality grouping and severity disclosure add 
             displayed_count = len([f for f in full_group if f.caused_by is None])
             plural = "s" if displayed_count != 1 else ""
             lines.append(f"{displayed_count} {severity.name.lower()}{plural}:")
-            follow_on_counts = Counter(f.caused_by for f in group if f.caused_by is not None)
-            for f in group:
-                if f.caused_by is not None:
-                    continue  # rendered as its root's follow-on line, below
+            for f in roots:
                 location = f.location()
                 prefix = f"  {severity.name} {f.rule_id}{_remap_note(f)}"
                 lines.append(f"{prefix} [{location}]" if location else prefix)
@@ -730,7 +729,8 @@ def _timeline_table(
             "</tr>"
         )
     return (
-        "<div class='table-scroll' tabindex='0' aria-label='Scrollable event table'>"
+        "<div class='table-scroll' role='region' tabindex='0' "
+        "aria-label='Scrollable event table'>"
         "<table class='timeline-table'>"
         "<caption>Run events in sequence order. This table is the text equivalent "
         "of the visual timeline.</caption>"
@@ -855,7 +855,7 @@ def render_html(
             groups.append(
                 "<details class='rule-group' open>"
                 f"<summary>{esc(rule_id)} - {count} finding{plural}</summary>"
-                f"<div class='table-scroll' tabindex='0' "
+                f"<div class='table-scroll' role='region' tabindex='0' "
                 f"aria-label='Scrollable findings table for {esc(rule_id)}'>"
                 "<table><caption>Findings, ordered by file, then row, then rule ID.</caption>"
                 "<thead><tr><th scope='col'>Severity</th><th scope='col'>Rule</th>"
