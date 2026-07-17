@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: "Existing release tag to build (e.g. v0.7.0). Empty builds main as latest-only."
+        description: "Existing release tag to build (e.g. v0.8.0). Empty builds main as latest-only."
         required: false
         type: string
         default: ""
