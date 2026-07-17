@@ -1,0 +1,54 @@
+name: Merge handoff (advisory)
+
+# Materialize the TODS-Supplemented GTFS and hand it to gtfs-validator, so
+# the merge contract is exercised end to end. Informational: a downstream
+# change should surface here without blocking unrelated work. Moved out of
+# ci.yml per CICD §11d: an advisory job that cannot fail the merge has no
+# business spending minutes on every commit.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Mondays at 08:00 UTC (mutation.yml runs 06:00, spec-watch.yml 07:00;
+    # staggered so the advisory jobs don't contend for runners).
+    - cron: "0 8 * * 1"
+
+permissions:
+  contents: read
+
+jobs:
+  merge-handoff:
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-java@1bcf9fb12cf4aa7d266a90ae39939e61372fe520 # v5.4.0
+        with:
+          distribution: temurin
+          java-version: "17"
+      - run: python -m pip install .
+      - name: Merge the valid fixture feed
+        run: |
+          tods-validate merge tests/fixtures/valid/tods \
+            --gtfs tests/fixtures/valid/gtfs -o supplemented.zip
+      - name: Validate the merged feed with gtfs-validator
+        run: |
+          # Pin a versioned asset and verify its checksum. gtfs-validator v8.0.1
+          # dropped the unversioned latest/download/gtfs-validator-cli.jar, so the
+          # old URL 404s. A bare `curl -sSL` follows the redirect but does not fail
+          # on 404, and silently saved the error page as the jar ("Invalid or
+          # corrupt jarfile"). The -f flag fails on HTTP errors; sha256sum -c
+          # catches a swapped or truncated artifact before java runs it.
+          curl -fsSL -o gtfs-validator.jar \
+            https://github.com/MobilityData/gtfs-validator/releases/download/v8.0.1/gtfs-validator-8.0.1-cli.jar
+          echo "19293ddd9b6f954f216d4f12054bd8a3232921751c4484339e339764a91000e2  gtfs-validator.jar" | sha256sum -c -
+          java -jar gtfs-validator.jar -i supplemented.zip -o validator-report
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: gtfs-validator-report
+          path: validator-report

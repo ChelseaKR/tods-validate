@@ -6,10 +6,18 @@ name: Semgrep
 # 2026-07-05 conformance remediation). Runs unauthenticated against the
 # public Semgrep Registry ruleset; no SEMGREP_APP_TOKEN required or used.
 
+# CICD §11e trigger shape (SAST): PRs into main + weekly schedule. No push
+# trigger — the pull_request run already scanned the same changes before
+# merge; the weekly run catches new Registry rules against unchanged code.
 on:
-  push:
-    branches: [main]
   pull_request:
+  schedule:
+    - cron: "43 6 * * 1" # weekly, Monday 06:43 UTC (staggered after codeql.yml)
+
+# Cancel superseded runs of the same ref (CICD §11c).
+concurrency:
+  group: semgrep-${{ github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
