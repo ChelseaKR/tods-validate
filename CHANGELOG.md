@@ -5,6 +5,31 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+Changed:
+
+- Supplement rows known to add a GTFS entry now require every field the GTFS
+  reference marks Required for that file. Updates and deletes still require
+  only their primary-key fields. The check stays permissive when no companion
+  GTFS is available because an addition cannot then be distinguished from an
+  update.
+- `employee_run_dates.txt` now uses the explicit four-field primary key agreed
+  in the #152 discussion. Exact duplicates produce `TODS-E204`;
+  `TODS-W408` remains as a grouped compatibility signal for existing machine
+  consumers.
+- The current GTFS supplement field inventory now recognizes
+  `trips.safe_duration_factor`, `trips.safe_duration_offset`,
+  `stops.stop_access`, and `routes.cemv_support`.
+
+Added:
+
+- A reviewed v1-candidate public-contract snapshot and blocking drift check
+  covering rule IDs/severities/categories, exit codes, supported spec versions,
+  Python exports, and required JSON report fields.
+- A blocking WCAG 2.1 AA accessibility job using both axe-core and
+  HTML_CodeSniffer on the playground and a generated HTML report. The same gate
+  runs during release verification, and the npm lockfile is vulnerability-
+  audited.
+
 ## v0.8.0 - 2026-07-16
 
 This release broadens compatibility and makes operational changes easier to

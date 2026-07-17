@@ -11,9 +11,9 @@ are welcome as GitHub issues.
   fighting warnings they have decided to accept.
 - `--format markdown`: a report suitable for pasting into an issue or a
   working-group thread.
-- Still open: fixes from validating real-world feeds. If you produce or
-  consume TODS and can share a feed (privately is fine), please open an
-  issue.
+- Real-feed validation is an ongoing maintainer practice. Private feed data is
+  never committed; observed failures are reduced to reviewable regression
+  fixtures. See `docs/production-feed-validation.md`.
 
 ## v0.3.0 — The merge pipeline (shipped 2026-06-12)
 
@@ -62,10 +62,13 @@ are welcome as GitHub issues.
 
 ## v1.0.0 — Stability commitments
 
-Gated on the rule set proving out against multiple production feeds and on
-no rule-ID churn for two consecutive releases. v1.0 means semantic-versioning
-guarantees on rule IDs, exit codes, and the JSON report schema, plus an
-acceptance-test corpus in CI.
+Access to real feeds is no longer blocked; the maintainer's privacy-preserving
+record is in `docs/production-feed-validation.md`. The remaining gate is one
+conformance-only release with no unreviewed drift against
+`docs/v1-contract-candidate.json`, while every real-feed defect is reduced to
+a reviewable regression case. v1.0 means semantic-versioning guarantees on
+rule IDs, exit codes, the public Python exports, and the JSON report schema,
+plus the acceptance-test corpus in CI.
 
 ## Out of scope
 
@@ -92,7 +95,7 @@ Updated 2026-07-05.
 | Container CVEs (CRITICAL/HIGH) | 0 | Trivy in `docker.yml` | AUTO | Chelsea Kelly-Reif |
 | Rule ↔ fixture parity | 1:1 | `tests/test_conformance.py` | AUTO | Chelsea Kelly-Reif |
 | Mutation kill-rate (rules engine) | ≥ 70% (ratchet; baseline ~65%) | `mutmut` (advisory, weekly) | REVIEW | Chelsea Kelly-Reif |
-| axe/pa11y violations (HTML report + playground) | 0 | not yet wired — see `docs/CONFORMANCE-GAPS.md#accessibility` | N/A-not-yet-built | Chelsea Kelly-Reif |
+| axe/pa11y violations (HTML report + playground) | 0 | `make a11y` (axe + HTML_CodeSniffer, WCAG 2.1 AA) | AUTO | Chelsea Kelly-Reif |
 | Perf regression budget | ≤ 2x baseline | `scripts/benchmark.py`, not yet a CI gate | N/A-not-yet-built | Chelsea Kelly-Reif |
 | Screen-reader walkthrough | per release | not yet committed as an artifact | REVIEW-not-yet-built | Chelsea Kelly-Reif |
 | Threat model | per new surface | `SECURITY.md`, updated ad hoc | REVIEW | Chelsea Kelly-Reif |

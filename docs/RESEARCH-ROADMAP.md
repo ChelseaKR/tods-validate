@@ -69,8 +69,8 @@ Effort: **S** ≈ an afternoon · **M** ≈ a day or two · **L** ≈ a week or 
 
 | ID | Remediation | Personas | Pri | Effort | Evidence / notes |
 | --- | --- | --- | --- | --- | --- |
-| R1 | **Recruit and validate real production TODS feeds** (privately is fine) and fold them into regression tests | P2,P4,P6,P7,P9,P11 | P0 | L | The single recurring blocker. **[corroborates roadmap v0.2.0 "still open: real-world feeds" and the v1.0 gate]** |
-| R2 | **Accessibility pass on the HTML report + terminal**: semantic table headers/scope, contrast, landmarks; documented `--no-color` / `NO_COLOR`; a short a11y statement | P3 | P1 | M | `--format html` and ANSI color ship; a11y is a stated quality bar but unaudited. **[corroborates the no-color/pipe-readable quality bar · NET-NEW as explicit work]** ✅ Implemented 2026-06-30 and merged in PR #6 — HTML report landmarks/caption/scoped headers/viewport/contrast fix + README accessibility statement |
+| R1 | **Recruit and validate real production TODS feeds** (privately is fine) and fold them into regression tests | P2,P4,P6,P7,P9,P11 | P0 | L | ✅ Access blocker corrected 2026-07-16: multiple real, non-synthetic exports have been used privately. Exact identities/counts are not publicly claimed; observed defects must become minimal regression cases. See `production-feed-validation.md`. |
+| R2 | **Accessibility pass on the HTML report + terminal**: semantic table headers/scope, contrast, landmarks; documented `--no-color` / `NO_COLOR`; a short a11y statement | P3 | P1 | M | ✅ Manual semantics work merged in PR #6; automated gate added for v0.9.0. `make a11y` now blocks on axe + HTML_CodeSniffer WCAG 2.1 AA errors for the playground and a generated HTML report. A manual screen-reader walkthrough remains separate work. |
 | R3 | **File the remaining `spec-questions.md` items upstream** as issues/PRs and track resolution | P4,P6,P7 | P1 | M | Eight documented; **#148 already filed**. **[corroborates `spec-questions.md` + the contribution play]** ✅ Implemented 2026-07-11 — question 2 was fixed upstream by PR #147; question 5 remains in #148; packaging is proposed in #151; questions 3, 4, 6, 7, and 8 are consolidated in #152. `docs/spec-questions.md` links every disposition without treating open questions as resolved. |
 | R4 | **Contributor rule-authoring guide**: severity choice, scheduler-grade message style, spec citation, ID allocation, fixture + `expectations.json`; seed "good first issue" rules | P5 | P1 | S | Rules-as-data + the conformance contract exist; the *how-to* is undocumented. **[NET-NEW · corroborates `conformance.md`]** ✅ Implemented 2026-06-30 and merged in PR #6 — docs/authoring-rules.md, linked from README + conformance.md |
 | R5 | **Keep the GitHub Action version current** in README and `merge` recipe, and publish to the **Marketplace** | P8 | P1 | S | Version skew is a real friction in CI documentation. **[NET-NEW]** 🟡 Partially complete — both README snippets now use the current `@v0.8.0` release. Marketplace publication remains blocked on the publisher-account UI flow and acceptance of its terms; no agent should accept those terms on the maintainer's behalf. |
@@ -95,30 +95,28 @@ Effort: **S** ≈ an afternoon · **M** ≈ a day or two · **L** ≈ a week or 
 
 ## Sequenced roadmap
 
-- **Now (P0–P1, the keystone and the cheap contribution wins).** R1 (recruit real
-  feeds) runs in the background because it gates everything and v1.0. In parallel,
-  ship the cheap, high-trust items that need no external input: R3 (file
-  spec-questions upstream), R2 (accessibility pass), R4 + R5 (contributor guide +
-  Action currency), and begin E2 + E3 (corpus upstream + exporter helper).
+- **Now (P0–P1).** Keep turning private real-feed findings into minimal regression
+  cases; finish the #152 specification clarification; and hold the v1 candidate
+  contract through one conformance-only release. Automated accessibility is now a
+  merge and release gate; the manual assistive-technology walkthrough remains.
 - **Next (P1–P2).** E1 (validate rosters/runtimes/chargers behind experimental) as
   those proposals advance upstream; R6 + R7 (worked examples + linked playground);
   E4 (`--spec-version` maturity); E6 (ingest-ready profile for P10).
 - **Soon (P2–P3).** E5 (fleet compliance artifact), R8 (drift hint), R9 (done —
   throughput published in `docs/BENCHMARKS.md`), E8 (comparative stats).
 - **Opportunistic (P3).** E7 (conformance level), E9 (packaging convention upstream).
-- **v1.0 cut** stays gated, per `docs/roadmap.md`, on R1 succeeding (multiple
-  production feeds) and no rule-ID churn for two releases.
+- **v1.0 cut** is gated on the privacy-preserving real-feed regression practice and
+  one conformance-only release with no unreviewed public-contract drift.
 
 ## Recommended first sprint (highest leverage, mostly already-built infra)
 
-The triage and the shipped roadmap converge on the same starting line. The theme:
-**convert the tool into a contribution and make its own claims true**, while the
-slow keystone (real feeds) runs in the background.
+The original first sprint below is retained as the 2026-06-30 recommendation.
+Its real-feed access assumption is superseded by
+`docs/production-feed-validation.md`; most other items have shipped.
 
-1. **R1 — start recruiting real feeds now.** It is the longest pole and gates v1.0,
-   so begin outreach immediately: the TODS Working Group, a producing agency, and a
-   vendor export team (the same audiences the project already targets). Everything
-   else is faster.
+1. **R1 — keep real-feed evidence actionable.** Access exists. Reduce each behavior
+   that changes the validator to a non-identifying regression fixture and avoid
+   unsupported public claims about feed producers or counts.
 2. **R3 — file the remaining spec-questions upstream.** Cheap, already started
    (#148), and it is the move that turns a validator into a recognized contribution
    to the standard. Highest reputational leverage per hour.

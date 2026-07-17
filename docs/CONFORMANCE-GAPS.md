@@ -198,22 +198,24 @@ response SLA (3 business days ack; 30/90-day fix-or-mitigate by severity).
 
 ## accessibility
 
-**Closed today:** an SRI hash (also filed under security above) on the
-Pyodide CDN script in `web/index.html`, closing the one concrete supply-
-chain-flavored a11y note (A11Y-17) from the audit.
+**Closed 2026-07-16:** a blocking `pa11y-ci` gate now runs axe-core and
+HTML_CodeSniffer at WCAG 2.1 AA against both the browser playground and a
+fixture-generated HTML report. It found and fixed the report's invalid ARIA
+labeling on scrollable table containers, and added the playground file-input
+label, dark-mode contrast variables, and explicit focus treatment. The locked
+npm dependency tree is checked with `npm audit --audit-level=high`. `make
+verify` and the reusable release verifier both include the gate.
 
-**Still open (all of P2-4, not attempted this pass):** no axe-core/pa11y-ci
-CI job against the generated HTML report or `web/index.html`; no Lighthouse
-a11y pass; no committed screen-reader/keyboard walkthrough artifact; no
-ACR/VPAT; the README `## Accessibility` section is a genuine, specific
-statement but is not yet promoted to a dated `docs/a11y/STATEMENT.md` with a
-named WCAG conformance target. This is real, scoped remaining work (a CI
-job driving axe-core/pa11y-ci against generated fixtures, plus a manual
-walkthrough artifact) — deferred this pass in favor of the P0/P1 items,
-which were both larger in number and higher severity (security exposure,
-broken release gates, misrepresented conformance). Recommended next step:
-wire `pa11y-ci` against a fixture-generated HTML report as a new `ci.yml`
-job, blocking, before adding the manual-walkthrough artifact.
+The Pyodide CDN script in `web/index.html` also retains its SRI hash, closing
+the supply-chain-flavored A11Y-17 note from the original audit.
+
+**Still open:** no Lighthouse pass; no committed screen-reader/keyboard
+walkthrough artifact; no ACR/VPAT; the README `## Accessibility` section is a
+genuine, specific statement but is not yet promoted to a dated
+`docs/a11y/STATEMENT.md` with a named WCAG conformance target. Automated checks
+are a floor, not evidence of screen-reader usability. The next accessibility
+artifact should therefore be the manual keyboard and assistive-technology
+walkthrough, not another scanner.
 
 ## quality-and-metrics
 
