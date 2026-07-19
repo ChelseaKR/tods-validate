@@ -18,7 +18,7 @@ description = "Validator for Transit Operational Data Standard (TODS) feeds, for
 readme = "README.md"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
-requires-python = ">=3.11"
+requires-python = ">=3.12"
 authors = [{ name = "Chelsea Kelly-Reif" }]
 keywords = ["transit", "gtfs", "tods", "ods", "validation", "cal-itp"]
 classifiers = [
@@ -26,7 +26,6 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: Other Audience",
-    "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: GIS",
@@ -64,7 +63,7 @@ mutation = ["mutmut>=3.6"]
 
 [tool.ruff]
 line-length = 100
-target-version = "py311"
+target-version = "py312"
 src = ["src", "tests"]
 
 [tool.ruff.lint]
