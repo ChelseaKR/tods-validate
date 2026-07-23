@@ -20,6 +20,18 @@ To try the validator without installing anything, use the
 [browser playground](https://chelseakr.github.io/tods-validate/). Validation
 runs locally in your browser; feed files are not uploaded.
 
+## Choose a starting point
+
+- **Try it:** open the
+  [browser playground](https://chelseakr.github.io/tods-validate/) with a
+  synthetic or approved feed.
+- **Adopt it:** install the CLI below, use the container image, or add the
+  [GitHub Action](#github-action) to a feed repository.
+- **Contribute:** test a workflow, improve a finding, or add a spec-cited rule
+  with passing and failing fixtures. Start with a
+  [bounded open issue](https://github.com/ChelseaKR/tods-validate/issues?q=is%3Aissue+is%3Aopen+label%3A%22help+wanted%22)
+  and [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Install
 
 Requires Python 3.11 or newer.
