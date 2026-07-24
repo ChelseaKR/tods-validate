@@ -7,6 +7,10 @@ new checks may be added in minor releases.
 
 Changed:
 
+- PyPI/GitHub releases now run only from the reviewed workflow on `main` with
+  an existing SSH-signed stable tag. A read-only job verifies signer and main
+  ancestry, the reusable gate checks the exact verified commit, and both
+  checkout-free publishers recheck the tag object before publication.
 - Supplement rows known to add a GTFS entry now require every field the GTFS
   reference marks Required for that file. Updates and deletes still require
   only their primary-key fields. The check stays permissive when no companion
