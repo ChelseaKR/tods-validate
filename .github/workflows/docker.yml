@@ -103,7 +103,7 @@ jobs:
           sbom: true
           provenance: mode=max
       - name: Install cosign
-        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Sign the image by digest
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -121,7 +121,7 @@ jobs:
       contents: read
     steps:
       - name: Install cosign
-        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+        uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6 # v4.1.2
       - name: Verify the keyless signature by digest
         env:
           DIGEST: ${{ needs.build-push.outputs.digest }}
