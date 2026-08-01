@@ -16,7 +16,8 @@
       "description": "Move every github/codeql-action/* step in one PR. init, analyze, autobuild and upload-sarif must run the same version: since CodeQL Action 3.30.4 the non-init steps hard-error when they load a configuration file written by a different version.",
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["github/codeql-action**"],
-      "groupName": "codeql-action"
+      "groupName": "codeql-action",
+      "minimumReleaseAge": "72 hours"
     }
   ]
 }
