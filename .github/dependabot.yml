@@ -6,6 +6,15 @@ updates:
       interval: monthly
     cooldown:
       default-days: 7
+    # One PR for the whole CodeQL action set: init, analyze, autobuild and
+    # upload-sarif must always run the same version. Since CodeQL Action
+    # 3.30.4 the non-init steps hard-error when they load a configuration
+    # file written by a different version, so a half-applied bump breaks the
+    # scan rather than merely warning.
+    groups:
+      codeql-action:
+        patterns:
+          - github/codeql-action*
   - package-ecosystem: pip
     directory: /
     schedule:
