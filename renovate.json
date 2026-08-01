@@ -17,7 +17,7 @@
       "matchManagers": ["github-actions"],
       "matchPackageNames": ["github/codeql-action**"],
       "groupName": "codeql-action",
-      "minimumReleaseAge": "72 hours"
+      "minimumReleaseAge": "7 days"
     }
   ]
 }
