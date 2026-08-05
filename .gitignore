@@ -18,3 +18,6 @@ node_modules/
 
 # mutmut writes the mutated copy of the tree and its stats here
 mutants/
+
+# live git worktrees checked out under the repo root
+.worktrees/
