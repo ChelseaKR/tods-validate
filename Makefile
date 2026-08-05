@@ -1,9 +1,9 @@
 # make verify reproduces the full merge-blocking gate set locally, byte-for-
 # byte with CI (CICD-27). Run it before opening a PR; the release workflows
 # re-run it at the tagged commit before anything publishes (REL-14/15).
-.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit secrets a11y
+.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation
 
-verify: lint format typecheck test docs-check contract-check i18n-check audit secrets a11y
+verify: lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation
 	@echo "make verify: all gates passed."
 
 lint:
@@ -52,3 +52,10 @@ secrets:
 a11y:
 	npm audit --audit-level=high
 	npm run a11y
+
+# Validates CITATION.cff against the Citation File Format 1.2.0 schema
+# (DOC-08). Catches malformed citation metadata before a release ships it.
+# Run via uvx so the check needs no addition to the dev dependency set;
+# cffconvert is fetched ephemerally into uv's tool cache.
+citation:
+	uvx cffconvert --validate -i CITATION.cff

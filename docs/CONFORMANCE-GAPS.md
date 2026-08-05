@@ -239,9 +239,15 @@ README status line (`Status: Beta`) added.
 **Closed 2026-07-09:** DOC-04/05 — `docs/adr/` exists (0000 + backfills
 0001–0005; same closure as CQ-44/45 above).
 
-**Still open:** DOC-08 (no `cffconvert --validate` CI step); DOC-15 (no
-currency stamps on `getting-started.md`/`api.md`, no `check_staleness.py`
-wiring).
+**Closed 2026-08-04:** DOC-08 — a `citation` job (`ci.yml`, folded into
+`make verify`) runs `cffconvert --validate` against `CITATION.cff` on every
+push and PR, via `uvx` so it needs no addition to the dev dependency set.
+Catches malformed citation metadata before a release ships it; the existing
+release-checklist eyeball check (tag/pyproject/CITATION.cff version
+agreement) still lives in `verify.yml`'s REL-03 step and is unaffected.
+
+**Still open:** DOC-15 (no currency stamps on `getting-started.md`/`api.md`,
+no `check_staleness.py` wiring).
 
 ## responsible-tech
 
