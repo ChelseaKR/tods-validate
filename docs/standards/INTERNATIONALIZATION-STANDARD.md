@@ -2,27 +2,24 @@
 
 Canonical rules for any repo that renders, stores, or transmits human-language text to a user. This is **decision-dense, not a survey**: the chosen tool and target are stated with a one-line rationale; rejected alternatives carry a "rejected because" note. A control is either **AUTO-GATE** (mechanically checkable, merge-blocking in CI) or **REVIEW-GATE** (human judgment, paired with a checklist item and a committed artifact). There is no aspirational third category. Cross-cutting rigor (coverage, SAST, supply-chain, a11y browser-engine gates) lives in its own STANDARD and is referenced, not repeated.
 
-> **Why this exists.** Eight bilingual repos store EN/ES as Python dicts or regex — `civic-rag-starter-kit`, `fare-assistant`, `ledger`, `nearmiss`, `swelter` — with no extraction tooling, no plural handling, no translator workflow, and no key-parity check. Only `trans-docs-navigator` (TS `LocaleBundle`), `personal-site` (i18next), and `habitable` (JSON catalogs) have real infra. For civic multilingual RAG explicitly targeting Spanish-dominant California populations, a hand-rolled dict is a correctness and equity defect, not a shortcut. This standard makes the catalog, the gates, and the disaggregated-quality tie-in mandatory for the surfaces that owe it, and makes "we don't need i18n" a **declared decision** rather than a silent omission.
+> **Why this exists.** Hand-rolled dictionaries and regular expressions lack extraction tooling, plural handling, translator workflow, and dependable key-parity checks. For a civic multilingual surface, that is a correctness and equity defect, not a shortcut. This standard makes catalogs, automated gates, and disaggregated quality mandatory for the surfaces that owe them, and makes "we don't need i18n" a **declared decision** rather than a silent omission. Current per-project implementation state belongs in the private applicability registry.
 
 ---
 
 ## 1. Applicability — who owes i18n and who declares N/A
 
-i18n is **required** for any repo with a user-facing civic / public-sector / multilingual surface. Concretely, in scope today:
+i18n is **required** for any repo with a user-facing civic / public-sector / multilingual surface. **The scoping registry is `STANDARDS/applicability.yml`** — each repo's entry declares its archetype (`civic-bilingual-app` repos always owe i18n) and marks this standard `applies` or `na: "<reason>"`; a new repo is scoped there, never by editing this prose. The table below illustrates *why* the standard attaches to typical in-scope repos; it is an example set, not the registry:
 
-| Repo | Surface | Required because |
+| Service shape | Surface | Required because |
 |---|---|---|
-| `civic-rag-starter-kit` | RAG answer UI/API | Civic RAG, Spanish-dominant CA users; LEP populations |
-| `trans-docs-navigator` | TS/React frontend | Public legal-doc navigation; already has `LocaleBundle` |
-| `govchat-eval` | Eval HTML reports + any served prompts/UI | Civic chat eval; user-facing report output |
-| `fare-assistant` | Transit fare answers (EN/ES dicts today) | Public transit + PII; LEP riders |
-| `gtfs-scorecard` | Transit scorecard UI | Civic transit data, public-facing |
-| `davis-bike-hazard-map` | TS/React map UI | Public civic map |
-| `personal-site` | i18next frontend | Already bilingual; reference implementation |
-| `habitable` | JSON catalogs | Already bilingual; reference for catalog parity |
-| `ledger`, `nearmiss`, `swelter` | EN/ES user-facing strings | Currently bespoke dicts → must migrate |
+| Hosted civic text service | RAG answer UI/API | Public-service content and LEP populations |
+| Multilingual web frontend | TS/React routes | Public navigation and localized task flows |
+| Generated-report interface | HTML reports and served prompts | User-facing report output |
+| Public transit interface | Fare or trip answers | Public transit and LEP riders |
+| Public data interface | Scorecard or map UI | Civic data presented to the public |
+| Localizable CLI | Human-facing terminal strings | More than one supported language or locale-aware values |
 
-**Explicitly out of scope** — a repo MAY declare i18n N/A when **all** hold: (a) no natural-language output to a human other than the single developer-operator; (b) English-only by design with no civic/public obligation; (c) no localized dates/numbers/currency shown to an end user. Candidate N/A repos: pure libraries/CLIs with English-only operator output (`tods-validate`, `olive-bark-logger`), single-user privacy tools (`self-osint-monitor`, `women-artist-discovery` where output is operator-only), the `queer-the-stacks`/`queer-specfic-reader` pair (reconcile the fork first — see §11).
+**Explicitly out of scope** — a repo MAY declare i18n N/A when **all** hold: (a) no natural-language output to a human other than the single developer-operator; (b) English-only by design with no civic/public obligation; (c) no localized dates/numbers/currency shown to an end user. The N/A reason is recorded in the repo's `STANDARDS/applicability.yml` entry. Typical N/A shapes are English-only operator CLIs and single-user local tools with no public or multilingual surface.
 
 **N/A is a committed decision, never a silent skip.** A repo claiming N/A MUST ship `docs/I18N.md` containing exactly:
 
@@ -35,10 +32,13 @@ AUTO-GATEs apply. See STANDARDS/INTERNATIONALIZATION-STANDARD.md §3.
 Declared: 2026-06-21 · Reviewer: <name>
 ```
 
+**Bilingual without a catalog dir is declared, not inferred (added 2026-08-07).** A repo whose UI strings are fully bilingual through typed string modules (e.g. `afterward`'s typed TS `en`/`es` modules) rather than a `locales/` catalog passes the declaration gate by committing `docs/I18N.md` with `i18n status: Applies` plus an `implementation:` line naming the mechanism and where the strings live. Catalog dirs, `N/A`, and `Applies — deferred to <target>` declarations remain valid unchanged.
+
 | Control | Gate | Mechanism |
 |---|---|---|
-| In-scope repo has no catalog infra | AUTO-GATE | CI fails if repo is on the in-scope list (§1 table, mirrored in `STANDARDS/applicability.yml`) and ships no `locales/` catalog dir |
-| N/A repo missing `docs/I18N.md` | AUTO-GATE | CI greps for `docs/I18N.md` with `i18n status: N/A` and a non-empty Reason; absence fails |
+| In-scope repo has no catalog infra [I18N-01] | AUTO-GATE | CI fails if the repo's `STANDARDS/applicability.yml` entry marks I18N `applies` and the repo ships neither a `locales/` catalog dir nor a committed `docs/I18N.md` declaring `i18n status: Applies` with an `implementation:` line naming the string mechanism (typed-string-module form accepted 2026-08-07) |
+| Repo missing from the manifest [I18N-03] | AUTO-GATE | `automation/conformance_check.py` fails the weekly run if any sibling repo is absent from `STANDARDS/applicability.yml` (or a manifest entry has no repo on disk) |
+| N/A repo missing `docs/I18N.md` [I18N-02] | AUTO-GATE | CI greps for `docs/I18N.md` with `i18n status: N/A` and a non-empty Reason; absence fails |
 
 ---
 
@@ -64,7 +64,7 @@ Declared: 2026-06-21 · Reviewer: <name>
 
 This is the migration seam every bespoke-dict repo crosses. It is intentionally trivial so "no i18n yet" is never justified by setup cost.
 
-**Python** (`civic-rag-starter-kit`, `fare-assistant`, `ledger`, `nearmiss`, `swelter`):
+**Python** (hosted services and human-facing CLIs):
 
 ```python
 # i18n.py — install once
@@ -80,7 +80,7 @@ _("Found {n} stops").format(n=n)         # extracted by pybabel
 ngettext("{n} stop", "{n} stops", n).format(n=n)
 ```
 
-**TS/React** (`trans-docs-navigator`, `davis-bike-hazard-map`, `gtfs-scorecard`, `govchat-eval` reports):
+**TS/React** (web frontends and generated reports):
 
 ```tsx
 import { useIntl } from "react-intl";              // FormatJS, MF2 migration path
@@ -99,18 +99,18 @@ Every in-scope repo wires these into `make verify` (Python) or the npm `verify` 
 
 | # | Metric | Target | Measured by | Gate |
 |---|---|---|---|---|
-| G1 | UTF-8 encoding | 0 non-UTF-8 files/strings | `git ls-files -z \| xargs -0 file --mime-encoding` asserts `utf-8`/`us-ascii`; DB columns asserted UTF-8 in migration test | merge-blocking |
-| G2 | No hardcoded UI strings | 0 natural-language strings outside an i18n call | Python: `pybabel extract` + ratchet on count; TS: `formatjs extract` + `i18n-ally`/`eslint-plugin-formatjs` `no-literal-string` | merge-blocking |
-| G3 | BCP 47 tag validity | 0 malformed tags | Validate every tag in code/config/headers/HTML via `Intl.Locale(tag)` (TS) / `babel.Locale.parse` (PY); registry-check authored locales | merge-blocking |
-| G4 | HTML root `lang` (WCAG 3.1.1 A) | 100% pages valid `lang` | axe-core rule `html-has-lang` + `html-lang-valid` in CI (graduate from advisory — see ACCESSIBILITY-STANDARD) | merge-blocking |
-| G5 | Translation completeness + placeholder parity | 0 missing keys, 0 broken/renamed placeholders, full CLDR plural categories | `i18n-check`/custom script: every source key in every target locale; plural categories `zero/one/two/few/many/other` present where the locale requires; placeholder set identical source↔target | merge-blocking |
-| G6 | **EN/ES key-parity** (every shipping bilingual repo) | `keys(en) == keys(es)` exactly | Catalog diff in CI; symmetric-difference must be empty | merge-blocking |
-| G7 | PO compilation | 0 `msgfmt` errors/warnings | `msgfmt --check --check-format --check-domain *.po` | merge-blocking (Python) |
-| G8 | XLIFF schema validity | 0 invalid files | Apache Okapi / OASIS 2.2 schema validation on any committed `.xlf` | merge-blocking (if XLIFF present) |
-| G9 | Pseudolocale overflow | 0 clipped/overlapping nodes under ~40% expansion | `formatjs` pseudo-locale (`en-XA` analogue) + Playwright DOM-overflow assertion on key views | merge-blocking (frontends) |
-| G10 | RTL: no physical-direction CSS | 0 `margin-left/right`, `padding-left/right`, `left/right` in layout components | stylelint `csstools/use-logical` (require `margin-inline-*`, `padding-inline-*`); `ar`/`he` `dir=rtl` Playwright mirror smoke | merge-blocking (frontends) |
-| G11 | `Vary: Accept-Language` | 100% localized endpoints set it | curl/Playwright header assertion in integration test; also assert `Content-Language` present on negotiated responses | merge-blocking (servers/Lambdas) |
-| G12 | CLDR/tzdata freshness | CLDR lag ≤ 1 major, tzdata ≥ 2026a | Assert pinned version in `pyproject.toml`/`package.json` ≥ 48.2 | merge-blocking |
+| G1 | UTF-8 encoding [I18N-03] | 0 non-UTF-8 files/strings | `git ls-files -z \| xargs -0 file --mime-encoding` asserts `utf-8`/`us-ascii`; DB columns asserted UTF-8 in migration test | merge-blocking |
+| G2 | No hardcoded UI strings [I18N-04] | 0 natural-language strings outside an i18n call | Python: `pybabel extract` + ratchet on count; TS: `formatjs extract` + `i18n-ally`/`eslint-plugin-formatjs` `no-literal-string` | merge-blocking |
+| G3 | BCP 47 tag validity [I18N-05] | 0 malformed tags | Validate every tag in code/config/headers/HTML via `Intl.Locale(tag)` (TS) / `babel.Locale.parse` (PY); registry-check authored locales | merge-blocking |
+| G4 | HTML root `lang` (WCAG 3.1.1 A) [I18N-06] | 100% pages valid `lang` | axe-core rule `html-has-lang` + `html-lang-valid` in CI (graduate from advisory — see ACCESSIBILITY-STANDARD) | merge-blocking |
+| G5 | Translation completeness + placeholder parity [I18N-07] | 0 missing keys, 0 broken/renamed placeholders, full CLDR plural categories | `i18n-check`/custom script: every source key in every target locale; plural categories `zero/one/two/few/many/other` present where the locale requires; placeholder set identical source↔target | merge-blocking |
+| G6 | **EN/ES key-parity** (every shipping bilingual repo) [I18N-08] | `keys(en) == keys(es)` exactly | Catalog diff in CI; symmetric-difference must be empty | merge-blocking |
+| G7 | PO compilation [I18N-09] | 0 `msgfmt` errors/warnings | `msgfmt --check --check-format --check-domain *.po` | merge-blocking (Python) |
+| G8 | XLIFF schema validity [I18N-10] | 0 invalid files | Apache Okapi / OASIS 2.2 schema validation on any committed `.xlf` | merge-blocking (if XLIFF present) |
+| G9 | Pseudolocale overflow [I18N-11] | 0 clipped/overlapping nodes under ~40% expansion | `formatjs` pseudo-locale (`en-XA` analogue) + Playwright DOM-overflow assertion on key views | merge-blocking (frontends) |
+| G10 | RTL: no physical-direction CSS [I18N-12] | 0 `margin-left/right`, `padding-left/right`, `left/right` in layout components | stylelint `csstools/use-logical` (require `margin-inline-*`, `padding-inline-*`); `ar`/`he` `dir=rtl` Playwright mirror smoke | merge-blocking (frontends) |
+| G11 | `Vary: Accept-Language` [I18N-13] | 100% localized endpoints set it | curl/Playwright header assertion in integration test; also assert `Content-Language` present on negotiated responses | merge-blocking (servers/Lambdas) |
+| G12 | CLDR/tzdata freshness [I18N-14] | CLDR lag ≤ 1 major, tzdata ≥ 2026a | Assert pinned version in `pyproject.toml`/`package.json` ≥ 48.2 | merge-blocking |
 
 ### Pseudolocale + extraction gate — copy-paste (TS frontends)
 
@@ -171,7 +171,7 @@ Each is paired with a checklist item in `docs/RESPONSIBLE-TECH-AUDITS.md` (or `d
 
 ## 6. Language negotiation (servers, Lambdas, RAG APIs)
 
-`fare-assistant`, `civic-rag-starter-kit`, `gtfs-scorecard`, `govchat-eval`, `personal-site` Lambda:
+For servers, Lambdas, and RAG APIs that negotiate language:
 
 - Parse `Accept-Language` (RFC 9110 §12.5.4) into BCP 47 ranges with `q` weights; apply **RFC 4647 lookup**.
 - Honor user preference; MUST NOT decide locale by IP geolocation alone.
@@ -185,16 +185,16 @@ Each is paired with a checklist item in `docs/RESPONSIBLE-TECH-AUDITS.md` (or `d
 
 This is the link to RESPONSIBLE-TECH-FRAMEWORK §B (bias & fairness) and AI-EVALUATION-STANDARD. **Translating the UI is necessary but not sufficient**; the *answer quality* must hold across languages, or LEP users get a degraded civic service.
 
-For every AI/RAG repo serving more than one language (`civic-rag-starter-kit`, `fare-assistant`, `govchat-eval`, `trans-docs-navigator` if it serves generated text):
+For every AI/RAG repository serving more than one language:
 
 | Metric | Target | Measured by | Gate |
 |---|---|---|---|
-| Per-language faithfulness/grounding | EN↔ES delta ≤ **5 pts** absolute, and ES meets the same absolute floor as EN (per AI-EVALUATION-STANDARD: Faithfulness ≥ 0.80) | RAGAS/DeepEval run **disaggregated by query language** on a held-out bilingual benchmark | AUTO-GATE on PRs touching prompts/retrieval/model version |
-| Per-language hallucination rate | ≤ 5% each language; no language > 2× the best | same held-out 100–500 query benchmark, split by language | AUTO-GATE |
-| Citation/grounding-guard coverage | 100% each language (no ungrounded code path — already enforced in the RAG repos) | existing citation guard, exercised with ES fixtures | AUTO-GATE |
-| Representational harm in non-EN output | none unmitigated | targeted probe suite per language | REVIEW-GATE (R7) |
+| Per-language faithfulness/grounding [I18N-22] | EN↔ES delta ≤ **5 pts** absolute, and ES meets the same absolute floor as EN (per AI-EVALUATION-STANDARD: Faithfulness ≥ 0.80) | RAGAS/DeepEval run **disaggregated by query language** on a held-out bilingual benchmark | AUTO-GATE on PRs touching prompts/retrieval/model version |
+| Per-language hallucination rate [I18N-23] | ≤ 5% each language; no language > 2× the best | same held-out 100–500 query benchmark, split by language | AUTO-GATE |
+| Citation/grounding-guard coverage [I18N-24] | 100% each language (no ungrounded code path) | citation guard exercised with non-English fixtures | AUTO-GATE |
+| Representational harm in non-EN output [I18N-21] | none unmitigated | targeted probe suite per language | REVIEW-GATE (R7) |
 
-Benchmarks MUST include native (not machine-translated) ES queries for the CA civic domain; an all-MT benchmark hides translation-induced quality loss and is itself a finding to record.
+Benchmarks MUST include native (not machine-translated) queries for each supported civic language; an all-MT benchmark hides translation-induced quality loss and is itself a finding to record. See `NATIVE-ES-BENCHMARK-PROCESS.md` for the sourcing, QA, licensing, and budget process used to commission such a benchmark.
 
 ---
 
@@ -212,7 +212,7 @@ Per W3C *Additional Requirements for Bidi in HTML and CSS*:
 
 ## 9. MF1 → MF2 migration
 
-Any repo with existing ICU MF1 resources (audit FormatJS/`react-intl` usage in `personal-site`, `trans-docs-navigator`) ships `MIGRATION_MF2.md` naming the target completion quarter. **REVIEW-GATE:** plan present; **AUTO-GATE:** no new MF1 message resources introduced after plan adoption (lint rule rejecting MF1-only syntax in new keys). gettext repos are exempt (PO is the chosen Python container; MF2 applies to the TS/JSON message layer).
+Any repository with ICU MF1 resources ships `MIGRATION_MF2.md` naming the target completion quarter. **REVIEW-GATE:** plan present; **AUTO-GATE:** no new MF1 message resources introduced after plan adoption (lint rule rejecting MF1-only syntax in new keys). gettext repositories are exempt (PO is the chosen Python container; MF2 applies to the TS/JSON message layer).
 
 ---
 
@@ -237,22 +237,19 @@ dependencies = ["babel>=2.16", "pyicu>=2.13"]   # CLDR via ICU >= 78.3 / CLDR >=
 
 ---
 
-## 11. Repo-specific actions (closing the gap)
+## 11. Rollout order
 
-| Repo | Action | First gate to land |
+| Starting condition | Action | First gate to land |
 |---|---|---|
-| `civic-rag-starter-kit` | Replace EN/ES dicts → gettext `.po`; add §7 disaggregated eval | G1, G2, G6, then §7 |
-| `fare-assistant` | regex/dict → `.po`; negotiate `Accept-Language`; ES faithfulness parity | G6, G11, §7 |
-| `ledger`, `nearmiss`, `swelter` | dict → `.po`; key-parity gate | G6, G7 |
-| `trans-docs-navigator` | confirm MF2/`LocaleBundle` parity + pseudolocale + RTL gates; fix the one tag-pinned `uses:` in `deploy-aws-preview.yml` (supply-chain, cross-ref) | G5, G9, G10 |
-| `personal-site` | reference i18next repo; audit MF1→MF2 (§9) | G9 (reference) |
-| `habitable` | JSON catalogs → wire G5/G6 parity gate | G6 |
-| `gtfs-scorecard` | add UI catalog; note real `pyproject.toml` lives under `pipeline/` — wire gates there | G1, G2, G4 |
-| `davis-bike-hazard-map` | pseudolocale + RTL gates on the map UI | G9, G10 |
-| `govchat-eval` | served HTML report `lang` + bidi; disaggregated eval | G4, §7 |
-| N/A candidates (`tods-validate`, `olive-bark-logger`, `self-osint-monitor`, `women-artist-discovery`) | commit `docs/I18N.md` N/A declaration | N/A-declaration gate |
-| `queer-the-stacks` / `queer-specfic-reader` | **reconcile the undocumented fork before declaring i18n status** — they share package `queer_the_stacks`; one declaration must not silently cover both | reconcile first |
-| `self-osint-monitor` | i18n decision is part of M0/M1 scaffold, not a retrofit; default N/A (single-user) with declaration | N/A-declaration gate |
+| Bespoke dictionaries or regex translation | Migrate to gettext or MF2 catalogs; add extraction and parity checks | G1, G2, G6 |
+| Server or Lambda choosing a response language | Implement RFC 4647 negotiation and response headers | G11, then R5 |
+| Multilingual AI/RAG output | Add native-language fixtures and disaggregated quality evaluation | §7 |
+| Existing ICU MF1 resources | Commit the MF2 migration plan and block new MF1-only syntax | G9 |
+| Web UI without directionality coverage | Add pseudolocale and RTL browser gates | G5, G10 |
+| Valid N/A candidate | Commit `docs/I18N.md` with the exact reason and re-entry point | N/A-declaration gate |
+
+Which repositories occupy these rows, and their current gaps, are maintained in
+the private applicability and remediation registries.
 
 ---
 
@@ -264,6 +261,7 @@ dependencies = ["babel>=2.16", "pyicu>=2.13"]   # CLDR via ICU >= 78.3 / CLDR >=
 - **Coverage floors, ruff/mypy pins, single `pyproject.toml`, `make verify == CI`**: CODE-QUALITY-STANDARD. The i18n target joins `make verify`.
 - **Data card / model card / disaggregated fairness narrative**: RESPONSIBLE-TECH-FRAMEWORK §B, §C, §D.
 - **Metric table shape** (Metric/Target/Measured-by/Gate/Owner) mirrored into each repo's `ROADMAP.md`: QUALITY-AND-METRICS-STANDARD.
+- **Commissioning process for the §7 benchmark itself** (sourcing, QA/labeling, licensing, refresh cadence, budget, pilot plan): `NATIVE-ES-BENCHMARK-PROCESS.md`.
 
 ---
 

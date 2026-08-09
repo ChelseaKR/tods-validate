@@ -1,7 +1,7 @@
 # Conformance gaps
 
 A dated ledger of what is open against `docs/standards/` (vendored
-2026-07-05, portfolio-standards v1.0.1), referenced from the README
+2026-08-09, portfolio-standards v2.0.0), referenced from the README
 Standards Conformance table. Each heading matches a row in that table.
 
 **Why this file instead of GitHub issues:** `DOCUMENTATION-STANDARD.md`
@@ -14,10 +14,40 @@ every open item below is a candidate `gh issue create` away from becoming a
 real tracked issue; once you open one, swap that row's link in the README
 table and here.
 
-Last regenerated: 2026-07-05 (conformance remediation pass, see
-`../audit-2026-07-05/tods-validate-REMEDIATION.md` in the sibling portfolio
-checkout for the full audit trail this is built from). Updated 2026-07-09:
-ADR-log closures recorded in the code-quality and documentation sections.
+Last regenerated: 2026-07-05. Updated 2026-08-09 for the four standards added
+in portfolio-standards v2.0.0; earlier ADR-log closures remain recorded in the
+code-quality and documentation sections.
+
+## ai-development-measurement
+
+**Still open:** the repository records delivery and quality metrics in
+`docs/roadmap.md`, but it has no dated AI-development diagnostic baseline or
+graduation decision. AI-product evaluation remains separately N/A because the
+validator itself has no model runtime.
+
+## data-governance
+
+**Current boundary:** validation is local and process-lifetime only;
+`docs/RESPONSIBLE-TECH-AUDITS.md` records that feeds are not retained.
+
+**Still open:** classify bundled, fixture, and user-supplied feed data under the
+v2.0.0 tiers and add a mechanically checked data-card/source inventory without
+claiming ownership of users' input feeds.
+
+## incident-response
+
+**Still open:** security reporting and release recovery exist, but the v2.0.0
+`incident`/`sevN` label convention, committed postmortem template, and
+secret-exposure response runbook have not been adopted as one checked contract.
+
+## performance
+
+**Current evidence:** `scripts/benchmark.py`, `scripts/generate_feed.py`, and
+`docs/BENCHMARKS.md` provide repeatable CLI throughput measurements.
+
+**Still open:** the benchmark is not a merge-blocking regression gate, and the
+shipped HTML surfaces have no committed Lighthouse/bundle baseline. This is the
+same open performance-budget boundary recorded under Quality & Metrics.
 
 ## code-quality
 

@@ -4,7 +4,7 @@ This is the canonical definition of the quality attributes every project targets
 
 Projects override the *values* (a hobby logger needs less than a public benefits tool) but not the *structure*.
 
-> **On "100% enforcement."** A metric is enforced when failing it **blocks the merge** — not when a dashboard shows it red after the fact. The honest ceiling: everything mechanically checkable is a hard CI gate; everything requiring judgment (genuine bias, accessibility-of-experience, ethical edge cases) is a *required human sign-off gate* with a checklist and a committed artifact. We enforce 100% of the checkable set automatically and 100% of the judgment set via blocking review. We never pretend a judgment call is fully automatable, and there is **no third "aspirational" category**.
+> **On "100% enforcement."** A metric is enforced when failing it **blocks the merge** — not when a dashboard shows it red after the fact. Everything mechanically checkable is a hard CI gate; everything requiring judgment (genuine bias, accessibility-of-experience, ethical edge cases) remains a *required human sign-off gate* with a checklist and a dated durable artifact (committed by default; an authenticated current-head PR/release record only where the owning standard authorizes it). An owning domain standard may authorize a narrowly scoped, truth-labeled **provisional release** from synthetic evidence plus maintainer residual-risk acceptance while an experiential REVIEW-GATE remains open. That disposition does not satisfy or reclassify the gate, establish conformance, or create a third gate type. Accessibility's bounded pathway is defined in `ACCESSIBILITY-STANDARD.md` §2.0.
 
 ## Sibling standards (reference, don't repeat)
 
@@ -15,24 +15,27 @@ This document is the index. Each row below is enforced **in** the named standard
 | Code quality / toolchain | `CODE-QUALITY-STANDARD.md` | ruff ≥0.15.x, mypy `--strict`, branch coverage ≥85% (libs ≥90%), single `pyproject.toml`, `uv sync --frozen`, `make verify` byte-equal to CI |
 | CI/CD hardening | `CI-CD-STANDARD.md` | top-level `permissions: contents: read`, OIDC-only cloud creds, `zizmor` on workflow PRs, concurrency groups, committed CODEOWNERS + branch ruleset |
 | Security & supply chain | `SECURITY-AND-SUPPLY-CHAIN-STANDARD.md` | ASVS 5.0 L2; SHA-pinned actions; Semgrep/CodeQL/gitleaks/pip-audit/Trivy blocking on HIGH+CRITICAL; SBOM + cosign + SLSA L2 |
-| Release & versioning | `RELEASE-AND-VERSIONING-STANDARD.md` | SemVer 2.0.0; signed tags; CHANGELOG entry per release; tag-triggered `make verify` re-run; Trusted Publishing (OIDC, no stored tokens); version-consistency gate |
+| Release & versioning | `RELEASE-AND-VERSIONING-STANDARD.md` | SemVer 2.0.0; signed tags; CHANGELOG entry per release; trusted-main dispatch re-runs verification at the selected tag; Trusted Publishing (OIDC, no stored tokens); version-consistency gate |
 | Observability | `OBSERVABILITY-STANDARD.md` | structured JSON logs, OTel spans, `/livez` + `/readyz`, SLOs + burn-rate alerts (tiered by deployment shape) |
-| Accessibility | `ACCESSIBILITY-STANDARD.md` | WCAG 2.2 AA floor; axe zero critical/serious/moderate; pa11y **blocking**; screen-reader walkthrough + ACR per release |
+| Performance | `PERFORMANCE-STANDARD.md` | k6 p95 budgets + Lighthouse-CI score/bundle budgets asserted against committed `perf/baseline.json`; >10% regression fails without product-owner sign-off; copyable `perf/` reference dir |
+| Accessibility | `ACCESSIBILITY-STANDARD.md` | WCAG 2.2 AA floor; axe zero critical/serious/moderate; pa11y **blocking**; screen-reader walkthrough + ACR per release; provisional solo-maintainer disposition in §2.0 |
 | Internationalization | `INTERNATIONALIZATION-STANDARD.md` | portable catalogs (gettext `.po` / MF2-ICU); EN/ES key-parity + placeholder-parity + pseudolocale gates |
 | AI evaluation | `AI-EVALUATION-STANDARD.md` | RAGAS faithfulness ≥0.80; hallucination ≤5%; Garak/Promptfoo OWASP-LLM red-team; judge-calibration agreement ≥0.80 / κ ≥0.60 |
+| Incident response | `INCIDENT-RESPONSE-STANDARD.md` | severity ladder (SEV1–4); `incident`/`sevN` labels feeding the DORA rows below; committed postmortem within 7 days (SEV1/2); secret-leak runbook |
+| Data governance | `DATA-GOVERNANCE-STANDARD.md` | data classification (L0–L3); data cards + lineage per ingest source; retention schedules; backup/DR for local-first repos; license/provenance for civic data |
 
 **Rule:** a repo records project-specific *values and findings* (its measured coverage, its ACR rows, its red-team results) in its own `ROADMAP.md` / audit artifacts. It does **not** restate the rigor — it cites the standard.
 
 ---
 
-## The enforcement model (binary, no exceptions)
+## The enforcement model (two gate types; provisional release is not a gate type)
 
 Every control in every standard is exactly one of:
 
 - **AUTO-GATE** — mechanically checkable, **merge-blocking in CI**, required status check under branch protection. Example: `pytest --cov-fail-under=85`.
-- **REVIEW-GATE** — requires human judgment, paired with **(a)** a checklist item in the PR template and **(b)** a committed artifact (signed walkthrough, ACR, threat model, risk register). The transition is blocked until the box is checked and the artifact is in the diff or linked.
+- **REVIEW-GATE** — requires human judgment, paired with **(a)** a checklist item in the PR template and **(b)** a dated durable artifact (normally committed; authenticated current-head PR/release metadata only where explicitly authorized). The transition is blocked until the box is checked and the artifact is in the diff or linked, unless the owning domain standard explicitly authorizes a truth-labeled provisional release while leaving that box open.
 
-A control that is "run but `|| true`," "advisory," or "on the roadmap" is a **defect**. The portfolio has live instances of this defect (`pip-audit || true` in `ledger`/`nearmiss`; `continue-on-error` pa11y in the eval harnesses; `tracesSampleRate: 0` in `davis`); the owning standards close each one.
+A control that is "run but `|| true`," "advisory," or "on the roadmap" is a **defect**. The owning standard must make the check blocking or classify it honestly as a non-gate; project-specific findings stay in the private remediation registry.
 
 ---
 
@@ -48,22 +51,22 @@ A control that is "run but `|| true`," "advisory," or "on the roadmap" is a **de
 
 ### 2. Performance Efficiency *(time behaviour, resource utilization, capacity)*
 - **Targets (web/API default):** p95 server response <500 ms (non-LLM routes); p95 first-token <1.5 s and full-response <6 s (LLM routes); Lighthouse Performance ≥90; critical-path JS <200 KB gzip. Regression budget: no numeric regression >10% vs committed baseline without product-owner sign-off.
-- **Gate (AUTO):** k6/Locust asserts p95 budgets; Lighthouse CI asserts score + bundle budgets; baseline artifact committed per PR touching latency-sensitive paths.
+- **Gate (AUTO):** **see `PERFORMANCE-STANDARD.md`** (reference implementation in `perf/`: copyable k6 script, `lighthouserc` budget, baseline schema). k6 asserts p95 budgets; Lighthouse CI asserts score + bundle budgets; `perf/baseline.json` committed, updated per PR touching latency-sensitive paths; >10% regression vs baseline fails without product-owner sign-off.
 
 ### 3. Compatibility *(co-existence, interoperability)*
 - **Targets:** two latest versions of Chrome/Firefox/Safari/Edge; documented minimum Node/Python runtimes; no undeclared global state; declared, versioned API contracts.
 - **Gate (AUTO):** Playwright cross-browser smoke; runtime/dependency matrix in CI.
 
 ### 4. Interaction Capability *(recognizability, learnability, operability, user-error protection, engagement, inclusivity, self-descriptiveness, user assistance)* — *formerly Usability*
-- **Targets:** **WCAG 2.2 AA** floor (AAA where already achieved, e.g. `personal-site`); keyboard-only completion of every primary task; visible focus; `prefers-reduced-motion` respected; readable at 200% zoom / 320 px; 2.5.8 target-size ≥24×24 CSS px; real EN/ES where civic.
-- **Gate:** **see `ACCESSIBILITY-STANDARD.md` and `INTERNATIONALIZATION-STANDARD.md`.** AUTO: axe zero critical/serious/moderate; pa11y-ci **blocking**; Lighthouse a11y ≥0.9 (≥95 where self-declared, e.g. `gtfs-scorecard` MUST wire it). REVIEW: screen-reader walkthrough + ACR per release.
+- **Targets:** **WCAG 2.2 AA** floor (retain any higher conformance a repository has declared); keyboard-only completion of every primary task; visible focus; `prefers-reduced-motion` respected; readable at 200% zoom / 320 px; 2.5.8 target-size ≥24×24 CSS px; real multilingual content where civic.
+- **Gate:** **see `ACCESSIBILITY-STANDARD.md` and `INTERNATIONALIZATION-STANDARD.md`.** AUTO: axe zero critical/serious/moderate; pa11y-ci **blocking**; Lighthouse a11y ≥0.9, or a higher self-declared floor. REVIEW: screen-reader walkthrough + ACR per release. Any provisional accessibility disposition follows `ACCESSIBILITY-STANDARD.md` §2.0 and leaves the REVIEW-GATE open.
 
 ### 5. Reliability *(faultlessness, availability, fault tolerance, recoverability)*
 - **Targets:** declared SLO (default 99.5% monthly for hosted services); graceful degradation on dependency failure; no data loss on crash; idempotent writes; MTTR clock starts at alert-fire, not customer report.
 - **Gate:** AUTO: chaos/fault-injection test for top dependency failure; restart-recovery test; `/livez` + `/readyz` (**see `OBSERVABILITY-STANDARD.md`**). REVIEW: error-budget burn reviewed at release.
 
 ### 6. Security *(confidentiality, integrity, non-repudiation, accountability, authenticity, **resistance**)* — *`resistance` new in 2023*
-- **Targets:** ASVS 5.0 **L2** for anything touching sensitive PII (`fare-assistant` transit PII, civic RAG), L1 floor elsewhere; no HIGH/CRITICAL SAST/SCA findings; secrets never in source; least-privilege tokens; signed commits + signed releases.
+- **Targets:** ASVS 5.0 **L2** for anything touching sensitive PII, including transit/location data and civic RAG; L1 floor elsewhere; no HIGH/CRITICAL SAST/SCA findings; secrets never in source; least-privilege tokens; signed commits + signed releases.
 - **Gate:** **see `SECURITY-AND-SUPPLY-CHAIN-STANDARD.md` + `CI-CD-STANDARD.md`.** AUTO: Semgrep/CodeQL, gitleaks (pre-commit **and** CI, **no `|| true`**), pip-audit/OSV/Trivy blocking on **CRITICAL,HIGH**, SHA-pinned `uses:`, SBOM+cosign+SLSA L2. REVIEW: threat model per new attack surface; Scorecard ≥8/10 with critical checks 10/10.
 
 ### 7. Maintainability *(modularity, reusability, analysability, modifiability, testability)*
@@ -75,18 +78,18 @@ A control that is "run but `|| true`," "advisory," or "on the roadmap" is a **de
 - **Gate (AUTO):** CI builds container + runs from-scratch bring-up; IaC `plan` validates.
 
 ### 9. Safety — **NEW in 2023** *(operational constraint, risk identification, fail-safe, hazard warning, safe integration)*
-- **Definition:** "acceptable levels of risk to human life, health, property, or environment." For our **non-safety-critical-but-high-stakes** repos (civic benefits, transit, OSINT, identity), Safety applies via **fail-safe** and **safe-integration** sub-characteristics. This is where the portfolio's signature responsible-tech guards live.
+- **Definition:** "acceptable levels of risk to human life, health, property, or environment." For **non-safety-critical but high-stakes** surfaces such as civic benefits, transit, identity, or public-data tools, Safety applies via **fail-safe** and **safe-integration** sub-characteristics.
 - **Targets / measured-by per repo (illustrative, values live in-repo):**
-  - `ledger`: no-outing guarantee — injected sentinel identities never surface (isolated CI job). **AUTO.**
-  - `women-artist-discovery`: "no identity inference ever" via AST-level static test. **AUTO.**
-  - civic RAG / `fare-assistant`: no ungrounded code path; citation/grounding guards. **AUTO** (see `AI-EVALUATION-STANDARD.md`).
-  - `nearmiss`: reproducibility tamper-tripwire. **AUTO.**
-  - `self-osint-monitor`: consent gate sequenced before any feature. **AUTO** gate + **REVIEW** consent artifact.
+  - no-outing guarantee — injected sentinel identities never surface (isolated CI job). **AUTO.**
+  - "no identity inference ever" via AST-level static test. **AUTO.**
+  - civic RAG or public-service AI: no ungrounded code path; citation/grounding guards. **AUTO** (see `AI-EVALUATION-STANDARD.md`).
+  - evidence-integrity pipeline: reproducibility tamper-tripwire. **AUTO.**
+  - privacy-sensitive local tools: consent gate sequenced before any feature. **AUTO** gate + **REVIEW** consent artifact.
 - **Gate:** AUTO where the guard is code-enforced (the above); REVIEW: residual-risk register + fail-safe walkthrough per release. For genuinely safety-critical features, the acceptance criteria must address all five Safety sub-characteristics explicitly.
 
 ### 10. Data quality & lineage *(portfolio addendum — civic/transit ingest)*
-- **Targets:** every record traceable to source + fetch timestamp; schema-validated on ingest; staleness alarms; per-source freshness SLA. Applies to `gtfs-scorecard`, `tods-validate`, `davis-bike-hazard-map`, `jobradar`, civic RAG.
-- **Gate (AUTO):** ingest-validation tests; a committed **data card** per source (license, refresh cadence). Untrusted external zips/subprocess paths (`gtfs-scorecard` fetches external GTFS + runs a Java subprocess) carry a Safety + Security note.
+- **Owned by `DATA-GOVERNANCE-STANDARD.md`.** Data-card presence, source + fetch-timestamp traceability, schema validation on ingest, staleness alarms, and per-source freshness SLAs are specified in full there (§1–2); this taxonomy slot exists only so "data quality" has a home in the ISO 25010 characteristic list.
+- **Targets/Gate:** see `DATA-GOVERNANCE-STANDARD.md` §1 (data cards) and §2 (retention). Applies to civic/transit data products, monitoring pipelines, and civic RAG. Untrusted external archives or subprocess paths additionally carry a Safety + Security note owned by `SECURITY-AND-SUPPLY-CHAIN-STANDARD.md`.
 
 ---
 
@@ -104,7 +107,12 @@ ISO 25010 says *what* quality is; DORA says *how fast and safely* it ships. This
 | Failed-Deployment Recovery Time | < 1 day; alert if any incident > 4 h | < 1 hour | incident open→resolve | health signal |
 | Deployment Rework Rate *(new 2024)* | < 10%; alert if > 5% (30-d) | low | unplanned-fix deploy ratio | health signal |
 
-**Reference implementation:** `dora-team/fourkeys` (Google OSS) ingesting GH Actions deploy events; incidents from GitHub issues labelled `incident`. Hosted repos with Lambdas (`personal-site`, `jobradar`, `fare-assistant`) feed real deploy events; library/CLI repos report DF/LT only.
+**Implementation contract:** a `gh api`-based collector reads deploy, release,
+and publish workflow runs plus `incident`-labelled issues, then writes a
+committed quarterly `DORA-<year>-Q<n>.md` report and JSON snapshot. Hosted
+repositories and Lambdas feed deploy events; library/CLI repositories report
+DF/LT only. Failed-Deployment Recovery Time reads N/A until the repository has
+adopted the incident-label convention; the collector never fabricates a zero.
 
 **2024/2025 findings we act on (not survey trivia):**
 - AI adoption is **positively** associated with throughput but **negatively** with stability — so automated safety nets (coverage gate, SAST, merge queue, red-team) are **prerequisite infrastructure**, not optional hygiene. This directly justifies the AUTO-GATE-everything stance.
@@ -136,7 +144,8 @@ Every repo ships a checked-in `DEFINITION_OF_DONE.md` at root, CODEOWNER-protect
                               ≤5%, red-team, judge κ ≥0.60
 9. observability            → structured-JSON log shape (jq test), [OBSERVABILITY]
                               secret-in-logs SAST rule
-10. performance             → k6/Lighthouse budgets, ≤10% regress  [this doc §2]
+10. performance             → k6/Lighthouse budgets, ≤10% regress  [PERFORMANCE]
+                              vs committed perf/baseline.json
 11. build + container + IaC plan
 ```
 
@@ -145,12 +154,12 @@ Every repo ships a checked-in `DEFINITION_OF_DONE.md` at root, CODEOWNER-protect
 **REVIEW-GATE (human sign-off committed as PR attestation + artifact):**
 - PR template checklist: acceptance criteria linked to issue; observability added (OTel spans on new paths); docs updated; rollback plan for schema/infra changes; ISO 25010 characteristic(s) named.
 - New external attack surface → threat-model sign-off (`SECURITY`).
-- New custom interactive component → ARIA APG audit; screen-reader walkthrough (`ACCESSIBILITY`).
+- New custom interactive component → ARIA APG audit; screen-reader walkthrough (`ACCESSIBILITY`; §2.0 governs any provisional disposition).
 - New AI feature → NIST AI RMF risk register + EU AI Act / ISO 42001 impact assessment (`AI-EVALUATION`).
 
-**RELEASE-GATE:** performance baseline regression passed; runbook updated; ACR + SBOM + provenance regenerated ("audit-as-artifact"); rollback documented.
+**RELEASE-GATE:** performance baseline regression passed; runbook updated; ACR (or the accessibility §2.0 provisional status record) + SBOM + provenance regenerated ("audit-as-artifact"); rollback documented. A domain-authorized provisional release must carry the synthetic-evidence record and maintainer residual-risk acceptance while keeping the human gate visibly open; it is not a conformance result.
 
-**Branch protection (per `CI-CD-STANDARD.md`, org rulesets preferred):** PR required (≥1 approval, ≥2 for Safety/Security-critical paths), last-pusher cannot self-approve, stale reviews dismissed, CODEOWNERS routing `.github/workflows/` + Safety-critical files to a required reviewer, required status checks in **strict** mode, **signed commits**, **linear history**, **block force-pushes**, **no admin bypass on `main`**. Merge queue on high-velocity branches.
+**Branch protection (per `CI-CD-STANDARD.md`, org rulesets preferred):** PR required (≥1 independent approval, ≥2 for Safety/Security-critical paths), stale reviews dismissed, CODEOWNERS routing `.github/workflows/` + Safety-critical files to a required reviewer, required status checks in **strict** mode, **signed commits**, **linear history**, and **blocked force-pushes/direct admin pushes**. A designated maintainer may bypass only through a PR under the documented CICD-15 emergency procedure. An eligible exactly-one-maintainer project uses CQ §7.1/CICD §5.1: platform approval count 0 plus an authenticated current-head owner decision and all checks green; it never labels self/synthetic review as independent approval. Accessibility §2.0 preserves linear history by merging the product change first, testing that protected-main commit, and merging the record through a separate evidence-only PR. Merge queue on high-velocity branches.
 
 ---
 
@@ -160,16 +169,16 @@ Each repo's `ROADMAP.md` carries a **Metrics** table with this exact shape so en
 
 | Metric | Target | Measured by | Gate | Owner |
 |--------|--------|-------------|------|-------|
-| Branch coverage | ≥ 85% (libs ≥ 90%) | `pytest --cov` in CI | AUTO | — |
-| axe violations | 0 crit/serious/mod | `axe-core` / `pa11y-ci` | AUTO | — |
-| p95 first-token | < 1.5 s | k6 load test | AUTO | — |
-| SHA-pinned `uses:` | 100% | `zizmor` / Scorecard Pinned-Deps ≥9 | AUTO | — |
-| RAG faithfulness | ≥ 0.80 | RAGAS in CI | AUTO | — |
-| EN/ES key parity | 100% | extract + parity check | AUTO | — |
-| Screen-reader walkthrough | per release | committed checklist + ACR | REVIEW | — |
-| Threat model | per new surface | committed `THREATS.md`/ADR | REVIEW | — |
+| Branch coverage [CQ-08] | ≥ 85% (libs ≥ 90%) | `pytest --cov` in CI | AUTO | — |
+| axe violations [A11Y-01] | 0 crit/serious/mod | `axe-core` / `pa11y-ci` | AUTO | — |
+| p95 first-token [QM-02] | < 1.5 s | k6 load test | AUTO | — |
+| SHA-pinned `uses:` [SEC-25] | 100% | `zizmor` / Scorecard Pinned-Deps ≥9 | AUTO | — |
+| RAG faithfulness [AIEV-02] | ≥ 0.80 | RAGAS in CI | AUTO | — |
+| EN/ES key parity [I18N-08] | 100% | extract + parity check | AUTO | — |
+| Screen-reader walkthrough [A11Y-11, A11Y-14] | per release | committed checklist + ACR | REVIEW | — |
+| Threat model [QM-14] | per new surface | committed `THREATS.md`/ADR | REVIEW | — |
 
-A metric is **AUTO-GATE** or **REVIEW-GATE** — never "aspirational." If it cannot be made merge-blocking, it is review-gated with a checklist item and a committed artifact.
+A metric is **AUTO-GATE** or **REVIEW-GATE** — never "aspirational." If it cannot be made merge-blocking, it is review-gated with a checklist item and a dated durable artifact under the owning standard.
 
 ---
 
@@ -177,12 +186,28 @@ A metric is **AUTO-GATE** or **REVIEW-GATE** — never "aspirational." If it can
 
 A standard that does not apply to a repo must be recorded as **N/A-with-reason** in that repo's `ROADMAP.md` — a silent skip is a defect. Common cases:
 
-- **i18n N/A** for single-user / English-only libraries — but the repo must still record the one-line entry point (wrap strings in `_()`). EN/ES key-parity is AUTO-GATE for **every** shipping bilingual repo (civic RAG, `fare-assistant`, `ledger`, `nearmiss`, `swelter`, `trans-docs-navigator`, `personal-site`, `habitable`).
+- **i18n N/A** for single-user / English-only libraries — but the repo must still record the one-line entry point (wrap strings in `_()`). Locale key-parity is AUTO-GATE for **every** shipping multilingual repository.
 - **Observability (OTel/SLO) out-of-scope** for libraries/CLIs — but `--log-format json` opt-in must exist and the out-of-scope decision must be documented.
-- **Accessibility (browser-engine) N/A** for headless libraries — but tools whose own HTML output is user-facing (eval harnesses: `civic-ai-eval-harness`, `govchat-eval`) **must** gate on their report's a11y.
+- **Accessibility (browser-engine) N/A** for headless libraries — but tools whose own HTML output is user-facing **must** gate on their report's accessibility.
 - **AI-eval N/A** for non-AI repos.
 
-**`self-osint-monitor`** is spec-only (no CI, Makefile, pyproject, or tests). It is the one repo where these standards are authored as the **M0/M1 scaffold**, not retrofitted: `CODE-QUALITY` toolchain + `make verify` + consent-gate (Safety) before any M1 code. **`queer-the-stacks` / `queer-specfic-reader`** share a package and must be reconciled (documented fork or merge) before standards work is counted, to avoid double-counting and independent drift.
+A pre-code repository authors these standards as its initial scaffold rather
+than retrofitting them: the code-quality toolchain, `make verify`, and any
+applicable consent gate land before feature code. Duplicate or forked packages
+must be reconciled or documented before conformance is counted.
+
+## DORA implementation — no longer aspirational
+
+The DORA section mandated automated measurement but named only the `fourkeys`
+reference. The portfolio implementation is **`automation/delivery_metrics.py`**
+(git + `gh` mining, no LLM), emitting `metrics/PORTFOLIO-METRICS.md` on the weekly
+launchd cadence: the DORA five plus the AI-quality-debt counterweights (churn,
+short-term-churn-14d, unreviewed-merge rate, revert rate). It **segments AI-authored
+vs human-authored** work via the `Co-Authored-By: Claude …` commit trailer, which
+closes the DORA-2025 AI-capabilities checklist item "AI-generated code segmented in
+DORA metrics." The full Track A methodology — the BASELINE/graduation gate state,
+the never-gate list, telemetry privacy, and the quarterly DORA AI-Capabilities
+self-assessment — lives in **`AI-DEVELOPMENT-MEASUREMENT-STANDARD.md`**.
 
 ---
 

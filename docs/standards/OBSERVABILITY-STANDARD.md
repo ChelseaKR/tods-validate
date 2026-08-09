@@ -12,18 +12,21 @@ The standard is **tiered by deployment shape**, because instrumenting a local-on
 
 Declare the tier in `docs/ROADMAP.md` under a `## Observability` heading. A repo that skips a tier control must record **N/A-with-reason** in that section; silent omission is a defect caught by the tier-declaration gate (§7).
 
-| Tier | Repos (this portfolio) | What is in scope |
+| Tier | Example shapes | What is in scope |
 |------|------------------------|------------------|
-| **A — Hosted service / Lambda** | fare-assistant, jobradar, civic-rag-starter-kit, govchat-eval (hosted eval API), personal-site Lambdas, davis-bike-hazard-map (API tier), gtfs-scorecard (pipeline service) | Full stack: OTel traces+metrics, structured JSON logs with trace correlation, RED/USE, `/livez`+`/readyz`, SLOs, burn-rate alerts, dashboards-as-code, PII-safe-logging gate |
-| **B — Frontend / PWA** | personal-site (SPA), davis-bike-hazard-map (map UI), trans-docs-navigator | Core Web Vitals RUM (LCP/INP/CLS), browser OTel spans on API calls, `traceparent` propagation to the backend, Lighthouse-CI CWV gate |
-| **C — Library / CLI** | ledger, nearmiss, swelter, tods-validate, women-artist-discovery, civic-ai-eval-harness (lib), olive-bark-logger, queer-the-stacks/queer-specfic-reader, self-osint-monitor | Opt-in `--log-format json` (structlog); OTel **optional and documented out-of-scope**; no SLO/health requirement |
+| **A — Hosted service / Lambda** | HTTP APIs, background pipeline services, and serverless handlers | Full stack: OTel traces+metrics, structured JSON logs with trace correlation, RED/USE, `/livez`+`/readyz`, SLOs, burn-rate alerts, dashboards-as-code, PII-safe-logging gate |
+| **B — Frontend / PWA** | SPAs, public maps, and multilingual web applications | Core Web Vitals RUM (LCP/INP/CLS), browser OTel spans on API calls, `traceparent` propagation to the backend, Lighthouse-CI CWV gate |
+| **C — Library / CLI** | local libraries, operator CLIs, and offline privacy-sensitive tools | Opt-in `--log-format json` (structlog); OTel **optional and documented out-of-scope**; no SLO/health requirement |
 
-A repo with both a service and a CLI (e.g. govchat-eval) applies Tier A to the service surface and Tier C to the CLI surface. State both.
+A repository with both a service and a CLI applies Tier A to the service surface and Tier C to the CLI surface. State both.
 
-**Repo-specific carries (record values, not gates):**
-- `davis-bike-hazard-map` has Prometheus + Sentry with `tracesSampleRate: 0` — raise to a sampled value and wire OTLP; it is the closest Tier-A/B repo to conformance.
-- `personal-site` already ships a Core Web Vitals RUM beacon — **it is the Tier-B reference implementation**; other frontends copy its `web-vitals` → beacon path.
-- `civic-rag-starter-kit`, `trans-docs-navigator`, `fare-assistant`, `personal-site` Lambdas currently emit bespoke JSON-lines / `console.error` — these are the migration targets for §3.
+**Migration triggers (record project values privately):**
+
+- A service using vendor-specific tracing adds OTLP export and a non-zero,
+  documented sampling policy.
+- A frontend adds the `web-vitals` to RUM beacon path described in §8.
+- A service emitting bespoke JSON-lines or `console.error` migrates to the §3
+  structured-log contract.
 
 ---
 
@@ -36,7 +39,7 @@ Run Python services under `opentelemetry-instrument python app.py`. Export via O
 **Required env (in the container manifest, not code):**
 
 ```dotenv
-OTEL_SERVICE_NAME=fare-assistant          # non-empty, == service.name resource attr
+OTEL_SERVICE_NAME=example-service             # non-empty, == service.name resource attr
 OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
 OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf
 OTEL_PROPAGATORS=tracecontext,baggage     # W3C Trace Context Level 1
@@ -55,11 +58,11 @@ W3C `traceparent` (`00-<32hex>-<16hex>-<2hex>`) and `tracestate` propagate on ev
 
 | Metric | Target | Measured by | Gate |
 |--------|--------|-------------|------|
-| `OTEL_SERVICE_NAME` set & non-empty | required | CI asserts env present in container manifest pre-deploy | AUTO-GATE |
-| HTTP route span coverage | every registered route produces ≥1 span with `http.request.method` + `http.response.status_code` | integration test enumerates routes, asserts spans | AUTO-GATE |
-| `traceparent` on cross-service calls | present, valid, non-zero | integration test asserts header on all service-to-service requests | AUTO-GATE |
-| Span attribute names | semconv v1.42.0, no deprecated (`net.peer.ip`→`network.peer.address`) or invented names | semconv linter (OPA/custom) on every PR | AUTO-GATE |
-| Span coverage report | 100% of HTTP routes instrumented | `observability/span-coverage.md`, owner sign-off per release | REVIEW-GATE |
+| `OTEL_SERVICE_NAME` set & non-empty [OBS-01] | required | CI asserts env present in container manifest pre-deploy | AUTO-GATE |
+| HTTP route span coverage [OBS-02] | every registered route produces ≥1 span with `http.request.method` + `http.response.status_code` | integration test enumerates routes, asserts spans | AUTO-GATE |
+| `traceparent` on cross-service calls [OBS-03] | present, valid, non-zero | integration test asserts header on all service-to-service requests | AUTO-GATE |
+| Span attribute names [OBS-04] | semconv v1.42.0, no deprecated (`net.peer.ip`→`network.peer.address`) or invented names | semconv linter (OPA/custom) on every PR | AUTO-GATE |
+| Span coverage report [OBS-05] | 100% of HTTP routes instrumented | `observability/span-coverage.md`, owner sign-off per release | REVIEW-GATE |
 
 ---
 
@@ -82,9 +85,9 @@ W3C `traceparent` (`00-<32hex>-<16hex>-<2hex>`) and `tracestate` propagate on ev
 
 | Metric | Target | Measured by | Gate |
 |--------|--------|-------------|------|
-| Metric naming | base units only; `_total` on every monotonic counter; no `_ms`/`_mb`/`_gb` suffix | `promtool lint` + custom linter in CI | AUTO-GATE |
-| Label cardinality | no `user_id`/`email`/`request_id`/unbounded labels | custom linter scans metric definitions | AUTO-GATE |
-| RED present per endpoint | requests_total + duration_seconds + errors_total exist for every public route | metrics-registry test | AUTO-GATE |
+| Metric naming [OBS-06] | base units only; `_total` on every monotonic counter; no `_ms`/`_mb`/`_gb` suffix | `promtool lint` + custom linter in CI | AUTO-GATE |
+| Label cardinality [OBS-07] | no `user_id`/`email`/`request_id`/unbounded labels | custom linter scans metric definitions | AUTO-GATE |
+| RED present per endpoint [OBS-08] | requests_total + duration_seconds + errors_total exist for every public route | metrics-registry test | AUTO-GATE |
 
 ---
 
@@ -121,17 +124,17 @@ structlog.configure(
 
 **Every Tier-A log record MUST contain:** `timestamp` (ISO 8601 UTC), `severity` (SeverityText), `service.name`, `trace_id`, `span_id`, `message`, and a structured attributes map. Never use `%s` format strings for structured fields — always pass `extra={}` / structlog kwargs.
 
-**PII / secrets — the explicit hard gate (OWASP Top 10:2025 A09).** NEVER log: passwords, session/access tokens, API keys, encryption keys, DB connection strings, PII/PHI, payment-card data, government IDs, or — for the civic/transit repos — rider identities and trip endpoints (fare-assistant), or any field that could deanonymize (ledger's no-outing guarantee, women-artist-discovery's no-identity-inference invariant extend *into the log stream*). De-identify (delete/pseudonymize) before logging; encode log data to prevent log injection.
+**PII / secrets — the explicit hard gate (OWASP Top 10:2025 A09).** NEVER log: passwords, session/access tokens, API keys, encryption keys, DB connection strings, PII/PHI, payment-card data, government IDs, rider identities, trip endpoints, or any field that could deanonymize a person. De-identify (delete/pseudonymize) before logging; encode log data to prevent log injection. This standard owns the redaction *mechanism* below; `DATA-GOVERNANCE-STANDARD.md` §4 owns the **classification** — the canonical sensitive-field inventory this gate is checked against, extended as a repository adds new L3 fields.
 
 | Metric | Target | Measured by | Gate |
 |--------|--------|-------------|------|
-| Log records are valid JSON | 100% of stdout lines parse | integration test pipes captured stdout through `jq .`; non-zero exit blocks merge | AUTO-GATE |
-| Required field presence | `timestamp`,`severity`,`service.name`,`trace_id`,`span_id`,`message` on every record | `jq` field-presence assertion in the same test | AUTO-GATE |
-| **No secrets/PII in logs** | zero log calls pass a variable named `password`,`token`,`secret`,`api_key`,`ssn`,`dob`,`email`,`credit_card` (extend with repo-specific identity fields) | `bandit` + custom `semgrep` rules on every PR | **AUTO-GATE** |
-| Trace correlation | `trace_id` in response logs == incoming `traceparent` trace-id | integration test | AUTO-GATE |
-| Data-classification audit | no logged field exceeds the service's permitted PII level | `compliance/logging-audit-YYYY-QN.md`, quarterly | REVIEW-GATE |
+| Log records are valid JSON [OBS-09] | 100% of stdout lines parse | integration test pipes captured stdout through `jq .`; non-zero exit blocks merge | AUTO-GATE |
+| Required field presence [OBS-10] | `timestamp`,`severity`,`service.name`,`trace_id`,`span_id`,`message` on every record | `jq` field-presence assertion in the same test | AUTO-GATE |
+| **No secrets/PII in logs** [OBS-11] | zero log calls pass a variable named `password`,`token`,`secret`,`api_key`,`ssn`,`dob`,`email`,`credit_card` (extend with repo-specific identity fields) | `bandit` + custom `semgrep` rules on every PR | **AUTO-GATE** |
+| Trace correlation [OBS-12] | `trace_id` in response logs == incoming `traceparent` trace-id | integration test | AUTO-GATE |
+| Data-classification audit [OBS-13] | no logged field exceeds the service's permitted PII level, per the `DATA-GOVERNANCE-STANDARD.md` §4 tier table | `compliance/logging-audit-YYYY-QN.md`, quarterly | REVIEW-GATE |
 
-**Tier C (libraries/CLIs):** offer an opt-in `--log-format json` flag backed by `structlog`; default human-readable is fine. The valid-JSON and required-field gates apply **only when `--log-format json` is selected**. OTel tracing is optional and **documented as out-of-scope** in the repo's `## Observability` section (N/A-with-reason). `olive-bark-logger`, being a logger, is the reference for the structlog JSON renderer config.
+**Tier C (libraries/CLIs):** offer an opt-in `--log-format json` flag backed by `structlog`; default human-readable is fine. The valid-JSON and required-field gates apply **only when `--log-format json` is selected**. OTel tracing is optional and **documented as out-of-scope** in the repo's `## Observability` section (N/A-with-reason). A logging-focused library provides the reference `structlog` JSON-renderer shape.
 
 **The PII-in-logs gate is the one non-tiered control: it is AUTO-GATE in every repo that logs anything, Tier A/B/C alike.** Privacy-first repos do not get to skip it; they are the reason it exists.
 
@@ -147,15 +150,15 @@ Per the Google SRE Workbook. SLIs are ratio metrics `good_events / total_events`
 
 | Service shape | Availability SLO | Latency SLI/SLO | Notes |
 |---------------|------------------|-----------------|-------|
-| Civic/benefits hosted (fare-assistant, civic-rag, govchat) | 99.5% / 4wk | p99 < 500 ms non-LLM; p95 first-token < 1.5 s LLM | benefits tooling — error budget spends conservatively |
-| Internal/eval API (govchat-eval, jobradar) | 99.0% / 4wk | p99 < 1 s | tolerant; not user-facing-critical |
-| Static-ish edge (personal-site Lambdas) | 99.9% / 4wk | p99 < 300 ms | trivially cheap to keep high |
+| Public civic or benefits service | 99.5% / 4wk | p99 < 500 ms non-LLM; p95 first-token < 1.5 s LLM | error budget spends conservatively |
+| Internal or evaluation API | 99.0% / 4wk | p99 < 1 s | not user-facing-critical |
+| Static edge handler | 99.9% / 4wk | p99 < 300 ms | small, predictable request surface |
 
 **Committed SLO file** — `slos/*.yaml`, schema-validated:
 
 ```yaml
-name: fare-assistant-availability
-sli_query: 1 - (sum(rate(fare_assistant_http_request_errors_total[5m])) / sum(rate(fare_assistant_http_requests_total[5m])))
+name: example-service-availability
+sli_query: 1 - (sum(rate(transit_assistance_http_request_errors_total[5m])) / sum(rate(transit_assistance_http_requests_total[5m])))
 target_percentage: 99.5
 window_days: 28
 error_budget_policy: freeze-features-on-50pct-burn
@@ -163,8 +166,8 @@ error_budget_policy: freeze-features-on-50pct-burn
 
 | Metric | Target | Measured by | Gate |
 |--------|--------|-------------|------|
-| SLO definition exists | `slos/*.yaml` present, passes JSON-Schema (`name`,`sli_query`,`target_percentage`,`window_days`,`error_budget_policy`) | schema validation in CI; no SLO file = no prod deploy | AUTO-GATE |
-| Quarterly SLO review | error-budget consumption vs target reviewed; SLI-vs-complaint alignment checked | ADR committed within 5 business days | REVIEW-GATE |
+| SLO definition exists [OBS-14] | `slos/*.yaml` present, passes JSON-Schema (`name`,`sli_query`,`target_percentage`,`window_days`,`error_budget_policy`) | schema validation in CI; no SLO file = no prod deploy | AUTO-GATE |
+| Quarterly SLO review [OBS-15] | error-budget consumption vs target reviewed; SLI-vs-complaint alignment checked | ADR committed within 5 business days | REVIEW-GATE |
 
 ---
 
@@ -181,26 +184,28 @@ Per the SRE Workbook. For each SLO, **both** the long- and short-window conditio
 ```yaml
 # alerts/burn-rate.yml  (promtool check rules MUST pass)
 groups:
-  - name: fare-assistant-slo-burn
+  - name: example-service-slo-burn
     rules:
       - alert: ErrorBudgetBurnCritical
         expr: |
-          (slo:error_rate:ratio_rate1h{service="fare-assistant"} > (14.4 * 0.005))
+          (slo:error_rate:ratio_rate1h{service="example-service"} > (14.4 * 0.005))
           and
-          (slo:error_rate:ratio_rate5m{service="fare-assistant"} > (14.4 * 0.005))
+          (slo:error_rate:ratio_rate5m{service="example-service"} > (14.4 * 0.005))
         labels: { severity: page }
       - alert: ErrorBudgetBurnHigh
         expr: |
-          (slo:error_rate:ratio_rate6h{service="fare-assistant"} > (6 * 0.005))
+          (slo:error_rate:ratio_rate6h{service="example-service"} > (6 * 0.005))
           and
-          (slo:error_rate:ratio_rate30m{service="fare-assistant"} > (6 * 0.005))
+          (slo:error_rate:ratio_rate30m{service="example-service"} > (6 * 0.005))
         labels: { severity: page }
 ```
 
 | Metric | Target | Measured by | Gate |
 |--------|--------|-------------|------|
-| Alert rules valid | zero errors | `promtool check rules alerts/*.yml` in CI | AUTO-GATE |
-| Burn-rate tiers complete | critical (14.4×, 1h+5m) **and** high (6×, 6h+30m) defined per SLO | rule-presence linter | AUTO-GATE |
+| Alert rules valid [OBS-16] | zero errors | `promtool check rules alerts/*.yml` in CI | AUTO-GATE |
+| Burn-rate tiers complete [OBS-17] | critical (14.4×, 1h+5m) **and** high (6×, 6h+30m) defined per SLO | rule-presence linter | AUTO-GATE |
+
+**A `page`-severity alert that confirms real user impact opens an `incident` issue.** This standard owns detection and routing; what happens once a page is confirmed real (severity assignment, labelling, the postmortem clock) is owned by `INCIDENT-RESPONSE-STANDARD.md` §1–3 — a fired alert is not itself an incident record.
 
 ---
 
@@ -222,15 +227,15 @@ readinessProbe: { httpGet: { path: /readyz, port: 8080 }, periodSeconds: 5 }
 
 | Metric | Target | Measured by | Gate |
 |--------|--------|-------------|------|
-| Both probes present, distinct paths | `livenessProbe`+`readinessProbe` defined, different paths | `kubeval` + OPA Conftest on manifest changes | AUTO-GATE |
-| `/livez` semantics | < 200 ms, no dependency calls | contract test | AUTO-GATE |
-| `/readyz` semantics | reflects dependency health (503 on failure) | contract test with dependency stubbed down | AUTO-GATE |
+| Both probes present, distinct paths [OBS-18] | `livenessProbe`+`readinessProbe` defined, different paths | `kubeval` + OPA Conftest on manifest changes | AUTO-GATE |
+| `/livez` semantics [OBS-19] | < 200 ms, no dependency calls | contract test | AUTO-GATE |
+| `/readyz` semantics [OBS-20] | reflects dependency health (503 on failure) | contract test with dependency stubbed down | AUTO-GATE |
 
 ---
 
 ## 7. Local-dev parity & tier declaration
 
-Observability must be reproducible locally or it rots. `make verify` runs the same JSON-log, semconv, metric-naming, and `promtool` lints CI runs — byte-for-byte where the repo already mirrors CI in its Makefile (the portfolio's existing `make verify` discipline extends to telemetry checks; no new mechanism).
+Observability must be reproducible locally or it rots. `make verify` runs the same JSON-log, semconv, metric-naming, and `promtool` lints CI runs, byte-for-byte through the repository Makefile. The existing local/CI parity contract extends to telemetry checks; no new mechanism is needed.
 
 Ship a `docker-compose.observability.yml` bringing up an OTel Collector + Grafana LGTM stack (Tempo/Mimir/Loki/Pyroscope) so a developer sees their own traces. The Collector pipeline is fixed:
 
@@ -243,23 +248,23 @@ exporters:  [otlphttp/tempo, prometheusremotewrite/mimir, loki, otlphttp/pyrosco
 
 | Metric | Target | Measured by | Gate |
 |--------|--------|-------------|------|
-| Tier declared | `## Observability` section names tier A/B/C and lists any N/A-with-reason | doc-lint asserts heading + tier token present | AUTO-GATE |
-| Local telemetry parity | `make verify` runs the same telemetry lints as CI | CI diff of lint invocations | AUTO-GATE |
+| Tier declared [OBS-21] | `## Observability` section names tier A/B/C and lists any N/A-with-reason | doc-lint asserts heading + tier token present | AUTO-GATE |
+| Local telemetry parity [OBS-22] | `make verify` runs the same telemetry lints as CI | CI diff of lint invocations | AUTO-GATE |
 
 ---
 
 ## 8. Frontends / PWAs — Core Web Vitals (Tier B)
 
-Instrument with `@opentelemetry/sdk-web` (stable spans for interactions + API calls) plus `@opentelemetry/browser-instrumentation` (experimental: navigation/resource timing). Emit Core Web Vitals via the `web-vitals` library as OTel metric events with `trace_id` for correlation. **`personal-site` already does the RUM beacon — copy it into davis-bike-hazard-map and trans-docs-navigator.**
+Instrument with `@opentelemetry/sdk-web` (stable spans for interactions + API calls) plus `@opentelemetry/browser-instrumentation` (experimental: navigation/resource timing). Emit Core Web Vitals via the `web-vitals` library as OTel metric events with `trace_id` for correlation. Every Tier-B frontend implements this RUM beacon path.
 
 **Field SLI (p75 of real-user sessions) and the Lighthouse-CI lab gate share thresholds:**
 
 | Metric | Target (p75 field SLI = lab gate) | Measured by | Gate |
 |--------|-----------------------------------|-------------|------|
-| LCP | < 2500 ms | Lighthouse CI on main routes (lab); RUM p75 in Grafana (field) | AUTO-GATE (lab) |
-| INP | < 200 ms | as above | AUTO-GATE (lab) |
-| CLS | < 0.1 | as above | AUTO-GATE (lab) |
-| ≥75% of sessions "good" per CWV | met | RUM dashboard | REVIEW-GATE |
+| LCP [OBS-23] | < 2500 ms | Lighthouse CI on main routes (lab); RUM p75 in Grafana (field) | AUTO-GATE (lab) |
+| INP [OBS-24] | < 200 ms | as above | AUTO-GATE (lab) |
+| CLS [OBS-25] | < 0.1 | as above | AUTO-GATE (lab) |
+| ≥75% of sessions "good" per CWV [OBS-26] | met | RUM dashboard | REVIEW-GATE |
 
 Lighthouse-CI lab numbers are the merge gate; field p75 RUM data is tracked separately (lab is a regression tripwire, not ground truth). This extends, and shares the budget envelope with, the existing Lighthouse gates in `QUALITY-AND-METRICS-STANDARD.md §2`.
 
@@ -271,21 +276,48 @@ The OTel **Profiles** signal is alpha in 2026; **do not depend on its API stabil
 
 | Metric | Target | Measured by | Gate |
 |--------|--------|-------------|------|
-| Profiling runbook | CPU+heap collected in prod, overhead ≤ 1%, profiles trace-correlated, endpoint configured | runbook entry per service onboarding | REVIEW-GATE |
+| Profiling runbook [OBS-27] | CPU+heap collected in prod, overhead ≤ 1%, profiles trace-correlated, endpoint configured | runbook entry per service onboarding | REVIEW-GATE |
 
 ---
 
 ## 10. When this standard does NOT apply
 
-- **Tier C OTel tracing/metrics/SLOs/health:** N/A for libraries and local-only CLIs (ledger, nearmiss, swelter, tods-validate, women-artist-discovery, queer-the-stacks/queer-specfic-reader, self-osint-monitor as a CLI). Declare it: `Observability: Tier C — OTel tracing out-of-scope (no network surface). Opt-in --log-format json only.`
+- **Tier C OTel tracing/metrics/SLOs/health:** N/A for libraries and local-only CLIs. Declare it: `Observability: Tier C — OTel tracing out-of-scope (no network surface). Opt-in --log-format json only.`
 - **`/livez`/`/readyz`:** N/A for non-long-lived serverless surfaces — declare with reason.
 - **CWV / Lighthouse:** N/A for non-UI repos.
 - **The PII/secrets-in-logs gate is NEVER N/A** for any repo that logs.
-- **`self-osint-monitor`** is spec-only today: this standard is authored into its **M0/M1 scaffold** (structlog JSON, tier declaration, PII-log gate) before feature code, not retrofitted — and only after its consent gate per `RESPONSIBLE-TECH-FRAMEWORK.md`.
+- **A not-yet-implemented privacy-sensitive tool** authors this standard into its initial scaffold (structlog JSON, tier declaration, PII-log gate) before feature code, and only after its consent gate per `RESPONSIBLE-TECH-FRAMEWORK.md`.
 
 Any skipped control is recorded as **N/A-with-reason** in the repo's `## Observability` section. Silent omission fails the tier-declaration gate (§7).
 
 ---
+
+## GenAI telemetry — OTel semantic conventions (Tier A, AI-bearing repos)
+
+For any repo with an LLM call path, LLM telemetry uses the **OpenTelemetry
+GenAI semantic conventions** — but through the pinned shim, never raw strings:
+
+- **Attribute names come from `STANDARDS/lib/genai_telemetry/attributes.py`**, not
+  inline `gen_ai.*` literals. The conventions are **pre-stable (Development
+  status)** — the shim owns the pinned `SEMCONV_VERSION` so a spec change touches
+  one file. (AUTO-GATE candidate: a lint that rejects inline `gen_ai.` literals in
+  instrumentation code.)
+- Every LLM call records: `gen_ai.request.model`, `gen_ai.usage.input_tokens` /
+  `output_tokens`, `gen_ai.usage.cache_creation.input_tokens` /
+  `cache_read.input_tokens` (→ cache-hit rate = cache_read / input_tokens),
+  operation duration, and `gen_ai.response.time_to_first_chunk` for streaming
+  (this supplies the p95-first-token metric). Agentic paths record
+  `execute_tool` spans + tool-call error rate.
+- **Cost per request/conversation** is computed by `lib/genai_telemetry/pricing.py`
+  from those token attributes × the pinned `pricing.json` (an estimate, not
+  billing). A repository cannot claim the cost metric until this harness exists.
+- **Content capture is opt-in and off by default** (OTel GenAI default + this
+  portfolio's local-first stance). No prompt/response content in telemetry unless a
+  repo makes a documented per-repo opt-in.
+
+Track A (how the portfolio is *built* with AI tools) is a separate standard:
+`AI-DEVELOPMENT-MEASUREMENT-STANDARD.md`, incl. the local Claude Code OTel
+collector at `automation/telemetry/`.
 
 ## Metrics ledger (per repo)
 
