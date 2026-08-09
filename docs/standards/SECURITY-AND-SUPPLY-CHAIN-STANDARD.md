@@ -2,7 +2,7 @@
 
 This is the canonical definition of application-security and software-supply-chain rigor for every repo in this portfolio. It owns the *machinery*: ASVS level, SAST/SCA/secret-scanning configuration, Action SHA-pinning, SBOM/signing/provenance, and the token-permission model. Repos record only project-specific *values and findings* — the threat model narrative, the residual-risk register, the per-repo ASVS level declaration — in `docs/RESPONSIBLE-TECH-AUDITS.md` (methodology: `RESPONSIBLE-TECH-FRAMEWORK.md` §F) and their `ROADMAP.md` Metrics table. Reference, don't repeat.
 
-> **Enforcement is binary.** A control is **AUTO-GATE** (mechanically checkable, merge-blocking in CI, no `|| true`, no `continue-on-error`) or **REVIEW-GATE** (human judgment, paired with a checklist line and a committed, dated artifact regenerated on release). There is no aspirational third category. The portfolio already proves every target here is achievable: `habitable`, `trans-docs-navigator`, and `civic-ai-eval-harness`/`govchat-eval` already ship the full SHA-pin + SBOM + Sigstore + OIDC posture. The work is propagation, not invention.
+> **Enforcement is binary.** A control is **AUTO-GATE** (mechanically checkable, merge-blocking in CI, no `|| true`, no `continue-on-error`) or **REVIEW-GATE** (human judgment, paired with a checklist line and a committed, dated artifact regenerated on release). There is no aspirational third category. SHA pinning, SBOM generation, keyless signing, provenance, and OIDC are established mechanisms; each repository records its own adoption evidence privately.
 
 CI/CD-pipeline hardening (token permissions, OIDC, branch rulesets, workflow SAST) lives in `CI-CD-STANDARD.md`; this document covers it only where it is load-bearing for supply-chain integrity and cross-references the rest. Toolchain floors (ruff/mypy/coverage) live in `CODE-QUALITY-STANDARD.md`.
 
@@ -15,29 +15,35 @@ Target framework is **OWASP ASVS 5.0.0** (May 2025). Every repo declares its lev
 | Repo class | ASVS target | Rationale | Examples |
 |---|---|---|---|
 | Default floor | **L1** | ASVS 5.0 states L1 is achievable with automated tooling alone; that maps exactly to our AUTO-GATE set. | every repo, minimum |
-| Touches PII / identity / location | **L2** | Field-level authz (BOPLA V8.2.1), cross-tenant isolation, breached-password checks, OIDC `acr`/`amr` validation. | `fare-assistant` (transit PII), `self-osint-monitor`, `olive-bark-logger`, `trans-docs-navigator`, `ledger` |
-| Catastrophic-breach surface | L3 *(none today)* | Hardware phishing-resistant factor, adaptive authz, annual threat-model + leadership justification. No current repo hosts auth at this blast radius; if one does, it declares L3 and adopts the V6/V8/V10 L3 review-gates. | — |
+| Touches PII / identity / location | **L2** | Field-level authz (BOPLA V8.2.1), cross-tenant isolation, breached-password checks, OIDC `acr`/`amr` validation. | public-service applications, privacy-sensitive tools, identity-aware frontends, or local data stores |
+| Catastrophic-breach surface | **L3** | Hardware phishing-resistant factor, adaptive authz, annual threat-model + leadership justification. Any repository at this blast radius declares L3 and adopts the V6/V8/V10 L3 review-gates. | high-impact identity or authorization systems |
 
-L1 is satisfied entirely by §3–§4 AUTO-GATEs (parameterized queries, output encoding, TLS 1.2+, server-side function- and object-level authz). L2 adds the authz integration tests in §5 and the OAuth/OIDC review-gate. `ledger`'s no-outing guarantee and `women-artist-discovery`'s "no identity inference" AST test are project-specific ASVS-V8 abuse-case controls — keep them; they are exemplars, not exceptions.
+L1 is satisfied entirely by §3–§4 AUTO-GATEs (parameterized queries, output encoding, TLS 1.2+, server-side function- and object-level authz). L2 adds the authz integration tests in §5 and the OAuth/OIDC review-gate. No-outing sentinel tests and AST-level no-identity-inference checks are reference ASVS-V8 abuse-case controls; repositories keep equivalent project-specific guarantees.
 
 ### When this section does NOT apply
-A repo with **no authentication, no authorization surface, and no network ingress** (a pure offline CLI or library, e.g. `tods-validate`, `swelter` as a library) declares `ASVS: N/A (no auth/authz/ingress surface)` with that exact reason. It still inherits all of §3, §4, §6, §7 — supply-chain and scanning are never N/A for a repo that ships code.
+A repo with **no authentication, no authorization surface, and no network ingress** (for example, a pure offline CLI or library) declares `ASVS: N/A (no auth/authz/ingress surface)` with that exact reason. It still inherits all of §3, §4, §6, §7 — supply-chain and scanning are never N/A for a repo that ships code.
 
 ---
 
-## 2. Privacy-first repos: hardened posture (olive-bark-logger, self-osint-monitor, trans-docs-navigator)
+## 2. Privacy-sensitive tools: hardened posture
 
-These three carry the highest individual-harm blast radius (a logger of sensitive activity, an OSINT self-monitor, and trans-resource navigation). They adopt **every** AUTO-GATE below as merge-blocking with **zero waivers**, plus:
+Tools that log sensitive activity, monitor people or identity signals, or help
+people navigate sensitive resources carry a high individual-harm blast radius.
+They adopt **every** AUTO-GATE below as merge-blocking with **zero waivers**,
+plus:
 
 | Control | Target | Measured by | Gate |
 |---|---|---|---|
-| No-secret/no-PII in logs | zero matches for password/token/email/`Authorization` field values | Semgrep custom rule + log-assertion integration test (`jq` over emitted JSON) | AUTO-GATE |
-| Consent gate before feature code | sequenced before any M1 feature; CI asserts gate module imported on every entrypoint | static import test | AUTO-GATE (`self-osint-monitor`) |
-| No third-party exfiltration | StepSecurity Harden-Runner egress allowlist in every job; deny-by-default | Harden-Runner `block` mode + audit | AUTO-GATE |
-| Sentinel-identity tripwire | injected sentinel survives full pipeline without leaking | isolated CI job (lift `ledger`'s no-outing test pattern) | AUTO-GATE |
-| ASVS L2 | full §5 authz tests | integration suite | AUTO-GATE |
+| No-secret/no-PII in logs [SEC-02] | zero matches for password/token/email/`Authorization` field values | Semgrep custom rule + log-assertion integration test (`jq` over emitted JSON) | AUTO-GATE |
+| Consent gate before feature code [SEC-03] | sequenced before any feature that processes sensitive data; CI asserts gate module imported on every entrypoint | static import test | AUTO-GATE |
+| No third-party exfiltration [SEC-04] | StepSecurity Harden-Runner egress allowlist in every job; deny-by-default | Harden-Runner `block` mode + audit | AUTO-GATE |
+| Sentinel-identity tripwire [SEC-05] | injected sentinel survives full pipeline without leaking | isolated no-outing CI job | AUTO-GATE |
+| ASVS L2 [SEC-06] | full §5 authz tests | integration suite | AUTO-GATE |
 
-`self-osint-monitor` is spec-only today (no CI, no `pyproject`, no tests). It **scaffolds this standard as its M0 deliverable** before any M1 feature code — Harden-Runner, gitleaks pre-commit + CI, SHA-pinned actions, top-level `permissions: contents: read`, and the consent gate land first.
+A privacy-sensitive tool with no implementation yet scaffolds this standard
+before its first feature code: Harden-Runner, gitleaks pre-commit + CI,
+SHA-pinned actions, top-level `permissions: contents: read`, and the consent gate
+land first.
 
 ---
 
@@ -47,10 +53,10 @@ These three carry the highest individual-harm blast radius (a logger of sensitiv
 
 | Metric | Target | Measured by | Gate |
 |---|---|---|---|
-| Semgrep findings | zero unwaived **HIGH/CRITICAL** at merge | `semgrep ci --sarif` | AUTO-GATE |
-| CodeQL findings | zero unwaived HIGH/CRITICAL on `main` | `github/codeql-action`, nightly + required on push to `main` | AUTO-GATE (graduate `davis-bike-hazard-map` from advisory) |
-| Workflow SAST | zero high/critical | CodeQL `language: actions` + `zizmor` (see §7) | AUTO-GATE |
-| Waiver hygiene | every waiver has expiry + reason | committed `.semgrep-waivers.yml`, reviewed quarterly | REVIEW-GATE |
+| Semgrep findings [SEC-07] | zero unwaived **HIGH/CRITICAL** at merge | `semgrep ci --sarif` | AUTO-GATE |
+| CodeQL findings [SEC-08] | zero unwaived HIGH/CRITICAL on `main` | `github/codeql-action`, nightly + required on push to `main` | AUTO-GATE |
+| Workflow SAST [SEC-09] | zero high/critical | CodeQL `language: actions` + `zizmor` (see §7) | AUTO-GATE |
+| Waiver hygiene [SEC-10] | every waiver has expiry + reason | committed `.semgrep-waivers.yml`, reviewed quarterly | REVIEW-GATE |
 
 ```yaml
 # .github/workflows/sast.yml — Semgrep PR gate
@@ -79,18 +85,21 @@ jobs:
 
 ### SCA — pip-audit / npm audit / OSV-Scanner + Dependabot/Renovate
 
-OSV-Scanner is the portfolio baseline (queries the same OSV DB as Scorecard's Vulnerabilities check, covers 20+ ecosystems incl. transitive lockfile deps). pip-audit / npm audit run additionally per ecosystem. **The `|| true` on `pip-audit` in `ledger` and `nearmiss` is deleted — that neuter defeats the gate entirely.**
+OSV-Scanner is the portfolio baseline (queries the same OSV DB as Scorecard's Vulnerabilities check, covers 20+ ecosystems incl. transitive lockfile deps). pip-audit / npm audit run additionally per ecosystem. **A scanner followed by `|| true` does not constitute a gate and is forbidden.**
 
 | Metric | Target | Measured by | Gate |
 |---|---|---|---|
-| Python vulns | zero **HIGH+CRITICAL with a fix available** | `pip-audit` (no `\|\| true`) + `osv-scanner -r .` over `uv.lock` | AUTO-GATE |
-| Node vulns | zero HIGH+CRITICAL | `npm audit --audit-level=high` | AUTO-GATE (frontends + `personal-site` Lambda) |
-| Transitive coverage | lockfile present & scanned | `osv-scanner` fails if no `uv.lock`/`package-lock.json` | AUTO-GATE |
-| Update automation | Dependabot or Renovate config present (Scorecard `Dependency-Update-Tool`) | committed `dependabot.yml`/`renovate.json` | AUTO-GATE |
-| Open critical alerts | none merge-able | branch ruleset blocks merge on open Dependabot alert CVSS ≥ 7.0 | AUTO-GATE |
-| Unfixable HIGH/CRITICAL waiver | tracked + VEX-justified | committed `vex.json` (CycloneDX 1.7 VEX), quarterly review | REVIEW-GATE |
+| Python vulns [SEC-11] | zero **HIGH+CRITICAL with a fix available** | `pip-audit` (no `\|\| true`) + `osv-scanner -r .` over `uv.lock` | AUTO-GATE |
+| Node vulns [SEC-12] | zero HIGH+CRITICAL | `npm audit --audit-level=high` | AUTO-GATE (frontends and Node Lambda handlers) |
+| Transitive coverage [SEC-13] | lockfile present & scanned | `osv-scanner` fails if no `uv.lock`/`package-lock.json` | AUTO-GATE |
+| Update automation [SEC-14] | Dependabot or Renovate config present (Scorecard `Dependency-Update-Tool`) | committed `dependabot.yml`/`renovate.json` | AUTO-GATE |
+| Open critical alerts [SEC-15] | none merge-able | branch ruleset blocks merge on open Dependabot alert CVSS ≥ 7.0 | AUTO-GATE |
+| Unfixable HIGH/CRITICAL waiver [SEC-16] | tracked + VEX-justified | committed `vex.json` (CycloneDX 1.7 VEX), quarterly review | REVIEW-GATE |
 
-`gtfs-scorecard` (fetches external GTFS zips, runs a Java subprocess) and `fare-assistant` (transit PII) currently have the **thinnest** scanning despite the highest sensitivity — they adopt the full SCA + secret-scan set first.
+Repositories that fetch untrusted archives, spawn subprocesses, or process
+sensitive transit or location data adopt the full SCA and secret-scan set before
+lower-risk repositories. Current project prioritization lives in the private
+remediation registry.
 
 ### Secret scanning — gitleaks (Gate 1+2) + TruffleHog (Gate 3)
 
@@ -98,19 +107,19 @@ Two-gate gitleaks: **pre-commit** (Gate 1) and **CI diff** (Gate 2). TruffleHog 
 
 | Gate | Tool | Target | Gate |
 |---|---|---|---|
-| 1 pre-commit | gitleaks `v8.30.1` | zero unredacted matches | AUTO-GATE |
-| 2 CI diff | gitleaks `--exit-code 1 --redact` (no `\|\| true`) | zero matches | AUTO-GATE |
-| 3 scheduled | `trufflehog git --object-discovery --results=verified,unknown --fail` | zero verified live creds | AUTO-GATE (page on hit) |
+| 1 pre-commit [SEC-17] | gitleaks `v8.30.1` | zero unredacted matches | AUTO-GATE |
+| 2 CI diff [SEC-18] | gitleaks `--exit-code 1 --redact` (no `\|\| true`) | zero matches | AUTO-GATE |
+| 3 scheduled [SEC-19] | `trufflehog git --object-discovery --results=verified,unknown --fail` | zero verified live creds | AUTO-GATE (page on hit) |
 
 ```yaml
-# .pre-commit-config.yaml — Gate 1 (also closes the pre-commit adoption gap)
+# .pre-commit-config.yaml — Gate 1
 repos:
   - repo: https://github.com/gitleaks/gitleaks
     rev: v8.30.1
     hooks: [{ id: gitleaks }]
 ```
 
-Pre-commit adoption is currently the minority (~6 of 19 repos). This config is now **mandatory** in every repo; the gitleaks + ruff + mypy hooks are the required floor.
+This pre-commit configuration is **mandatory** in every repository; the gitleaks + ruff + mypy hooks are the required floor.
 
 ---
 
@@ -129,23 +138,23 @@ def test_unauthorized_principal_gets_403(client, route):
 
 | Metric | Target | Measured by | Gate |
 |---|---|---|---|
-| Injection / XSS | zero | Semgrep taint rules + DAST in staging | AUTO-GATE |
-| Function-level authz | every protected route 403s unauth | parametrized integration test | AUTO-GATE (L2) |
-| Object-level authz (BOLA) | cross-tenant access denied | integration test w/ second principal | AUTO-GATE (L2) |
-| OAuth/OIDC (V10) | PKCE enforced; `acr`/`amr` validated; sender-constrained tokens | security architecture review | REVIEW-GATE (identity-critical services) |
-| Annual pentest (BOLA/BOPLA/tenant) | report attached to release | manual + human triage | REVIEW-GATE (L2 PII repos) |
+| Injection / XSS [SEC-20] | zero | Semgrep taint rules + DAST in staging | AUTO-GATE |
+| Function-level authz [SEC-21] | every protected route 403s unauth | parametrized integration test | AUTO-GATE (L2) |
+| Object-level authz (BOLA) [SEC-22] | cross-tenant access denied | integration test w/ second principal | AUTO-GATE (L2) |
+| OAuth/OIDC (V10) [SEC-23] | PKCE enforced; `acr`/`amr` validated; sender-constrained tokens | security architecture review | REVIEW-GATE (identity-critical services) |
+| Annual pentest (BOLA/BOPLA/tenant) [SEC-24] | report attached to release | manual + human triage | REVIEW-GATE (L2 PII repos) |
 
 ---
 
 ## 6. Supply chain: pin Actions, SBOM, signing, provenance, Scorecard
 
-This is the portfolio's largest open gap (~13 of 19 repos non-conformant on SHA-pinning) and the most active threat — the **March 2026 trivy-action force-push** and **tj-actions** compromises were real exfiltration events, not hypotheticals.
+Mutable action references are an active supply-chain threat: the **March 2026 trivy-action force-push** and **tj-actions** compromises were real exfiltration events, not hypotheticals. Adoption status stays in the private remediation registry.
 
-> This section owns the supply-chain **machinery** (SBOM, signing, provenance) that a release *invokes*. The release **process and policy** — SemVer, signed tags, CHANGELOG, the tag-triggered pipeline, and Trusted Publishing — lives in `RELEASE-AND-VERSIONING-STANDARD.md`. When that standard says "sign + attest → SECURITY §6," this is the section it means.
+> This section owns the supply-chain **machinery** (SBOM, signing, provenance) that a release *invokes*. The release **process and policy** — SemVer, signed tags, CHANGELOG, the trusted-main signed-tag pipeline, and Trusted Publishing — lives in `RELEASE-AND-VERSIONING-STANDARD.md`. When that standard says "sign + attest → SECURITY §6," this is the section it means.
 
 ### 6.1 Pin every Action to a full 40-char commit SHA — AUTO-GATE
 
-Every `uses:` — third-party actions, `actions/*`, **reusable workflows, and the deploy path** — is pinned to a full 40-char commit SHA with a trailing `# vX.Y.Z` comment. Tags and branches are immutable-reference failures. This explicitly closes `nearmiss` (0/17 SHA), `gtfs-scorecard` (0/2), and `trans-docs-navigator`'s single straggler in `deploy-aws-preview.yml`.
+Every `uses:` — third-party actions, `actions/*`, **reusable workflows, and the deploy path** — is pinned to a full 40-char commit SHA with a trailing `# vX.Y.Z` comment. Tags and branches are immutable-reference failures. Partial adoption does not pass: one moving reference in a preview or deploy workflow fails the gate.
 
 ```yaml
 # correct — immutable, human-readable
@@ -174,8 +183,8 @@ npx pin-github-action .github/workflows/*.yml   # rewrites tags -> SHA + comment
 
 | Metric | Target | Measured by | Gate |
 |---|---|---|---|
-| Every `uses:` SHA-pinned | 100% incl. reusable + deploy | Scorecard `Pinned-Dependencies` **≥ 9/10** on default branch | AUTO-GATE |
-| SHAs kept current | Renovate active, 72h cooldown | committed `renovate.json` | AUTO-GATE |
+| Every `uses:` SHA-pinned [SEC-25] | 100% incl. reusable + deploy | Scorecard `Pinned-Dependencies` **≥ 9/10** on default branch | AUTO-GATE |
+| SHAs kept current [SEC-26] | Renovate active, 72h cooldown | committed `renovate.json` | AUTO-GATE |
 
 ### 6.2 SBOM — CycloneDX 1.7 — AUTO-GATE on every release
 
@@ -191,7 +200,7 @@ Required component fields: `name`, `version`, `purl`, `hashes` (SHA-256). AI/RAG
 
 ### 6.3 Container CVE scanning — AUTO-GATE for every Dockerfile repo
 
-Trivy/Grype image scan, threshold standardized to **CRITICAL,HIGH** portfolio-wide (the eval harnesses' CRITICAL-only setting is raised). Closes the missing scans in `davis-bike-hazard-map`, `habitable`, `civic-rag-starter-kit`, `queer-the-stacks`, `trans-docs-navigator`.
+Trivy/Grype image scan, threshold standardized to **CRITICAL,HIGH** portfolio-wide. A CRITICAL-only threshold is raised; any repository that builds an image must run the scan.
 
 ```bash
 trivy image --severity CRITICAL,HIGH --ignore-unfixed --exit-code 1 $IMAGE
@@ -231,14 +240,14 @@ slsa-verifier verify-artifact --source-uri github.com/<org>/<repo> dist/<artifac
 
 | Scorecard check | Target | Gate |
 |---|---|---|
-| `Pinned-Dependencies` | ≥ 9/10 | AUTO-GATE |
-| `Token-Permissions` | 10/10 | AUTO-GATE |
-| `Dangerous-Workflow` | 10/10 | AUTO-GATE |
-| `Branch-Protection` | ≥ 8/10 | AUTO-GATE |
-| `Signed-Releases` | 10/10 (`.intoto.jsonl` on last 5) | AUTO-GATE (release repos) |
-| `Vulnerabilities` | 10/10 | AUTO-GATE |
-| Aggregate | ≥ 8/10 | AUTO-GATE |
-| Monthly Scorecard report committed | present, dated | REVIEW-GATE |
+| `Pinned-Dependencies` [SEC-31] | ≥ 9/10 | AUTO-GATE |
+| `Token-Permissions` [SEC-32] | 10/10 | AUTO-GATE |
+| `Dangerous-Workflow` [SEC-33] | 10/10 | AUTO-GATE |
+| `Branch-Protection` [SEC-34] | ≥ 8/10 | AUTO-GATE |
+| `Signed-Releases` [SEC-35] | 10/10 (`.intoto.jsonl` on last 5) | AUTO-GATE (release repos) |
+| `Vulnerabilities` [SEC-36] | 10/10 | AUTO-GATE |
+| Aggregate [SEC-37] | ≥ 8/10 | AUTO-GATE |
+| Monthly Scorecard report committed [SEC-38] | present, dated | REVIEW-GATE |
 
 ---
 
@@ -248,13 +257,13 @@ Owned in detail by `CI-CD-STANDARD.md`; the supply-chain-load-bearing minimums r
 
 | Control | Target | Measured by | Gate |
 |---|---|---|---|
-| Top-level `permissions` | `contents: read`, per-job escalation only | present in every workflow (closes `gtfs-scorecard`, `jobradar`, `personal-site`, `tods-validate`) | AUTO-GATE |
-| Cloud creds | OIDC only, no long-lived secrets, sub scoped to `repo:…:environment:…` | audit-log alert on new long-lived secret | AUTO-GATE |
-| Workflow SAST | `zizmor` required check on any PR touching `.github/workflows/` | merge-blocked on high/critical | AUTO-GATE |
-| `persist-credentials: false` | on every `actions/checkout` | zizmor / grep | AUTO-GATE |
-| No direct push to `main` | branch ruleset, no admin bypass, ≥1 required review | committed ruleset export | AUTO-GATE |
-| CODEOWNERS routes `.github/workflows/` + security-critical files | required reviewer | committed `CODEOWNERS` | AUTO-GATE |
-| Branch ruleset + CODEOWNERS as committed artifacts | present | repo files | REVIEW-GATE (close portfolio-wide absence) |
+| Top-level `permissions` [CICD-02] | `contents: read`, per-job escalation only | present in every workflow | AUTO-GATE |
+| Cloud creds [CICD-05, CICD-06, CICD-07] | OIDC only, no long-lived secrets, sub scoped to `repo:…:environment:…` | audit-log alert on new long-lived secret | AUTO-GATE |
+| Workflow SAST [CICD-19] | `zizmor` required check on any PR touching `.github/workflows/` | merge-blocked on high/critical | AUTO-GATE |
+| `persist-credentials: false` [SEC-39] | on every `actions/checkout` | zizmor / grep | AUTO-GATE |
+| No direct push to `main` [CQ-37, CICD-15] | branch ruleset blocks direct admin pushes; designated maintainer bypass is PR-only and break-glass; normal/solo review disposition follows CQ §7.1 | committed ruleset export + bypassed PR attestation | AUTO+REVIEW-GATE |
+| CODEOWNERS routes `.github/workflows/` + security-critical files [CICD-17] | routing present in both profiles; approval mechanics are owned by CICD-18 / CQ §7.1 | committed `CODEOWNERS` | AUTO-GATE |
+| Branch ruleset + CODEOWNERS as committed artifacts [CICD-12] | present | repo files | REVIEW-GATE |
 
 ```yaml
 # zizmor as a required check
@@ -283,9 +292,12 @@ Every repo's `docs/RESPONSIBLE-TECH-AUDITS.md` §F records, with no blanks:
 
 An N/A is a *declared decision with a one-line reason*, reviewed like any other. A blank is a defect.
 
-### Cross-repo reconciliation (blocking on the affected repos)
-- `queer-the-stacks` / `queer-specfic-reader` share the `queer_the_stacks` package — an undocumented fork/rename. Reconcile to one canonical repo before applying this standard, or both drift and double-count. **REVIEW-GATE.**
-- `gtfs-scorecard` has no repo-root config; its project lives at `pipeline/`. CI here must target `pipeline/` (or hoist config to root) so portfolio tooling does not silently skip it. **AUTO-GATE** (CI path declared).
+### Cross-repository reconciliation
+
+- A duplicated or renamed package records one canonical repository before
+  controls are applied, preventing drift and double-counting. **REVIEW-GATE.**
+- A nested project declares its package path or exposes repository-root
+  verification so portfolio tooling cannot silently skip it. **AUTO-GATE.**
 
 ---
 
