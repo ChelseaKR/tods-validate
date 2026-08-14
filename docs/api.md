@@ -118,3 +118,15 @@ These shapes follow the project's semantic-versioning promise: fields are only
 added within a major version, never removed or renamed. Rule IDs are likewise
 stable. The lower-level `tods_validate.runner.run` is available too, but
 `validate_feed` is the supported entry point.
+
+---
+
+Last verified: 2026-08-14, against tods-validate 0.8.0. Every signature,
+`ValidationResult` and `Finding` member, `Suggestion` field, and test helper on
+this page was called and checked against the implementation, including the
+documented `PackageNotFoundError` and the `SUPPORTED_SPEC_VERSIONS` values.
+Recheck cadence: every release, and whenever this page changes —
+`make docs-check` fails if the page is edited without a fresh verification.
+
+<!-- doc-currency: sha256=603b2ea973ec -->
+
