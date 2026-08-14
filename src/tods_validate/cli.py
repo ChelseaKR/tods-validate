@@ -33,7 +33,7 @@ from .init import SHAPES, DestinationNotEmptyError
 from .init import scaffold as scaffold_package
 from .loader import Package, PackageNotFoundError, load_package
 from .merge import merge_feeds
-from .policy import GatingPolicy
+from .policy import EXIT_CLEAN, EXIT_FINDINGS, EXIT_USAGE, GatingPolicy
 from .report import (
     RENDERERS,
     render_batch_markdown,
@@ -73,7 +73,7 @@ if TYPE_CHECKING:
 
 def _fail(message: str) -> NoReturn:
     click.echo(f"tods-validate: error: {message}", err=True)
-    sys.exit(2)
+    sys.exit(EXIT_USAGE)
 
 
 def _resolve_config(config_path: str | None) -> Config:
@@ -424,7 +424,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
         try:
             watch_feed(path, _tick)
         except KeyboardInterrupt:
-            sys.exit(0)
+            sys.exit(EXIT_CLEAN)
         return
 
     try:
@@ -437,7 +437,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
     # (policy.apply already filtered `findings` for --ignore, so re-running it
     # here just applies the baseline narrowing on top of the same kept list).
     gate = policy.apply(findings)
-    sys.exit(1 if gate.failed else 0)
+    sys.exit(EXIT_FINDINGS if gate.failed else EXIT_CLEAN)
 
 
 @main.command()
@@ -523,7 +523,7 @@ def diff(
         )
 
     gate = policy.apply(result.introduced)
-    sys.exit(1 if gate.failed else 0)
+    sys.exit(EXIT_FINDINGS if gate.failed else EXIT_CLEAN)
 
 
 @main.command()
@@ -580,7 +580,7 @@ def drift(
         click.echo(render_drift_markdown(report))
     else:
         click.echo(render_drift_text(report))
-    sys.exit(1 if report.has_breaks else 0)
+    sys.exit(EXIT_FINDINGS if report.has_breaks else EXIT_CLEAN)
 
 
 @main.command()
@@ -698,7 +698,7 @@ def batch(
                 click.echo(
                     f"{row['errors']:>7} {row['warnings']:>9} {row['infos']:>6}  {row['source']}"
                 )
-    sys.exit(1 if any_failed else 0)
+    sys.exit(EXIT_FINDINGS if any_failed else EXIT_CLEAN)
 
 
 @main.command()
@@ -1065,7 +1065,7 @@ def doctor(
     validator_stage = report.stage("gtfs-validator")
     if validator_stage is not None and validator_stage.status == "failed":
         failed = True
-    sys.exit(1 if failed else 0)
+    sys.exit(EXIT_FINDINGS if failed else EXIT_CLEAN)
 
 
 @main.command(name="rules")

@@ -5,15 +5,24 @@ v1.0.0 is released.
 
 The machine-readable snapshot is
 [`v1-contract-candidate.json`](v1-contract-candidate.json). CI compares it to
-the implementation so contract changes cannot land as an incidental code
-edit. Updating the snapshot is allowed before v1, but its diff must be reviewed
-as a product compatibility decision.
+the implementation on every pull request (`.github/workflows/ci.yml`, the
+`contract` job), and `tests/test_public_contract.py` runs the same comparison in
+the test suite, so contract changes cannot land as an incidental code edit.
+Updating the snapshot is allowed before v1, but its diff must be reviewed as a
+product compatibility decision.
+
+Every field in the snapshot except `contractVersion` is recomputed from the
+implementation and compared. `contractVersion` names the snapshot rather than
+describing the code, so it is excluded by name instead of being compared
+against itself.
 
 The candidate contract covers:
 
 - CLI exit codes: 0 for a clean gate, 1 for findings at or above the selected
-  threshold, and 2 for usage or input errors. The behavioral golden tests are
-  in `tests/test_policy.py`.
+  threshold, and 2 for usage or input errors. These are read from
+  `tods_validate.policy` (`EXIT_CLEAN`/`EXIT_FINDINGS`/`EXIT_USAGE`), which is
+  what `cli.py` exits with; the behavioral golden tests are in
+  `tests/test_policy.py`.
 - all rule IDs, their declared severity, and whether they are core, coverage,
   or advisory checks;
 - the supported TODS spec versions;

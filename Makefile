@@ -1,6 +1,9 @@
-# make verify reproduces the full merge-blocking gate set locally, byte-for-
-# byte with CI (CICD-27). Run it before opening a PR; the release workflows
-# re-run it at the tagged commit before anything publishes (REL-14/15).
+# make verify runs every merge-blocking gate that can run on a laptop, with the
+# same command CI runs (CICD-27). Run it before opening a PR; the release
+# workflows re-run it at the tagged commit before anything publishes
+# (REL-14/15). CI additionally runs what needs GitHub itself -- the composite
+# action's self-test, CodeQL, Semgrep and zizmor -- so a green `make verify` is
+# a necessary condition for merge, not a sufficient one.
 .PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation
 
 verify: lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation
