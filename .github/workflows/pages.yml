@@ -70,11 +70,12 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: "24"
-          cache: npm
-          cache-dependency-path: package-lock.json
+      # Deliberately no actions/setup-node: this workflow runs on `release`, a
+      # publishing trigger, and zizmor's cache-poisoning audit blocks a
+      # cache-capable setup action in that context. The runner's preinstalled
+      # Node runs pa11y-ci fine, and `npm ci` installs from the committed
+      # lockfile either way.
+      - run: node --version
       - run: npm ci --ignore-scripts
       - name: Check the deployed page is the tree that was just published
         run: ./scripts/check-deployed-playground.sh web/index.html
