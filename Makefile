@@ -1,7 +1,7 @@
 # make verify reproduces the full merge-blocking gate set locally, byte-for-
 # byte with CI (CICD-27). Run it before opening a PR; the release workflows
 # re-run it at the tagged commit before anything publishes (REL-14/15).
-.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation
+.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation perf-check
 
 verify: lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation
 	@echo "make verify: all gates passed."
@@ -59,3 +59,11 @@ a11y:
 # cffconvert is fetched ephemerally into uv's tool cache.
 citation:
 	uvx cffconvert --validate -i CITATION.cff
+
+# Perf budget (QM-02): validation throughput against perf/baseline.json.
+# Deliberately NOT a `verify` prerequisite: the baseline is recorded on the CI
+# runner's machine class, so a laptop's number is not comparable to it. Run it
+# to see the measurement locally; the merge-blocking comparison is the `perf`
+# job in .github/workflows/ci.yml.
+perf-check:
+	python scripts/check_perf_budget.py

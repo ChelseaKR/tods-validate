@@ -1,0 +1,9 @@
+{
+  "trips": 50000,
+  "repeat": 3,
+  "rowsPerCpuSecond": null,
+  "maxRegressionFactor": 2.0,
+  "measuredAt": null,
+  "measuredOn": "GitHub-hosted ubuntu-latest, Python 3.12",
+  "note": "Recorded by the perf job in .github/workflows/ci.yml, which prints the number to commit here. Throughput is per CPU-second, not wall clock, so a busy shared runner does not read as a regression. A number measured on any other machine class is not comparable; scripts/check_perf_budget.py fails rather than compares while rowsPerCpuSecond is null."
+}

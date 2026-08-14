@@ -32,7 +32,9 @@ are welcome as GitHub issues.
   metadata) and a published JSON Schema for the report format, so dashboards
   can consume findings without scraping text.
 - A pre-commit hook definition.
-- `scripts/benchmark.py` for throughput on large synthetic feeds.
+- `scripts/benchmark.py` for throughput on large synthetic feeds, and
+  `scripts/check_perf_budget.py`, which turns that measurement into a CI gate
+  against `perf/baseline.json`.
 - SARIF and HTML report formats; richer text/Markdown (by-rule grouping,
   root-cause hints, path-to-green).
 - `diff`, `batch`, `stats`, and `anonymize` subcommands; a `merge` manifest.
@@ -96,7 +98,7 @@ Updated 2026-07-05.
 | Rule ↔ fixture parity | 1:1 | `tests/test_conformance.py` | AUTO | Chelsea Kelly-Reif |
 | Mutation kill-rate (rules engine) | ≥ 70% (ratchet; baseline ~65%) | `mutmut` (advisory, weekly) | REVIEW | Chelsea Kelly-Reif |
 | axe/pa11y violations (HTML report + playground) | 0 | `make a11y` (axe + HTML_CodeSniffer, WCAG 2.1 AA) | AUTO | Chelsea Kelly-Reif |
-| Perf regression budget | ≤ 2x baseline | `scripts/benchmark.py`, not yet a CI gate | N/A-not-yet-built | Chelsea Kelly-Reif |
+| Perf regression budget | ≤ 2x baseline (rows per CPU-second) | `make perf-check` (`perf` job in `ci.yml`) vs `perf/baseline.json` | AUTO | Chelsea Kelly-Reif |
 | Screen-reader walkthrough | per release | not yet committed as an artifact | REVIEW-not-yet-built | Chelsea Kelly-Reif |
 | Threat model | per new surface | `SECURITY.md`, updated ad hoc | REVIEW | Chelsea Kelly-Reif |
 
