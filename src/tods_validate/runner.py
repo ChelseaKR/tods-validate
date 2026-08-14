@@ -13,7 +13,7 @@ from .findings import Finding, Severity
 from .gtfs_companion import build_companion
 from .loader import Package, load_package
 from .rules import RunCoverage, ValidationContext, validate
-from .schema import GTFS_FILENAMES, SPEC_VERSION
+from .schema import GTFS_COMPANION_FILENAMES, SPEC_VERSION
 
 # Root rule IDs and the rule IDs whose findings on that same row are downstream
 # echoes rather than independent data problems. A ragged row (TODS-E104) can
@@ -69,8 +69,11 @@ def run_with_coverage(
     use this so the report can state its own scope.
 
     When ``gtfs_path`` is given, references are resolved against that feed.
-    Otherwise, if GTFS files sit next to the TODS files, the package is used
-    as its own companion feed.
+    Otherwise the package is used as its own companion feed, but only when it
+    carries at least one GTFS file that TODS IDs actually resolve against
+    (schema.GTFS_COMPANION_FILENAMES). A package holding only, say, a stray
+    ``agency.txt`` is not a companion feed: promoting it would let every
+    reference rule report as run against a feed with nothing to resolve.
 
     ``enabled`` turns on opt-in rules (rule IDs or category names). ``encoding``
     overrides the default UTF-8 decoding for non-conforming exports.
@@ -87,7 +90,7 @@ def run_with_coverage(
         gtfs_package = load_package(gtfs_path, encoding=encoding)
         gtfs = build_companion(gtfs_package, package, source=str(gtfs_path))
         gtfs_source = "flag"
-    elif any(name in GTFS_FILENAMES for name in package.files):
+    elif any(name in GTFS_COMPANION_FILENAMES for name in package.files):
         gtfs = build_companion(package, package, source=package.source)
         gtfs_source = "package"
     context = ValidationContext(

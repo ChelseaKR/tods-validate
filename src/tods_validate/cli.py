@@ -1089,6 +1089,10 @@ def rules_command(output_format: str) -> None:
                 "description": r.description,
                 "specSection": r.spec_section,
                 "needsGtfs": r.needs_gtfs,
+                # Which companion GTFS files the rule reads. Each inner list is
+                # a set of alternatives; the rule is skipped
+                # ("skipped:needs_gtfs_table") unless every group is satisfied.
+                "gtfsTables": [list(group) for group in r.gtfs_tables],
                 "category": r.category,
                 "defaultEnabled": r.default_enabled,
                 "interpretation": r.interpretation,

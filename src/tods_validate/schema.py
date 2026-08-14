@@ -214,6 +214,12 @@ GTFS_PRIMARY_KEYS: dict[str, tuple[str, ...]] = {
     "calendar_dates.txt": ("service_id", "date"),
 }
 
+# The GTFS files TODS IDs actually resolve against -- the only ones the
+# companion view models. A package carrying none of these cannot serve as its
+# own companion feed, however many other GTFS files sit beside the TODS files:
+# a stray agency.txt says nothing about whether a trip_id exists.
+GTFS_COMPANION_FILENAMES: frozenset[str] = frozenset(GTFS_PRIMARY_KEYS)
+
 # Fields whose Presence is exactly Required in the current GTFS Schedule
 # reference. Conditionally Required fields are intentionally excluded: whether
 # they apply depends on values and relationships outside this TODS clarification.
@@ -589,6 +595,7 @@ def spec_link(table: TableSpec) -> str:
 
 
 __all__ = [
+    "GTFS_COMPANION_FILENAMES",
     "GTFS_FIELDS",
     "GTFS_FILENAMES",
     "GTFS_PRIMARY_KEYS",

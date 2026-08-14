@@ -15,7 +15,7 @@ from ..gtfs_companion import parse_gtfs_date
 from ..loader import Row
 from ..run_events import _Event
 from ..schema import SPEC_URL, SPEC_VERSION
-from . import ValidationContext, rule
+from . import GTFS_CALENDARS, GTFS_TRIPS, ValidationContext, rule
 
 _RUN_EVENTS_SECTION = f"{SPEC_URL}#run_eventstxt"
 # These checks assume v2.1.0's run_events.txt field names (start_time/end_time,
@@ -233,6 +233,7 @@ def employee_double_booked(context: ValidationContext) -> Iterator[Finding]:  # 
     ),
     spec_section=f"{SPEC_URL}#service_id-crew-schedules-and-trip-schedules",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_TRIPS, GTFS_CALENDARS),
 )
 def run_dates_exceed_trip_dates(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
@@ -289,6 +290,7 @@ def run_dates_exceed_trip_dates(context: ValidationContext) -> Iterator[Finding]
     ),
     spec_section=f"{SPEC_URL}#employee_run_datestxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_CALENDARS,),
 )
 def assignment_outside_service(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
@@ -336,6 +338,7 @@ def assignment_outside_service(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#vehicle_assignmentstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_CALENDARS,),
 )
 def vehicle_assignment_outside_service(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None

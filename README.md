@@ -61,8 +61,14 @@ tods-validate exports/tods/ --gtfs exports/gtfs.zip
 ```
 
 When the TODS files sit next to the GTFS files in one package, the GTFS files
-are picked up automatically. A complete sample feed ships in this repo, so you
-can try it right after installing:
+are picked up automatically — but only the files TODS IDs actually resolve
+against (`trips.txt`, `stops.txt`, `stop_times.txt`, `routes.txt`,
+`calendar.txt`, `calendar_dates.txt`). A package holding none of those is not
+treated as its own companion feed, and a check that reads a file the companion
+does not have is reported as skipped, never as a rule that ran clean. A stray
+`agency.txt` cannot answer whether a `trip_id` exists, so it is not allowed to
+look like it did. A complete sample feed ships in this repo, so you can try it
+right after installing:
 
 ```console
 $ tods-validate examples/sample-feed

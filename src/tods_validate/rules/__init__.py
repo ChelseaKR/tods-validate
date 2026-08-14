@@ -23,7 +23,7 @@ from .. import run_events
 from ..findings import Finding, Severity
 from ..gtfs_companion import CompanionGTFS
 from ..loader import Package
-from ..schema import SPEC_VERSION, TableSpec, tables_for_version
+from ..schema import GTFS_PRIMARY_KEYS, SPEC_VERSION, TableSpec, tables_for_version
 
 
 @dataclass
@@ -68,6 +68,17 @@ class ValidationContext:
 CheckFunction = Callable[[ValidationContext], Iterator[Finding]]
 
 
+# Requirement groups for Rule.gtfs_tables, named once here so every rule module
+# spells them the same way. Each is one group of alternatives: GTFS lets a feed
+# define services in calendar.txt, calendar_dates.txt, or both, so either file
+# satisfies GTFS_CALENDARS.
+GTFS_TRIPS = ("trips.txt",)
+GTFS_STOPS = ("stops.txt",)
+GTFS_ROUTES = ("routes.txt",)
+GTFS_STOP_TIMES = ("stop_times.txt",)
+GTFS_CALENDARS = ("calendar.txt", "calendar_dates.txt")
+
+
 # Categories group rules by how aggressively they fire. "core" rules check the
 # spec and run by default. "coverage" and "advisory" rules are opt-in (see
 # default_enabled) because they surface judgement calls, not spec violations,
@@ -88,6 +99,15 @@ class Rule:
     # Rules that resolve IDs into the companion GTFS feed are skipped when no
     # companion feed is available.
     needs_gtfs: bool = False
+    # Which GTFS files this rule actually reads out of the companion feed.
+    # Each inner tuple is a set of alternatives, and every group must be
+    # satisfied: (("trips.txt",), ("stop_times.txt",)) needs both files, while
+    # (("calendar.txt", "calendar_dates.txt"),) needs either one. A rule whose
+    # requirement the companion feed cannot meet is skipped rather than run:
+    # "the check function was invoked" is not the same claim as "the check had
+    # anything to check", and only the second one earns a clean result. Every
+    # needs_gtfs rule must declare this (enforced in rule()).
+    gtfs_tables: tuple[tuple[str, ...], ...] = ()
     # See CATEGORIES.
     category: str = "core"
     # Opt-in rules (default_enabled=False) run only when their ID or category
@@ -763,13 +783,21 @@ REGISTRY: list[Rule] = []
 # were skipped and why. See RunCoverage.
 STATUS_RAN = "ran"
 STATUS_SKIPPED_NEEDS_GTFS = "skipped:needs_gtfs"
+STATUS_SKIPPED_NEEDS_GTFS_TABLE = "skipped:needs_gtfs_table"
 STATUS_SKIPPED_DISABLED = "skipped:disabled"
 STATUS_SKIPPED_IGNORED = "skipped:ignored"
 STATUS_SKIPPED_SPEC_VERSION = "skipped:spec_version"
 
 # Human-readable reason per status, for the one-line disclosure in reports.
+# This mapping is the single source of the skipped statuses: RunCoverage groups
+# by its keys, so a status added here is disclosed everywhere, and a status
+# added *without* an entry here would be counted as skipped but never explained
+# -- which is the failure this manifest exists to prevent.
 _STATUS_REASON = {
     STATUS_SKIPPED_NEEDS_GTFS: "no companion GTFS feed was provided",
+    STATUS_SKIPPED_NEEDS_GTFS_TABLE: (
+        "the companion GTFS feed has none of the files the check reads"
+    ),
     STATUS_SKIPPED_DISABLED: "opt-in rule not enabled (use --enable)",
     STATUS_SKIPPED_IGNORED: "suppressed by local policy (--ignore)",
     STATUS_SKIPPED_SPEC_VERSION: "not defined by the requested --spec-version",
@@ -814,14 +842,13 @@ class RunCoverage:
         return tuple(o for o in self.outcomes if not o.ran)
 
     def skipped_by_reason(self) -> dict[str, list[RuleOutcome]]:
-        """Skipped rules grouped by status, in a stable status order."""
+        """Skipped rules grouped by status, in a stable status order.
+
+        Iterates _STATUS_REASON rather than its own list of statuses, so every
+        skipped rule lands in exactly one group and no skip can go undisclosed.
+        """
         grouped: dict[str, list[RuleOutcome]] = {}
-        for status in (
-            STATUS_SKIPPED_NEEDS_GTFS,
-            STATUS_SKIPPED_DISABLED,
-            STATUS_SKIPPED_IGNORED,
-            STATUS_SKIPPED_SPEC_VERSION,
-        ):
+        for status in _STATUS_REASON:
             members = [o for o in self.outcomes if o.status == status]
             if members:
                 grouped[status] = members
@@ -882,6 +909,7 @@ def rule(
     description: str,
     spec_section: str,
     needs_gtfs: bool = False,
+    gtfs_tables: tuple[tuple[str, ...], ...] = (),
     category: str = "core",
     default_enabled: bool = True,
     interpretation: str | None = None,
@@ -891,6 +919,20 @@ def rule(
     """Register a check function. Used as a decorator in the rule modules."""
     if category not in CATEGORIES:
         raise ValueError(f"unknown rule category {category!r}")
+    if needs_gtfs and not gtfs_tables:
+        raise ValueError(
+            f"rule {id} needs the companion GTFS feed but does not declare which "
+            "files it reads (gtfs_tables); without that it would be reported as "
+            "having run against a companion that cannot answer it"
+        )
+    if gtfs_tables and not needs_gtfs:
+        raise ValueError(f"rule {id} declares gtfs_tables but does not set needs_gtfs")
+    unknown = {name for group in gtfs_tables for name in group} - set(GTFS_PRIMARY_KEYS)
+    if unknown:
+        raise ValueError(
+            f"rule {id} declares GTFS file(s) the companion feed does not model: "
+            f"{', '.join(sorted(unknown))}"
+        )
 
     def decorator(check: CheckFunction) -> CheckFunction:
         if any(r.id == id for r in REGISTRY):
@@ -904,6 +946,7 @@ def rule(
                 spec_section=spec_section,
                 check=check,
                 needs_gtfs=needs_gtfs,
+                gtfs_tables=gtfs_tables,
                 category=category,
                 default_enabled=default_enabled,
                 interpretation=interpretation,
@@ -922,11 +965,25 @@ def _is_enabled(r: Rule, enabled: frozenset[str]) -> bool:
     return r.id in enabled or r.category in enabled
 
 
+def missing_gtfs_tables(r: Rule, gtfs: CompanionGTFS) -> tuple[str, ...]:
+    """Which of ``r``'s required GTFS files the companion feed does not have.
+
+    A requirement group is met when any one of its alternatives is a *base*
+    file of the companion feed. A TODS supplement file does not meet it: a
+    supplement modifies a GTFS table, so without that table there is nothing to
+    resolve a reference against, and every ID would look missing.
+    """
+    return tuple(" or ".join(group) for group in r.gtfs_tables if not set(group) & gtfs.present)
+
+
 def _rule_status(r: Rule, context: ValidationContext, enabled: frozenset[str]) -> str:
     if r.spec_versions is not None and context.spec_version not in r.spec_versions:
         return STATUS_SKIPPED_SPEC_VERSION
-    if r.needs_gtfs and context.gtfs is None:
-        return STATUS_SKIPPED_NEEDS_GTFS
+    if r.needs_gtfs:
+        if context.gtfs is None:
+            return STATUS_SKIPPED_NEEDS_GTFS
+        if missing_gtfs_tables(r, context.gtfs):
+            return STATUS_SKIPPED_NEEDS_GTFS_TABLE
     if not _is_enabled(r, enabled):
         return STATUS_SKIPPED_DISABLED
     return STATUS_RAN
