@@ -76,6 +76,22 @@ def test_bad_time_is_a_review_suggestion(tmp_path: Path) -> None:
     assert fixes[0].proposed == "09:45:00"
 
 
+def test_unpadded_three_part_time_keeps_its_minutes_and_seconds(tmp_path: Path) -> None:
+    # _normalize_time's own docstring example, 9:5:3 -> 09:05:03, and until now
+    # the only time these tests exercised was 9:45, whose seconds field is "00"
+    # either way: a normalizer that discarded the seconds passed every one of
+    # them. Every component has to survive, in the right place.
+    src = _feed(
+        tmp_path,
+        "run_events.txt",
+        _RUN_EVENTS_HEADER + "weekday,10000,10,sign-in,garage,08:45:00,garage,9:5:3\n",
+    )
+    fixes = [s for s in _suggestions(src) if s.rule_id == "TODS-E203"]
+    assert len(fixes) == 1
+    assert fixes[0].current == "9:5:3"
+    assert fixes[0].proposed == "09:05:03"
+
+
 def test_applying_the_time_suggestion_clears_the_error(tmp_path: Path) -> None:
     src = _feed(
         tmp_path,
