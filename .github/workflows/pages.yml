@@ -1,10 +1,23 @@
 name: Deploy playground
 
 # Publishes web/ (the in-browser Pyodide validator) to GitHub Pages.
-# One-time setup: Settings -> Pages -> Source: "GitHub Actions". Then run this
-# workflow manually. Kept on workflow_dispatch so it never deploys unverified.
+# One-time setup: Settings -> Pages -> Source: "GitHub Actions".
+#
+# Deploys on release, because manual-only dispatch is how the published page
+# came to sit three weeks behind the library at the previous release's rule set
+# with nothing detecting it. The release is also the right moment: the page
+# micropip-installs `tods-validate==<pinned>` from PyPI, so it must not be
+# published before that version exists there -- the job below refuses to deploy
+# until PyPI serves it. workflow_dispatch stays for out-of-band fixes.
+#
+# The verify job below then checks that the deployment actually took effect and
+# that the live page passes WCAG 2.1 AA -- a deploy is not done because a job
+# went green, it is done when the page people open is the page that was built.
+# .github/workflows/playground-deployment.yml re-runs both checks weekly.
 
 on:
+  release:
+    types: [published]
   workflow_dispatch:
 
 # Least-privilege default; the deploy job escalates only what it needs
@@ -29,9 +42,46 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
+      - name: Refuse to publish a page pinned to a wheel PyPI does not have
+        run: |
+          set -euo pipefail
+          pin="$(sed -n 's/.*TODS_VALIDATE_VERSION = "\([^"]*\)".*/\1/p' web/index.html | head -1)"
+          test -n "$pin"
+          echo "playground pins tods-validate==$pin"
+          if ! curl -fsSL -o /dev/null "https://pypi.org/pypi/tods-validate/$pin/json"; then
+            echo "::error::PyPI has no tods-validate $pin, so the deployed page could not install itself."
+            exit 1
+          fi
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
           path: web
       - id: deployment
         uses: actions/deploy-pages@cd2ce8fcbc39b97be8ca5fce6e763baed58fa128 # v5.0.0
+
+  # Confirms the deployment against the live URL: the served page must be the
+  # tree that was just uploaded, and it must pass the same WCAG 2.1 AA runners
+  # ci.yml applies to the repository copy.
+  verify:
+    needs: deploy
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Check the deployed page is the tree that was just published
+        run: ./scripts/check-deployed-playground.sh web/index.html
+      - name: Select the hosted Chrome binary
+        run: |
+          a11y_chrome="$(command -v google-chrome)"
+          test -x "$a11y_chrome"
+          echo "PUPPETEER_EXECUTABLE_PATH=$a11y_chrome" >> "$GITHUB_ENV"
+      - name: Audit the deployed page (WCAG 2.1 AA)
+        run: ./node_modules/.bin/pa11y-ci --config scripts/pa11y-ci-live.cjs

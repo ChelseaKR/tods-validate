@@ -28,7 +28,16 @@ Added:
 - A blocking WCAG 2.1 AA accessibility job using both axe-core and
   HTML_CodeSniffer on the playground and a generated HTML report. The same gate
   runs during release verification, and the npm lockfile is vulnerability-
-  audited.
+  audited. That job audits this repository's `web/index.html`, which is the
+  source of the deployed playground and not the deployment; the deployed page is
+  now checked separately, against the live URL, by the same runners and standard.
+- The playground is deployed when a release is published, rather than only by
+  manual dispatch, and the deploy refuses to publish a page pinned to a wheel
+  PyPI does not have yet. After each deploy, and weekly, the served page is
+  compared against the page this repository publishes and audited for
+  accessibility, so a stale or silently failed deployment is reported instead of
+  going unnoticed. `tests/test_playground.py` pins the playground's
+  `TODS_VALIDATE_VERSION` to `pyproject.toml`'s version.
 
 ## v0.8.0 - 2026-07-16
 

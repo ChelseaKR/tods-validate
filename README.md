@@ -392,6 +392,14 @@ non-color users.
   marker in addition to color. The report ships as a single file with no
   external assets.
 
+- The blocking WCAG 2.1 AA check (axe + HTML_CodeSniffer) runs against this
+  repository's `web/index.html` and a generated HTML report on every pull
+  request. The *deployed* playground is a separate artifact and is checked
+  separately: after each deploy and weekly, the live page is compared against
+  the page this repository publishes and audited with the same runners. A page
+  that is accessible in the repository is not evidence about the page you open,
+  so both are checked.
+
 If you hit an output that is hard to read with assistive technology, that is a
 bug — please report it.
 
