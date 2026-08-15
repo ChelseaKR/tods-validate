@@ -4,7 +4,7 @@
 # (REL-14/15). CI additionally runs what needs GitHub itself -- the composite
 # action's self-test, CodeQL, Semgrep and zizmor -- so a green `make verify` is
 # a necessary condition for merge, not a sufficient one.
-.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation
+.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation perf-check
 
 verify: lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation
 	@echo "make verify: all gates passed."
@@ -63,3 +63,11 @@ a11y:
 # cffconvert is fetched ephemerally into uv's tool cache.
 citation:
 	uvx cffconvert --validate -i CITATION.cff
+
+# Perf budget (QM-02): validation throughput against perf/baseline.json.
+# Deliberately NOT a `verify` prerequisite: the baseline is recorded on the CI
+# runner's machine class, so a laptop's number is not comparable to it. Run it
+# to see the measurement locally; the merge-blocking comparison is the `perf`
+# job in .github/workflows/ci.yml.
+perf-check:
+	python scripts/check_perf_budget.py

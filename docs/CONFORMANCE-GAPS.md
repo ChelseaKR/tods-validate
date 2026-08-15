@@ -253,8 +253,15 @@ walkthrough, not another scanner.
 `.github/PULL_REQUEST_TEMPLATE.md` added; `docs/roadmap.md` gained a
 Metrics ledger table and a release checklist (QM-17).
 
-**Still open:** QM-02 (perf budget as a CI gate, not just a script that
-exists), QM-11 (DORA quarterly review — no cadence established yet).
+QM-02 closed: the perf budget is a gate. `scripts/check_perf_budget.py` (the
+`perf` job in `ci.yml`, `make perf-check` locally) validates a 50,000-trip
+synthetic feed and fails when throughput regresses past
+`perf/baseline.json`'s factor. Throughput is rows per CPU-second, not wall
+clock, so a busy shared runner does not read as a regression; the baseline is
+recorded from the CI runner's machine class, and the check fails rather than
+passes when it has no baseline to compare against.
+
+**Still open:** QM-11 (DORA quarterly review — no cadence established yet).
 
 ## documentation
 

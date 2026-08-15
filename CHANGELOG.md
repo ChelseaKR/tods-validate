@@ -68,6 +68,13 @@ Added:
   document. `make docs-check` now fails when a stamped page changes without a
   fresh verification, so the date means the text was checked rather than that
   someone typed a date once.
+- The perf budget is enforced (QM-02). `scripts/check_perf_budget.py` validates
+  a 50,000-trip synthetic feed and fails when throughput regresses past the
+  factor in `perf/baseline.json`; `scripts/benchmark.py` could measure this
+  before, but nothing compared the measurement to anything. Throughput is
+  measured in rows per CPU-second rather than wall clock, so a busy shared
+  runner is not reported as a regression, and the check fails rather than
+  passes when it has no baseline to compare against.
 
 ## v0.8.0 - 2026-07-16
 

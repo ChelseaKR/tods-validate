@@ -104,6 +104,28 @@ jobs:
       - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - run: make test
 
+  # Perf budget (QM-02): validation throughput must stay within
+  # perf/baseline.json's regression factor. scripts/benchmark.py could always
+  # measure this; nothing compared the measurement to anything, so a regression
+  # was only visible to whoever ran it and remembered the old number.
+  #
+  # The baseline is recorded from this job, on this machine class, because a
+  # number measured anywhere else is not comparable to what this job measures.
+  # The check fails rather than passes while the baseline is unrecorded.
+  perf:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          python-version: "3.12"
+      - run: uv sync --frozen
+      - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+      - run: make perf-check
+
   accessibility:
     runs-on: ubuntu-latest
     timeout-minutes: 10
