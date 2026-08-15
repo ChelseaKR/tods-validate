@@ -26,9 +26,27 @@ version in the `<script src=".../pyodide/vX.Y.Z/...">` tag to the current
 
 The playground is published at
 <https://chelseakr.github.io/tods-validate/>. GitHub Pages uses the GitHub
-Actions build source; the manually dispatched **Deploy playground** workflow
-(`.github/workflows/pages.yml`) publishes this folder. Verify the live page
-after each deployment before sharing it.
+Actions build source; the **Deploy playground** workflow
+(`.github/workflows/pages.yml`) publishes this folder when a release is
+published, and can still be dispatched manually for an out-of-band fix. It
+refuses to deploy a page whose `TODS_VALIDATE_VERSION` pin is not on PyPI yet,
+since the page installs that exact wheel in the browser.
+
+The deployment is then checked against the live URL, not assumed from a green
+deploy job:
+
+- `scripts/check-deployed-playground.sh` fails if the served page is not
+  byte-identical to the page this repository publishes — run right after each
+  deploy against the tree that was just uploaded, and weekly
+  (`.github/workflows/playground-deployment.yml`) against `web/index.html` at
+  the most recent release tag.
+- `scripts/pa11y-ci-live.cjs` runs axe and HTML_CodeSniffer at WCAG2AA against
+  the live page. `make a11y` audits this folder's copy, which is the source of
+  the deployment and not the deployment itself; this is what holds the artifact
+  people actually open to the same standard.
+
+`tests/test_playground.py` pins `TODS_VALIDATE_VERSION` to the version in
+`pyproject.toml`, so the repository copy cannot be left behind either.
 
 ## rules/
 
