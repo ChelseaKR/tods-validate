@@ -44,7 +44,12 @@ Added:
 
 - A reviewed v1-candidate public-contract snapshot and blocking drift check
   covering rule IDs/severities/categories, exit codes, supported spec versions,
-  Python exports, and required JSON report fields.
+  Python exports, and required JSON report fields. It runs on every pull request
+  and in the test suite; previously it reached CI only through the release
+  workflows, so the contract was first verified after a release tag was cut.
+  The CLI's exit codes now have names in `tods_validate.policy`
+  (`EXIT_CLEAN`/`EXIT_FINDINGS`/`EXIT_USAGE`) that the check reads, instead of
+  literals restated inside the checker.
 - A blocking WCAG 2.1 AA accessibility job using both axe-core and
   HTML_CodeSniffer on the playground and a generated HTML report. The same gate
   runs during release verification, and the npm lockfile is vulnerability-
