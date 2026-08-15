@@ -5,6 +5,26 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+Fixed:
+
+- A stray GTFS file next to the TODS files no longer promotes the package to
+  its own companion GTFS feed. A package is a companion only when it carries a
+  file TODS IDs resolve against (`trips.txt`, `stops.txt`, `stop_times.txt`,
+  `routes.txt`, `calendar.txt`, `calendar_dates.txt`); one `agency.txt` used to
+  be enough, which made all 16 GTFS cross-reference rules run against a feed
+  with no trips, stops or calendars — 28 invented errors on a valid feed, and a
+  coverage manifest reporting 39 of 42 rules as having run.
+- Every rule that reads the companion GTFS feed now declares which files it
+  reads, and is reported `skipped:needs_gtfs_table` when the companion does not
+  have them, instead of running against data that cannot answer it. A TODS
+  supplement file no longer counts as its own GTFS base table: `trips_supplement.txt`
+  modifies `trips.txt`, so without `trips.txt` there is nothing to resolve a
+  `trip_id` against. This also stops `TODS-I501` reporting trip coverage
+  computed from supplement rows alone.
+- `docs/report.schema.json` now lists `skipped:spec_version`, which the
+  validator has emitted since v0.8.0 without documenting: a report from
+  `--spec-version 1.0.0` failed the schema it publishes.
+
 Changed:
 
 - Supplement rows known to add a GTFS entry now require every field the GTFS

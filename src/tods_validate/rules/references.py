@@ -5,6 +5,13 @@ Rules that resolve IDs into the companion GTFS feed run against the
 Each check is gated on its target data actually being available, so a missing
 companion file produces one clear finding instead of a flood of broken
 references.
+
+That gating is declared, not re-implemented per rule: each rule lists the GTFS
+files it reads in ``gtfs_tables``, and the registry skips it -- visibly, in the
+coverage manifest -- when the companion feed does not have them. So a rule body
+here can assume its own files are present, and a rule that could not check
+anything is never counted as one that ran. Checks that read several files
+independently (TODS-W302, TODS-E314) still ask per file with the helpers below.
 """
 
 from __future__ import annotations
@@ -14,7 +21,15 @@ from collections.abc import Iterator
 from ..findings import Finding, Severity
 from ..loader import FeedFile, Package, Row
 from ..schema import SPEC_URL, SPEC_VERSION, TABLES
-from . import ValidationContext, rule
+from . import (
+    GTFS_CALENDARS,
+    GTFS_ROUTES,
+    GTFS_STOP_TIMES,
+    GTFS_STOPS,
+    GTFS_TRIPS,
+    ValidationContext,
+    rule,
+)
 from .fields import parse_time
 
 _SUPPLEMENT_SECTION = f"{SPEC_URL}#supplement-files"
@@ -22,6 +37,13 @@ _SUPPLEMENT_SECTION = f"{SPEC_URL}#supplement-files"
 # a mechanism the v1.0.0 spec does not have (Supplement files were introduced
 # in v2.0.0-alpha.1). Restricted to v2.1.0; see docs/spec-versions.md.
 _V2_ONLY = (SPEC_VERSION,)
+
+# Every GTFS base file a supplement file can target, as one alternatives group:
+# TODS-W313 and TODS-E314 read whichever of them the package supplements, so
+# they have something to check as long as one of these is in the companion.
+_SUPPLEMENTABLE = GTFS_TRIPS + GTFS_STOPS + GTFS_ROUTES + GTFS_STOP_TIMES + GTFS_CALENDARS
+# The four files TODS-E314 resolves supplement rows against.
+_E314_TARGETS = GTFS_ROUTES + GTFS_CALENDARS + GTFS_TRIPS + GTFS_STOPS
 
 
 def _rows(context: ValidationContext, filename: str) -> list[Row]:
@@ -36,37 +58,30 @@ def _run_pairs(context: ValidationContext) -> set[tuple[str, str]]:
     return context.run_pairs
 
 
+# A GTFS table is available to resolve references only when the companion feed
+# actually carries it. A TODS supplement file is not a substitute: it modifies
+# a GTFS table, so without that table the "supplemented" view holds nothing but
+# the supplement's own rows and every real ID reads as missing. Rules gated on
+# these are also skipped in the coverage manifest for the same reason (see
+# Rule.gtfs_tables), so an unavailable table is disclosed, never reported clean.
 def _trips_available(context: ValidationContext) -> bool:
     assert context.gtfs is not None
-    return (
-        "trips.txt" in context.gtfs.present
-        or context.package.get("trips_supplement.txt") is not None
-    )
+    return "trips.txt" in context.gtfs.present
 
 
 def _stops_available(context: ValidationContext) -> bool:
     assert context.gtfs is not None
-    return (
-        "stops.txt" in context.gtfs.present
-        or context.package.get("stops_supplement.txt") is not None
-    )
+    return "stops.txt" in context.gtfs.present
 
 
 def _calendar_available(context: ValidationContext) -> bool:
     assert context.gtfs is not None
-    return bool(
-        {"calendar.txt", "calendar_dates.txt"} & context.gtfs.present
-        or context.package.get("calendar_supplement.txt") is not None
-        or context.package.get("calendar_dates_supplement.txt") is not None
-    )
+    return bool(set(GTFS_CALENDARS) & context.gtfs.present)
 
 
 def _routes_available(context: ValidationContext) -> bool:
     assert context.gtfs is not None
-    return (
-        "routes.txt" in context.gtfs.present
-        or context.package.get("routes_supplement.txt") is not None
-    )
+    return "routes.txt" in context.gtfs.present
 
 
 @rule(
@@ -379,6 +394,7 @@ def delete_with_values(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_TRIPS,),
     example=(
         "Before: `run_events.txt` row has `trip_id=T-1042`, but the companion "
         "`trips.txt` was re-exported without `T-1042`. After: re-export the companion "
@@ -387,8 +403,6 @@ def delete_with_values(context: ValidationContext) -> Iterator[Finding]:
 )
 def run_event_trip_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
-    if not _trips_available(context):
-        return
     for row in _rows(context, "run_events.txt"):
         trip_id = row.values.get("trip_id", "")
         if trip_id and trip_id not in context.gtfs.trip_service:
@@ -423,6 +437,7 @@ def run_event_trip_missing(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_CALENDARS,),
     example=(
         "Before: `run_events.txt` uses `service_id=WKDY-OLD`, but calendars were "
         "regenerated with `service_id=WKDY-2026`. After: update the run event's "
@@ -431,8 +446,6 @@ def run_event_trip_missing(context: ValidationContext) -> Iterator[Finding]:
 )
 def run_event_service_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
-    if not _calendar_available(context):
-        return
     reported: set[str] = set()
     for row in _rows(context, "run_events.txt"):
         service_id = row.values.get("service_id", "")
@@ -471,6 +484,7 @@ def run_event_service_missing(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_STOPS,),
     example=(
         "Before: `run_events.txt` row has `start_location=STOP-99`, but `stops.txt` "
         "renumbered it to `STOP-0099`. After: update start_location/end_location to "
@@ -479,8 +493,6 @@ def run_event_service_missing(context: ValidationContext) -> Iterator[Finding]:
 )
 def run_event_stop_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
-    if not _stops_available(context):
-        return
     for row in _rows(context, "run_events.txt"):
         for field_name in ("start_location", "end_location"):
             stop_id = row.values.get(field_name, "")
@@ -519,11 +531,10 @@ def run_event_stop_missing(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_TRIPS,),
 )
 def run_event_block_mismatch(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
-    if not _trips_available(context):
-        return
     for row in _rows(context, "run_events.txt"):
         block_id = row.values.get("block_id", "")
         trip_id = row.values.get("trip_id", "")
@@ -563,6 +574,7 @@ def run_event_block_mismatch(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_STOP_TIMES,),
     interpretation=(
         "the spec says these locations 'should' be the trip endpoints, so a mismatch is "
         "a warning; skipped for mid-trip events and for trips with no stop_times."
@@ -619,6 +631,7 @@ def run_event_endpoint_mismatch(context: ValidationContext) -> Iterator[Finding]
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_STOP_TIMES,),
     interpretation=(
         "the companion of TODS-W315 for time: a run event claiming to work a whole trip "
         "should span the trip's scheduled times, so a mismatch is a warning; skipped for "
@@ -681,11 +694,10 @@ def run_event_time_mismatch(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#vehicle_assignmentstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_TRIPS,),
 )
 def vehicle_block_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
-    if not _trips_available(context):
-        return
     for row in _rows(context, "vehicle_assignments.txt"):
         block_id = row.values.get("block_id", "")
         if block_id and block_id not in context.gtfs.block_ids:
@@ -715,11 +727,10 @@ def vehicle_block_missing(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#vehicle_assignmentstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_CALENDARS,),
 )
 def vehicle_service_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
-    if not _calendar_available(context):
-        return
     for row in _rows(context, "vehicle_assignments.txt"):
         service_id = row.values.get("service_id", "")
         if service_id and service_id not in context.gtfs.service_ids:
@@ -750,6 +761,7 @@ def vehicle_service_missing(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=_SUPPLEMENT_SECTION,
     needs_gtfs=True,
+    gtfs_tables=(_SUPPLEMENTABLE,),
 )
 def delete_target_missing(context: ValidationContext) -> Iterator[Finding]:
     assert context.gtfs is not None
@@ -801,6 +813,7 @@ def delete_target_missing(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=_SUPPLEMENT_SECTION,
     needs_gtfs=True,
+    gtfs_tables=(_E314_TARGETS,),
     example=(
         "Before: `trips_supplement.txt` adds a trip with `route_id=RT-77`, but no such "
         "route exists in `routes.txt` or `routes_supplement.txt`. After: use an existing "
