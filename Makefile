@@ -4,10 +4,38 @@
 # (REL-14/15). CI additionally runs what needs GitHub itself -- the composite
 # action's self-test, CodeQL, Semgrep and zizmor -- so a green `make verify` is
 # a necessary condition for merge, not a sufficient one.
-.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation perf-check
+.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation perf-check
 
-verify: lint format typecheck test docs-check contract-check i18n-check audit secrets a11y citation
-	@echo "make verify: all gates passed."
+# Every gate `make verify` runs, in reporting order. Each one is independent:
+# see the recipe below for why that matters.
+VERIFY_GATES := lint format typecheck test docs-check contract-check i18n-check \
+	audit npm-audit secrets a11y citation
+
+# The gates run one after another and every one of them runs, whatever the ones
+# before it did. This is deliberate. When `verify` was a prerequisite list, make
+# stopped at the first failure, so a red gate silently cancelled every gate
+# after it -- an unfixable dependency advisory in the npm toolchain meant the
+# accessibility check had not run on any commit for weeks, and nothing said so.
+# Running them all is not the same as tolerating failures: each gate prints its
+# own PASS/FAIL, and `verify` exits non-zero if any of them failed, so nothing
+# is muted and nothing is hidden behind something else's result.
+verify:
+	@status=0; failed=""; \
+	for gate in $(VERIFY_GATES); do \
+		printf '\n== make %s ==\n' "$$gate"; \
+		if $(MAKE) --no-print-directory "$$gate"; then \
+			printf '== %s: PASS ==\n' "$$gate"; \
+		else \
+			status=1; failed="$$failed $$gate"; \
+			printf '== %s: FAIL ==\n' "$$gate"; \
+		fi; \
+	done; \
+	if [ "$$status" -eq 0 ]; then \
+		printf '\nmake verify: all gates passed.\n'; \
+	else \
+		printf '\nmake verify: FAILED:%s\n' "$$failed" >&2; \
+	fi; \
+	exit $$status
 
 lint:
 	ruff check src tests scripts
@@ -50,11 +78,22 @@ audit:
 secrets:
 	gitleaks detect --source . --redact --exit-code 1
 
+# Node dependency vulnerability audit (SEC-11). This used to be the first line
+# of the `a11y` recipe, which meant a HIGH advisory anywhere in the npm
+# toolchain aborted the recipe before `npm run a11y` ever started: the
+# accessibility gate reported a dependency problem and never performed an
+# accessibility check. It is its own gate now, and it reports its own result.
+# The gate blocks on HIGH/CRITICAL exactly as `npm audit --audit-level=high`
+# did; the script exists because npm cannot accept a single reviewed advisory,
+# and the alternative -- raising the severity floor -- would hide every finding
+# at that level. See waivers.yml.
+npm-audit:
+	python scripts/check_npm_audit.py
+
 # Blocking WCAG 2.1 AA automation for the browser playground and a generated
 # HTML report. npm ci must have been run first; CI and the reusable release
 # verification workflow both install from package-lock.json.
 a11y:
-	npm audit --audit-level=high
 	npm run a11y
 
 # Validates CITATION.cff against the Citation File Format 1.2.0 schema

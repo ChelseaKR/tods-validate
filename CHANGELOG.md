@@ -7,6 +7,18 @@ new checks may be added in minor releases.
 
 Fixed:
 
+- The accessibility gate now runs an accessibility check. `make a11y` began
+  with `npm audit --audit-level=high`, so once an unpatched HIGH advisory
+  appeared in the pa11y-ci development toolchain the recipe aborted on its
+  first line and `npm run a11y` stopped executing entirely — the job went red
+  for a dependency reason and audited nothing, on every commit, for weeks. The
+  npm dependency audit is now its own gate (`make npm-audit`, in the `audit`
+  job, at the same HIGH floor) and `make verify` runs every gate independently
+  and reports each one's result, instead of stopping at the first failure. The
+  one advisory behind this, GHSA-jmr9-qjv8-65gv in `extract-zip`, is recorded
+  in `waivers.yml` with an owner and a 2026-11-15 expiry; a different advisory,
+  the same advisory on another package, or the same advisory escalated in
+  severity still fails the gate, which `tests/test_npm_audit_gate.py` pins.
 - A stray GTFS file next to the TODS files no longer promotes the package to
   its own companion GTFS feed. A package is a companion only when it carries a
   file TODS IDs resolve against (`trips.txt`, `stops.txt`, `stop_times.txt`,

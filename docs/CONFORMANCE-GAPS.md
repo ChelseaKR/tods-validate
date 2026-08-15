@@ -233,8 +233,17 @@ HTML_CodeSniffer at WCAG 2.1 AA against both the browser playground and a
 fixture-generated HTML report. It found and fixed the report's invalid ARIA
 labeling on scrollable table containers, and added the playground file-input
 label, dark-mode contrast variables, and explicit focus treatment. The locked
-npm dependency tree is checked with `npm audit --audit-level=high`. `make
-verify` and the reusable release verifier both include the gate.
+npm dependency tree is checked at the same HIGH floor by a separate gate,
+`make npm-audit`. `make verify` and the reusable release verifier both include
+both gates.
+
+**Corrected 2026-08-15:** the npm dependency audit used to be the first line of
+the `a11y` recipe. Between 2026-07-16 and 2026-08-15 an unpatched HIGH advisory
+in the pa11y-ci toolchain (GHSA-jmr9-qjv8-65gv, waivers.yml WVR-001) failed
+that line, so `npm run a11y` never executed and the accessibility gate performed
+no accessibility check at all while reporting itself red for a dependency
+reason. The two are independent gates now, each reporting its own result, and
+`make verify` runs every gate rather than stopping at the first failure.
 
 The Pyodide CDN script in `web/index.html` also retains its SRI hash, closing
 the supply-chain-flavored A11Y-17 note from the original audit.

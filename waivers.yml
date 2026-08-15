@@ -1,0 +1,42 @@
+# Repository waiver registry (portfolio waiver-hygiene convention, SEC-10).
+#
+# Every entry is dated, owned, and expiring. An entry accepts exactly one
+# finding: `kind: npm-audit` waivers are matched by scripts/check_npm_audit.py
+# against the advisory id, the package, and the severity, all three. A new
+# advisory, the same advisory on a different package, or the same advisory
+# escalated to a higher severity is not covered by any entry here and fails
+# the gate. An expired or malformed entry accepts nothing.
+version: 1
+
+waivers:
+  - id: WVR-001
+    control: SEC-11
+    repo: tods-validate
+    kind: npm-audit
+    advisory: GHSA-jmr9-qjv8-65gv
+    package: extract-zip
+    version: 2.0.1
+    severity: high
+    dependency_path: >-
+      pa11y-ci@4.1.1 -> pa11y@9.1.1 -> puppeteer@24.43.1 ->
+      @puppeteer/browsers@2.13.2 -> extract-zip@2.0.1
+    reason: >-
+      extract-zip 2.0.1 does not validate symlink targets when unpacking an
+      archive, so a crafted archive can write outside the extraction directory
+      (CWE-22, CVSS 8.1). It reaches this repository only as a transitive
+      development dependency of the accessibility toolchain, five levels down
+      from pa11y-ci, where its sole job is unpacking the Chrome build that
+      @puppeteer/browsers downloads from Google's own storage host. It is in
+      the npm devDependencies set, is never installed by the published Python
+      package or the browser playground, and no code path in the shipped
+      artifact reaches it. No patched release of extract-zip exists as of
+      2026-08-15; the only remedy npm offers is `npm audit fix --force`, which
+      downgrades pa11y-ci from 4.1.1 to 3.1.0, a breaking major that would take
+      the WCAG 2.1 AA gate backwards to accept a fix for a package the shipped
+      artifact never loads. Accepted on that basis, to be re-reviewed on or
+      before the expiry date below and released the moment extract-zip ships a
+      fixed version or pa11y-ci moves off it.
+    owner: chelseakr
+    granted: 2026-08-15
+    expires: 2026-11-15
+    link: https://github.com/advisories/GHSA-jmr9-qjv8-65gv
