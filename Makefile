@@ -23,6 +23,7 @@ test:
 
 docs-check:
 	python scripts/generate_rules_doc.py --check
+	python scripts/check_doc_currency.py
 
 contract-check:
 	python scripts/check_public_contract.py

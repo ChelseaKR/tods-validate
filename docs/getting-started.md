@@ -64,3 +64,14 @@ tods-validate anonymize tods/ -o tods-anon/
 ```
 
 This is pseudonymization, not guaranteed anonymity — see [SECURITY.md](../SECURITY.md).
+
+---
+
+Last verified: 2026-08-14, against tods-validate 0.8.0. Every exit code, flag,
+and command on this page was run, and `ghcr.io/chelseakr/tods-validate` was
+confirmed published with a `latest` tag.
+Recheck cadence: every release, and whenever this page changes —
+`make docs-check` fails if the page is edited without a fresh verification.
+
+<!-- doc-currency: sha256=4713532b80fa -->
+

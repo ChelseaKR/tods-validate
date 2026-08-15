@@ -63,6 +63,11 @@ Added:
   accessibility, so a stale or silently failed deployment is reported instead of
   going unnoticed. `tests/test_playground.py` pins the playground's
   `TODS_VALIDATE_VERSION` to `pyproject.toml`'s version.
+- Currency stamps on `docs/getting-started.md` and `docs/api.md` (DOC-15), added
+  after re-running every command, exit code, signature, and member those pages
+  document. `make docs-check` now fails when a stamped page changes without a
+  fresh verification, so the date means the text was checked rather than that
+  someone typed a date once.
 
 ## v0.8.0 - 2026-07-16
 
