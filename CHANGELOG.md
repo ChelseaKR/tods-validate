@@ -5,6 +5,26 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+Fixed:
+
+- A stray GTFS file next to the TODS files no longer promotes the package to
+  its own companion GTFS feed. A package is a companion only when it carries a
+  file TODS IDs resolve against (`trips.txt`, `stops.txt`, `stop_times.txt`,
+  `routes.txt`, `calendar.txt`, `calendar_dates.txt`); one `agency.txt` used to
+  be enough, which made all 16 GTFS cross-reference rules run against a feed
+  with no trips, stops or calendars — 28 invented errors on a valid feed, and a
+  coverage manifest reporting 39 of 42 rules as having run.
+- Every rule that reads the companion GTFS feed now declares which files it
+  reads, and is reported `skipped:needs_gtfs_table` when the companion does not
+  have them, instead of running against data that cannot answer it. A TODS
+  supplement file no longer counts as its own GTFS base table: `trips_supplement.txt`
+  modifies `trips.txt`, so without `trips.txt` there is nothing to resolve a
+  `trip_id` against. This also stops `TODS-I501` reporting trip coverage
+  computed from supplement rows alone.
+- `docs/report.schema.json` now lists `skipped:spec_version`, which the
+  validator has emitted since v0.8.0 without documenting: a report from
+  `--spec-version 1.0.0` failed the schema it publishes.
+
 Changed:
 
 - Supplement rows known to add a GTFS entry now require every field the GTFS
@@ -24,11 +44,30 @@ Added:
 
 - A reviewed v1-candidate public-contract snapshot and blocking drift check
   covering rule IDs/severities/categories, exit codes, supported spec versions,
-  Python exports, and required JSON report fields.
+  Python exports, and required JSON report fields. It runs on every pull request
+  and in the test suite; previously it reached CI only through the release
+  workflows, so the contract was first verified after a release tag was cut.
+  The CLI's exit codes now have names in `tods_validate.policy`
+  (`EXIT_CLEAN`/`EXIT_FINDINGS`/`EXIT_USAGE`) that the check reads, instead of
+  literals restated inside the checker.
 - A blocking WCAG 2.1 AA accessibility job using both axe-core and
   HTML_CodeSniffer on the playground and a generated HTML report. The same gate
   runs during release verification, and the npm lockfile is vulnerability-
-  audited.
+  audited. That job audits this repository's `web/index.html`, which is the
+  source of the deployed playground and not the deployment; the deployed page is
+  now checked separately, against the live URL, by the same runners and standard.
+- The playground is deployed when a release is published, rather than only by
+  manual dispatch, and the deploy refuses to publish a page pinned to a wheel
+  PyPI does not have yet. After each deploy, and weekly, the served page is
+  compared against the page this repository publishes and audited for
+  accessibility, so a stale or silently failed deployment is reported instead of
+  going unnoticed. `tests/test_playground.py` pins the playground's
+  `TODS_VALIDATE_VERSION` to `pyproject.toml`'s version.
+- Currency stamps on `docs/getting-started.md` and `docs/api.md` (DOC-15), added
+  after re-running every command, exit code, signature, and member those pages
+  document. `make docs-check` now fails when a stamped page changes without a
+  fresh verification, so the date means the text was checked rather than that
+  someone typed a date once.
 - The perf budget is enforced (QM-02). `scripts/check_perf_budget.py` validates
   a 50,000-trip synthetic feed and fails when throughput regresses past the
   factor in `perf/baseline.json`; `scripts/benchmark.py` could measure this

@@ -283,8 +283,18 @@ Catches malformed citation metadata before a release ships it; the existing
 release-checklist eyeball check (tag/pyproject/CITATION.cff version
 agreement) still lives in `verify.yml`'s REL-03 step and is unaffected.
 
-**Still open:** DOC-15 (no currency stamps on `getting-started.md`/`api.md`,
-no `check_staleness.py` wiring).
+**Closed 2026-08-14:** DOC-15 — `docs/getting-started.md` and `docs/api.md`
+carry `Last verified:` and `Recheck cadence:` lines per
+`DOCUMENTATION-STANDARD.md` §6.5, stamped only after every command, exit code,
+signature, and member on those pages was actually run against the current build.
+`scripts/check_doc_currency.py` (folded into `make docs-check`, so the existing
+`docs-drift` CI job runs it on every pull request) makes the claim falsifiable:
+each stamp records a fingerprint of the page it describes, and the check fails
+when the page changes without a fresh verification. What it cannot check is
+whether a verification was any good — that stays a REVIEW gate, which is what
+the cadence line is for.
+
+**Still open:** nothing in this section.
 
 ## responsible-tech
 

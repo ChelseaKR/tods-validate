@@ -12,7 +12,7 @@ from collections.abc import Iterator
 
 from ..findings import Finding, Severity
 from ..schema import SPEC_URL, SPEC_VERSION
-from . import ValidationContext, rule
+from . import GTFS_TRIPS, ValidationContext, rule
 
 _BREAK_KEYWORDS = ("break", "lunch", "meal")
 # A continuous on-duty span longer than this (seconds) with no break event is
@@ -35,6 +35,7 @@ _V2_ONLY = (SPEC_VERSION,)
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_TRIPS,),
     category="coverage",
     default_enabled=False,
 )
@@ -71,6 +72,7 @@ def trips_without_run_events(context: ValidationContext) -> Iterator[Finding]:
     ),
     spec_section=f"{SPEC_URL}#vehicle_assignmentstxt",
     needs_gtfs=True,
+    gtfs_tables=(GTFS_TRIPS,),
     category="coverage",
     default_enabled=False,
 )

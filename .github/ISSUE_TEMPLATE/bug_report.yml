@@ -1,0 +1,53 @@
+name: Bug report
+description: Something behaves differently than documented
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. The most useful reports say what you ran,
+        what happened, and what you expected instead.
+
+        If this is a security vulnerability, please do not file it here. See
+        SECURITY.md for how to report it privately.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: >-
+        What you ran and what came back. Paste the output rather than describing it.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected instead
+      description: >-
+        If a rule or spec section says otherwise, quoting it helps a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: The feed, or the relevant rows
+      description: >-
+        Paste the smallest excerpt that reproduces it, or link a public feed. Do not attach operational data you cannot share publicly.
+      render: text
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: >-
+        tods-validate --version
+    validations:
+      required: true
+  - type: textarea
+    id: anything-else
+    attributes:
+      label: Anything else
+      description: >-
+        Environment, workarounds you tried, related issues.
+    validations:
+      required: false

@@ -1,4 +1,16 @@
 #!/usr/bin/env bash
+# The blocking WCAG 2.1 AA gate (`make a11y`), over two pages served from a temp
+# directory: this repository's web/index.html and a freshly generated HTML
+# report.
+#
+# What this does NOT audit: the deployed playground at the project's Pages URL.
+# It copies web/index.html below, which is the *source* of that deployment, not
+# the deployment -- and the two can differ, which is exactly how the live page
+# stayed at the previous release for three weeks with this gate green. The
+# deployed artifact is audited against the same runners and standard by
+# scripts/pa11y-ci-live.cjs, run from .github/workflows/pages.yml right after
+# each deploy and weekly from playground-deployment.yml, with
+# scripts/check-deployed-playground.sh checking the two are the same page.
 set -euo pipefail
 
 a11y_tmp="$(mktemp -d "${TMPDIR:-/tmp}/tods-a11y.XXXXXX")"

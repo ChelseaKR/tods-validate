@@ -1,0 +1,35 @@
+name: Idea or feature request
+description: Suggest something this should do that it does not
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Ideas are welcome, including ones that turn out to be a bad fit. If you
+        are unsure whether something is a bug or intended behaviour, open a
+        discussion instead and we can work it out there.
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: >-
+        What are you trying to do that is hard or impossible right now?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What you have in mind
+      description: >-
+        A rough shape is fine. Alternatives you considered are useful too.
+    validations:
+      required: false
+  - type: checkboxes
+    id: willing
+    attributes:
+      label: Would you want to build it?
+      description: >-
+        Entirely optional, and a no is a perfectly good answer.
+      options:
+        - label: I would be interested in opening a PR for this
+          required: false

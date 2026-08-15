@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Question, or "is this a bug or did I misread the spec?"
+    url: https://github.com/ChelseaKR/tods-validate/discussions
+    about: Ask here first if you are not sure it is a bug. No wrong questions.
+  - name: Report a security vulnerability
+    url: https://github.com/ChelseaKR/tods-validate/blob/main/SECURITY.md
+    about: Please report privately, not in a public issue.

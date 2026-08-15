@@ -56,6 +56,10 @@ assignments. This is the reason `RunCoverage`/the coverage manifest
 a clean report now discloses which rules ran versus were skipped and why,
 rather than implying a full check happened when it did not (e.g. no
 companion GTFS was supplied, so GTFS-cross-reference rules were skipped).
+"Ran" has to mean ran for that disclosure to be worth anything: a rule whose
+GTFS file the companion feed does not carry is reported
+`skipped:needs_gtfs_table`, because a check with nothing to read has not
+earned the clean result it would otherwise contribute to.
 
 **Commitments.**
 - Non-goals, stated in README `## What this does not check`: this tool does

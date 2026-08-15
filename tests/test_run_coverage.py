@@ -13,6 +13,8 @@ from click.testing import CliRunner
 from conftest import FIXTURES, VALID_GTFS, VALID_TODS, run_invalid_fixture
 from tods_validate.cli import main
 from tods_validate.findings import Finding, Severity
+from tods_validate.gtfs_companion import build_companion
+from tods_validate.loader import load_package
 from tods_validate.report import (
     REPORT_SCHEMA_VERSION,
     RULE_PAGE_BASE,
@@ -21,19 +23,35 @@ from tods_validate.report import (
     render_text,
 )
 from tods_validate.rules import (
+    _STATUS_REASON,
     CATEGORIES,
     REGISTRY,
     STATUS_RAN,
     STATUS_SKIPPED_DISABLED,
     STATUS_SKIPPED_IGNORED,
     STATUS_SKIPPED_NEEDS_GTFS,
+    STATUS_SKIPPED_NEEDS_GTFS_TABLE,
+    STATUS_SKIPPED_SPEC_VERSION,
     all_rules,
+    missing_gtfs_tables,
 )
 from tods_validate.runner import run, run_with_coverage
+from tods_validate.schema import GTFS_PRIMARY_KEYS
 
 SCHEMA = json.loads(
     (Path(__file__).parent.parent / "docs" / "report.schema.json").read_text(encoding="utf-8")
 )
+SCHEMA_STATUSES = set(
+    SCHEMA["properties"]["coverage"]["properties"]["rules"]["items"]["properties"]["status"]["enum"]
+)
+NEEDS_GTFS = {r.id for r in all_rules() if r.needs_gtfs}
+
+
+def _copy_valid_tods(destination: Path) -> Path:
+    """The valid TODS package, copied so a test can add a file beside it."""
+    for source in VALID_TODS.iterdir():
+        (destination / source.name).write_bytes(source.read_bytes())
+    return destination
 
 
 def test_report_schema_version_bumped_for_coverage() -> None:
@@ -113,12 +131,7 @@ def test_json_report_carries_coverage_and_matches_schema() -> None:
     jsonschema.validate(payload, SCHEMA)
     coverage = payload["coverage"]
     assert coverage["total"] == len(REGISTRY)
-    assert {r["status"] for r in coverage["rules"]} <= {
-        "ran",
-        "skipped:needs_gtfs",
-        "skipped:disabled",
-        "skipped:ignored",
-    }
+    assert {r["status"] for r in coverage["rules"]} <= SCHEMA_STATUSES
 
 
 def test_ignored_rules_are_disclosed_in_the_report() -> None:
@@ -193,6 +206,126 @@ def test_reference_findings_carry_structured_data() -> None:
     assert e307.data is not None
     assert e307.data["referenced"] == "trips.trip_id"
     assert e307.data["value"]
+
+
+def test_a_stray_gtfs_file_is_not_a_companion_feed(tmp_path: Path) -> None:
+    # One stray agency.txt used to promote the package to its own companion
+    # feed, so all 16 GTFS reference rules ran against a "feed" with no trips,
+    # stops or calendars: 28 invented errors, and a manifest claiming 39 of 42
+    # rules had run. agency.txt holds nothing a TODS ID resolves against, so
+    # the package is not a companion and those rules must stay skipped.
+    package = _copy_valid_tods(tmp_path)
+    (package / "agency.txt").write_text(
+        "agency_name,agency_url,agency_timezone\nA,https://a.example,Etc/UTC\n"
+    )
+    _, findings, coverage = run_with_coverage(package)
+    assert findings == []
+    skipped = {o.id for o in coverage.outcomes if o.status == STATUS_SKIPPED_NEEDS_GTFS}
+    assert skipped == NEEDS_GTFS
+    # Identical to the same package without the stray file, in both directions.
+    _, _, without = run_with_coverage(VALID_TODS)
+    assert coverage.to_dict() == without.to_dict()
+
+
+def test_package_with_no_tods_files_does_not_report_reference_checks_as_run() -> None:
+    # tests/fixtures/invalid/TODS-W101 is a single agency.txt and zero TODS
+    # files. It used to report 39 of 42 rules as having run while simultaneously
+    # finding "no TODS files were found in this package".
+    _, findings, coverage = run_with_coverage(FIXTURES / "invalid" / "TODS-W101")
+    assert "TODS-W101" in {f.rule_id for f in findings}
+    ran = {o.id for o in coverage.ran}
+    assert not (ran & NEEDS_GTFS), "GTFS reference rules cannot have run: there is no GTFS feed"
+
+
+def test_rules_whose_gtfs_table_is_absent_are_skipped_not_run(tmp_path: Path) -> None:
+    # A partial companion: stops.txt is there, so stop references are genuinely
+    # checkable, but nothing resolves a trip_id or a service_id. Rules that read
+    # the missing tables get their own skip reason rather than reporting a pass.
+    package = _copy_valid_tods(tmp_path)
+    (package / "stops.txt").write_text("stop_id\nS1\n")
+    _, _, coverage = run_with_coverage(package, enabled=frozenset(CATEGORIES))
+    by_id = {o.id: o.status for o in coverage.outcomes}
+    assert by_id["TODS-E309"] == STATUS_RAN  # stops.txt is present
+    for rule_id in ("TODS-E307", "TODS-E310", "TODS-E311", "TODS-I501"):  # need trips.txt
+        assert by_id[rule_id] == STATUS_SKIPPED_NEEDS_GTFS_TABLE
+    for rule_id in ("TODS-E308", "TODS-E312", "TODS-W406"):  # need the calendars
+        assert by_id[rule_id] == STATUS_SKIPPED_NEEDS_GTFS_TABLE
+    # The reason is distinct from "no companion feed at all", which is a
+    # different problem with a different fix.
+    assert STATUS_SKIPPED_NEEDS_GTFS not in by_id.values()
+    assert "none of the files the check reads" in (coverage.summary_line() or "")
+    # Which file was missing is answerable, not just that something was.
+    companion = build_companion(load_package(package), load_package(package), source="package")
+    by_rule = {r.id: r for r in all_rules()}
+    assert missing_gtfs_tables(by_rule["TODS-E307"], companion) == ("trips.txt",)
+    assert missing_gtfs_tables(by_rule["TODS-E308"], companion) == (
+        "calendar.txt or calendar_dates.txt",
+    )
+    assert missing_gtfs_tables(by_rule["TODS-E309"], companion) == ()
+
+
+def test_a_supplement_alone_does_not_make_a_gtfs_table_checkable(tmp_path: Path) -> None:
+    # trips_supplement.txt modifies trips.txt; it is not trips.txt. With no base
+    # table the supplemented view holds only the supplement's own rows, so every
+    # real trip_id would read as missing. The valid package supplements trips,
+    # stops, routes and both calendars, and still has nothing to resolve against.
+    package = _copy_valid_tods(tmp_path)
+    (package / "routes.txt").write_text("route_id\nR1\n")
+    _, _, coverage = run_with_coverage(package, enabled=frozenset(CATEGORIES))
+    by_id = {o.id: o.status for o in coverage.outcomes}
+    assert by_id["TODS-E307"] == STATUS_SKIPPED_NEEDS_GTFS_TABLE
+    assert by_id["TODS-E309"] == STATUS_SKIPPED_NEEDS_GTFS_TABLE
+
+
+def test_every_needs_gtfs_rule_declares_the_files_it_reads() -> None:
+    # The skip is only as honest as the declaration. A needs_gtfs rule with no
+    # gtfs_tables would silently go back to being reported as run against a
+    # companion that cannot answer it; rule() rejects that, and this pins it.
+    for r in all_rules():
+        assert bool(r.gtfs_tables) == r.needs_gtfs, r.id
+        for group in r.gtfs_tables:
+            assert group, r.id
+            assert set(group) <= set(GTFS_PRIMARY_KEYS), r.id
+
+
+def test_no_skipped_rule_is_ever_counted_as_run(tmp_path: Path) -> None:
+    # The manifest's whole job is that "ran" means ran. Across every shape of
+    # run: the counts add up, no skipped rule appears in ran, and every skipped
+    # rule is disclosed under exactly one reason with human-readable text.
+    stray = _copy_valid_tods(tmp_path)
+    (stray / "agency.txt").write_text("agency_name\nA\n")
+    runs = [
+        run_with_coverage(VALID_TODS, VALID_GTFS)[2],
+        run_with_coverage(VALID_TODS)[2],
+        run_with_coverage(stray)[2],
+        run_with_coverage(VALID_TODS, VALID_GTFS, enabled=frozenset(CATEGORIES))[2],
+        run_with_coverage(FIXTURES / "spec_v1" / "valid", spec_version="1.0.0")[2],
+    ]
+    for coverage in runs:
+        payload = coverage.to_dict()
+        assert payload["ran"] + payload["skipped"] == payload["total"] == len(REGISTRY)
+        assert {o.id for o in coverage.ran}.isdisjoint({o.id for o in coverage.skipped})
+        grouped = coverage.skipped_by_reason()
+        disclosed = [o.id for members in grouped.values() for o in members]
+        assert sorted(disclosed) == sorted(o.id for o in coverage.skipped)
+        assert len(disclosed) == len(set(disclosed))
+        for outcome in coverage.skipped:
+            assert outcome.reason, outcome.id
+            assert not outcome.ran
+
+
+def test_report_schema_documents_every_status_the_validator_emits() -> None:
+    # A status missing from the schema means a real report fails its own
+    # published contract. skipped:spec_version was missing until 0.9.0.
+    assert {STATUS_RAN, *_STATUS_REASON} == SCHEMA_STATUSES
+
+
+def test_spec_version_skips_validate_against_the_published_schema() -> None:
+    payload = _report(str(FIXTURES / "spec_v1" / "valid"), "--spec-version", "1.0.0")
+    jsonschema.validate(payload, SCHEMA)
+    statuses = {r["status"] for r in payload["coverage"]["rules"]}
+    assert STATUS_SKIPPED_SPEC_VERSION in statuses
+    assert statuses <= SCHEMA_STATUSES
 
 
 def test_vehicle_assignment_block_refs_disclosed_without_trips(tmp_path: Path) -> None:

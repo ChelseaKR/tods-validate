@@ -1,0 +1,67 @@
+name: Playground deployment check
+
+# The deployed playground is a shipped artifact, and nothing was checking it.
+# It sat at v0.7.0 for three weeks after web/index.html moved to v0.8.0, so the
+# README's "try it without installing anything" path validated with the previous
+# release's rule set, and the blocking WCAG 2.1 AA gate in ci.yml passed the
+# whole time -- it audits a copy of web/index.html from a temp directory, which
+# is the source of the deployment, not the deployment.
+#
+# Two things are checked, both against the live page:
+#
+# 1. Drift: the served index.html must be byte-identical to web/index.html at
+#    the most recent release tag. That is the version the deployment is supposed
+#    to be, so a main branch that has moved on since the release is not drift.
+# 2. Accessibility: pa11y-ci (axe + HTML_CodeSniffer, WCAG2AA) against the live
+#    URL, so the page people actually open is held to the standard the
+#    repository copy is already held to.
+#
+# Weekly and on demand. pages.yml runs the same two checks immediately after it
+# deploys, so a deploy that silently failed to take effect is caught there.
+# Neither is a pull-request gate: a PR that edits web/index.html is *supposed*
+# to differ from what is deployed until the next release.
+
+on:
+  schedule:
+    - cron: "23 6 * * 1" # Mondays, 06:23 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: playground-deployment
+  cancel-in-progress: false
+
+jobs:
+  drift:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+          fetch-depth: 0 # release tags: the deployed page is compared against one
+      - name: Compare the deployed page with web/index.html at the latest release
+        run: ./scripts/check-deployed-playground.sh
+
+  accessibility:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Select the hosted Chrome binary
+        run: |
+          a11y_chrome="$(command -v google-chrome)"
+          test -x "$a11y_chrome"
+          echo "PUPPETEER_EXECUTABLE_PATH=$a11y_chrome" >> "$GITHUB_ENV"
+      - name: Audit the deployed page (WCAG 2.1 AA)
+        run: ./node_modules/.bin/pa11y-ci --config scripts/pa11y-ci-live.cjs

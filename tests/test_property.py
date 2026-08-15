@@ -18,13 +18,15 @@ out of the mutation baseline.
 from __future__ import annotations
 
 import contextlib
+import sys
 import zipfile
+from datetime import date
 
 import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-from tods_validate import _pkgio
+from tods_validate import _pkgio, suggest
 from tods_validate.fix import fix_package
 from tods_validate.gtfs_companion import parse_gtfs_date
 from tods_validate.loader import PackageNotFoundError, UnsafeArchiveError, _parse_csv, load_package
@@ -206,15 +208,24 @@ def test_merge_feeds_is_deterministic_and_round_trips(
 def test_normalize_time_is_meaning_preserving(
     hour: int, minute: int, second: int, drop_seconds: bool
 ) -> None:
+    # suggest.py:_normalize_time promises "only leading zeros and a zero seconds
+    # field are ever added; the numeric value is preserved", and `tods-validate
+    # fix` rewrites an agency's feed on the strength of it with no human in the
+    # loop. So the assertion has to be that the proposal means the same instant
+    # -- not merely that it is *a* valid time, which a normalizer that silently
+    # dropped the seconds would also satisfy.
     raw = f"{hour}:{minute}" if drop_seconds else f"{hour}:{minute}:{second}"
+    # "9:45" means 9:45:00; the generated second is not part of that input.
+    meant = hour * 3600 + minute * 60 + (0 if drop_seconds else second)
 
     proposed = _normalize_time(raw)
 
     if proposed is None:
         return
-    assert parse_time(proposed) is not None
-    # Re-running the normalizer on its own output is a fixed point: nothing
-    # left to fix, matching suggest.py's "never alters what the value means".
+    assert parse_time(proposed) == meant
+    # A second, weaker property, kept because it catches a different mistake:
+    # re-running the normalizer on its own output is a fixed point, so there is
+    # nothing left to fix and applying a suggestion twice cannot drift.
     assert _normalize_time(proposed) == proposed
 
 
@@ -229,13 +240,53 @@ def test_normalize_date_is_meaning_preserving(
     year: int, month: int, day: int, separator: str
 ) -> None:
     raw = f"{year:04d}{separator}{month:02d}{separator}{day:02d}"
+    meant = date(year, month, day)
 
     proposed = _normalize_date(raw)
 
     if proposed is None:
         return
-    assert parse_gtfs_date(proposed) is not None
+    assert parse_gtfs_date(proposed) == meant
     assert _normalize_date(proposed) == proposed
+
+
+# A test named for a property it does not check is worse than no test, because
+# the name is what a later reader trusts. The two tests below run the two above
+# against normalizers that deliberately change the value's meaning, and fail if
+# the property passes them. They are the evidence that the assertions have teeth
+# -- the same evidence the original "is the output a valid time" assertion could
+# not have produced, since it passed a seconds-dropping normalizer on all 38,400
+# cases it was given.
+
+
+def _dropped_seconds(value: str) -> str | None:
+    """A _normalize_time that zeroes the seconds field: valid, and wrong."""
+    # Reached through the module so the monkeypatch below cannot make this
+    # call itself.
+    proposed = suggest._normalize_time(value)
+    return None if proposed is None else proposed[:6] + "00"
+
+
+def _first_of_the_month(value: str) -> str | None:
+    """A _normalize_date that moves every date to the 1st: valid, and wrong."""
+    proposed = suggest._normalize_date(value)
+    return None if proposed is None else proposed[:6] + "01"
+
+
+def test_the_time_property_fails_a_normalizer_that_drops_the_seconds(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys.modules[__name__], "_normalize_time", _dropped_seconds)
+    with pytest.raises(AssertionError):
+        test_normalize_time_is_meaning_preserving()
+
+
+def test_the_date_property_fails_a_normalizer_that_moves_the_day(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(sys.modules[__name__], "_normalize_date", _first_of_the_month)
+    with pytest.raises(AssertionError):
+        test_normalize_date_is_meaning_preserving()
 
 
 # ---------------------------------------------------------------------------
