@@ -126,6 +126,13 @@ jobs:
       - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - run: make perf-check
 
+  # WCAG 2.1 AA automation, and nothing else. `make a11y` used to begin with
+  # `npm audit --audit-level=high`, so an unfixable advisory in the npm
+  # toolchain aborted the recipe before pa11y-ci started: this job went red for
+  # a dependency reason and performed no accessibility check at all. The Node
+  # dependency audit now runs as its own gate in the `audit` job below, which
+  # is a required status check; this job answers one question and reports one
+  # result.
   accessibility:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -151,7 +158,11 @@ jobs:
           echo "PUPPETEER_EXECUTABLE_PATH=$a11y_chrome" >> "$GITHUB_ENV"
       - run: make a11y
 
-  # Dependency vulnerability audit (CQ-11 / SEC-11). Blocking; no mute pattern.
+  # Dependency vulnerability audit (CQ-11 / SEC-11), Python and Node. Blocking;
+  # no mute pattern. Both audits run on every commit even when the other one
+  # fails: `if: ${{ !cancelled() }}` lets the later step start regardless of the
+  # earlier step's result, and a failed step still fails this job, so neither
+  # audit can hide behind the other's result.
   audit:
     runs-on: ubuntu-latest
     steps:
@@ -161,9 +172,19 @@ jobs:
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
       - run: uv sync --frozen --extra dev
       - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
-      - run: make audit
+      - name: Python dependency audit (pip-audit over uv.lock)
+        run: make audit
+      # npm audit reads the committed lockfile, so no npm ci is needed here.
+      - name: Node dependency audit (npm audit, adjudicated against waivers.yml)
+        if: ${{ !cancelled() }}
+        run: make npm-audit
 
   # Secret scan over the PR/push diff and full history (SEC-17/18). Installs
   # the gitleaks CLI directly (checksum-verified) rather than the third-party
