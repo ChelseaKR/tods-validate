@@ -61,8 +61,14 @@ tods-validate exports/tods/ --gtfs exports/gtfs.zip
 ```
 
 When the TODS files sit next to the GTFS files in one package, the GTFS files
-are picked up automatically. A complete sample feed ships in this repo, so you
-can try it right after installing:
+are picked up automatically — but only the files TODS IDs actually resolve
+against (`trips.txt`, `stops.txt`, `stop_times.txt`, `routes.txt`,
+`calendar.txt`, `calendar_dates.txt`). A package holding none of those is not
+treated as its own companion feed, and a check that reads a file the companion
+does not have is reported as skipped, never as a rule that ran clean. A stray
+`agency.txt` cannot answer whether a `trip_id` exists, so it is not allowed to
+look like it did. A complete sample feed ships in this repo, so you can try it
+right after installing:
 
 ```console
 $ tods-validate examples/sample-feed
@@ -391,6 +397,14 @@ non-color users.
   locations, and findings in a table. They use a dashed outline and diamond
   marker in addition to color. The report ships as a single file with no
   external assets.
+
+- The blocking WCAG 2.1 AA check (axe + HTML_CodeSniffer) runs against this
+  repository's `web/index.html` and a generated HTML report on every pull
+  request. The *deployed* playground is a separate artifact and is checked
+  separately: after each deploy and weekly, the live page is compared against
+  the page this repository publishes and audited with the same runners. A page
+  that is accessible in the repository is not evidence about the page you open,
+  so both are checked.
 
 If you hit an output that is hard to read with assistive technology, that is a
 bug — please report it.

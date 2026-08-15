@@ -44,10 +44,17 @@ def test_rules_json_lists_every_rule() -> None:
         "description",
         "specSection",
         "needsGtfs",
+        "gtfsTables",
         "category",
         "defaultEnabled",
         "interpretation",
     }
+    # A consumer reading a skipped:needs_gtfs_table outcome can look up which
+    # companion file was missing, so the skip reason is actionable.
+    by_id = {r["id"]: r for r in payload}
+    assert by_id["TODS-E307"]["gtfsTables"] == [["trips.txt"]]
+    assert by_id["TODS-E308"]["gtfsTables"] == [["calendar.txt", "calendar_dates.txt"]]
+    assert all(bool(r["gtfsTables"]) == r["needsGtfs"] for r in payload)
 
 
 def test_rules_text_lists_every_rule() -> None:

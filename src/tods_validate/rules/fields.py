@@ -19,7 +19,7 @@ from ..schema import (
     TableSpec,
     spec_link,
 )
-from . import ValidationContext, rule
+from . import GTFS_TRIPS, ValidationContext, rule
 
 # GTFS Time: H:MM:SS or HH:MM:SS; hours may exceed 24 for service past midnight
 # and have no upper bound in the spec, so the hour field is not width-capped.
@@ -331,6 +331,7 @@ def duplicate_primary_key(context: ValidationContext) -> Iterator[Finding]:
     # companion GTFS (trips.txt). Without it the check cannot run, so depend on
     # GTFS rather than silently passing.
     needs_gtfs=True,
+    gtfs_tables=(GTFS_TRIPS,),
     # vehicle_assignments.txt does not exist in TODS v1.0.0 (added in v2.1.0).
     spec_versions=(SPEC_VERSION,),
 )

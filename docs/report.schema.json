@@ -106,7 +106,15 @@
               "severity": { "enum": ["ERROR", "WARNING", "INFO"] },
               "category": { "type": "string" },
               "status": {
-                "enum": ["ran", "skipped:needs_gtfs", "skipped:disabled", "skipped:ignored"]
+                "description": "'ran' means the check executed against data it could read. Every other value is a skip: the check did not run, and its rule must not be read as passed. 'skipped:needs_gtfs_table' means a companion feed was available but did not contain a GTFS file the check reads.",
+                "enum": [
+                  "ran",
+                  "skipped:needs_gtfs",
+                  "skipped:needs_gtfs_table",
+                  "skipped:disabled",
+                  "skipped:ignored",
+                  "skipped:spec_version"
+                ]
               }
             },
             "additionalProperties": false

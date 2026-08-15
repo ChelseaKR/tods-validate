@@ -18,6 +18,15 @@ from .config import Config
 from .findings import Finding, Severity
 from .report import summarize
 
+# The CLI's exit codes, named once here rather than spelled as bare literals at
+# each sys.exit() call site. Two things read them: cli.py, which is what a user
+# actually observes, and scripts/check_public_contract.py, which can therefore
+# compare the published contract against the implementation instead of against a
+# copy of the same numbers. The behavioral goldens are in tests/test_policy.py.
+EXIT_CLEAN = 0
+EXIT_FINDINGS = 1
+EXIT_USAGE = 2
+
 # Ordered so a threshold comparison ("does this severity meet or exceed the
 # gate?") is a single Severity comparison rather than a chain of `or`s.
 _FAIL_ON_SEVERITY: dict[str, Severity] = {
@@ -117,4 +126,4 @@ class GatingPolicy:
         )
 
 
-__all__ = ["GatingPolicy", "GateResult"]
+__all__ = ["EXIT_CLEAN", "EXIT_FINDINGS", "EXIT_USAGE", "GatingPolicy", "GateResult"]
