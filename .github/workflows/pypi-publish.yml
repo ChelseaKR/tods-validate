@@ -20,9 +20,12 @@ name: Publish to PyPI
 # on PyPI is the one that was verified, not merely that upload didn't error.
 
 on:
-  release:
-    types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing signed stable SemVer tag (vX.Y.Z)"
+        required: true
+        type: string
 
 # Least-privilege default; the publish job escalates only what it needs.
 permissions:
@@ -30,25 +33,67 @@ permissions:
 
 # Never run two publishes of the same ref at once (Section 6.4).
 concurrency:
-  group: pypi-publish-${{ github.ref }}
+  group: pypi-publish
   cancel-in-progress: false
 
 jobs:
-  verify:
-    uses: ./.github/workflows/verify.yml
-    with:
-      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
-
-  publish:
-    needs: [verify]
+  authorize:
+    name: verify trusted main and signed release tag
     runs-on: ubuntu-latest
     permissions:
-      contents: write # attach the SBOM to the GitHub release
-      id-token: write # OIDC for PyPI Trusted Publishing + provenance
+      contents: read
+    outputs:
+      release_commit: ${{ steps.tag.outputs.commit }}
+      release_tag: ${{ steps.tag.outputs.tag }}
+      tag_object_sha: ${{ steps.tag.outputs.tag_object_sha }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: main
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Resolve and verify the reviewed signed tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG="${INPUT_TAG}"
+          test "${GITHUB_REF}" = refs/heads/main
+          test "$(git rev-parse HEAD)" = "${GITHUB_SHA}"
+          test "$(git rev-parse origin/main)" = "${GITHUB_SHA}"
+          [[ "${TAG}" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
+          git fetch --force origin "refs/tags/${TAG}:refs/tags/${TAG}"
+          test "$(git cat-file -t "refs/tags/${TAG}")" = tag
+          RELEASE_COMMIT="$(git rev-parse --verify "${TAG}^{commit}")"
+          git merge-base --is-ancestor "${RELEASE_COMMIT}" origin/main
+          git config gpg.format ssh
+          git config gpg.ssh.allowedSignersFile "${GITHUB_WORKSPACE}/.github/allowed_signers"
+          git verify-tag -- "${TAG}"
+          {
+            echo "tag=${TAG}"
+            echo "commit=${RELEASE_COMMIT}"
+            echo "tag_object_sha=$(git rev-parse "refs/tags/${TAG}")"
+          } >> "${GITHUB_OUTPUT}"
+
+  verify:
+    needs: authorize
+    uses: ./.github/workflows/verify.yml
+    with:
+      tag: ${{ needs.authorize.outputs.release_tag }}
+      commit: ${{ needs.authorize.outputs.release_commit }}
+
+  build:
+    needs: [authorize, verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
       attestations: write # SLSA build provenance attestation
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
+          ref: ${{ needs.authorize.outputs.release_commit }}
           persist-credentials: false
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
@@ -79,6 +124,12 @@ jobs:
           name: sbom-cyclonedx
           path: tods-validate-sbom.cdx.json
           if-no-files-found: error
+      - name: Upload verified distributions
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: pypi-distributions
+          path: dist/*
+          if-no-files-found: error
 
       # SLSA build provenance for the wheel + sdist (Section 6.4, SLSA Build L2).
       - name: Attest build provenance
@@ -86,31 +137,61 @@ jobs:
         with:
           subject-path: "dist/*"
 
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
-
-      # Attach the SBOM to the GitHub release for consumer verification.
-      - name: Upload SBOM to the release
-        if: github.event_name == 'release'
+  publish-release:
+    needs: [authorize, build]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: sbom-cyclonedx
+      - name: Recheck immutable tag object and publish GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
-          # Routed through env: rather than interpolated into the run: shell
-          # (CICD-21): see the note in release-corpus.yml.
-          TAG: ${{ github.event.release.tag_name }}
-        run: gh release upload "$TAG" tods-validate-sbom.cdx.json --clobber
+          TAG: ${{ needs.authorize.outputs.release_tag }}
+          TAG_OBJECT_SHA: ${{ needs.authorize.outputs.tag_object_sha }}
+        run: |
+          set -euo pipefail
+          LIVE_TAG_OBJECT="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq .object.sha)"
+          test "${LIVE_TAG_OBJECT}" = "${TAG_OBJECT_SHA}"
+          gh release create "${TAG}" tods-validate-sbom.cdx.json \
+            --title "tods-validate ${TAG}" --generate-notes --verify-tag
+
+  publish-pypi:
+    needs: [authorize, build, publish-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          name: pypi-distributions
+          path: dist
+      - name: Recheck immutable tag object before PyPI publication
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.authorize.outputs.release_tag }}
+          TAG_OBJECT_SHA: ${{ needs.authorize.outputs.tag_object_sha }}
+        run: |
+          set -euo pipefail
+          LIVE_TAG_OBJECT="$(gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/${TAG}" --jq .object.sha)"
+          test "${LIVE_TAG_OBJECT}" = "${TAG_OBJECT_SHA}"
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@ba38be9e461d3875417946c167d0b5f3d385a247 # release/v1
 
   verify-published:
     # Re-fetch what actually landed on PyPI and check its attestation, rather
     # than trusting that `publish` exiting 0 means the right bits are public
     # (REL-16). Only meaningful for a real release, not workflow_dispatch.
-    needs: [publish]
-    if: github.event_name == 'release'
+    needs: [authorize, publish-pypi]
     runs-on: ubuntu-latest
     permissions:
       contents: read
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: ${{ github.event.release.tag_name }}
+      TAG: ${{ needs.authorize.outputs.release_tag }}
     steps:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:

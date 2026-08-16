@@ -7,7 +7,18 @@ name: Conformance corpus
 on:
   release:
     types: [published]
+  # Releases are now created by pypi-publish.yml with the workflow's own
+  # GITHUB_TOKEN, and events raised by that token do not trigger other
+  # workflows — so the corpus upload for a new release arrives by dispatching
+  # this workflow with the tag (same pattern as docker.yml). An empty tag
+  # builds the corpus without uploading, for a quick check.
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to upload the corpus to (e.g. v0.9.0). Empty builds without uploading."
+        required: false
+        type: string
+        default: ""
 
 # Least-privilege default; the corpus job escalates only what it needs
 # (CICD-04: write scopes job-level only).
@@ -25,7 +36,7 @@ jobs:
   verify:
     uses: ./.github/workflows/verify.yml
     with:
-      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag || '' }}
 
   corpus:
     needs: [verify]
@@ -36,13 +47,16 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
+          # On a release event inputs.tag is empty, so this stays github.ref
+          # (the tag); a dispatch with a tag builds that tag's tree.
+          ref: ${{ inputs.tag || github.ref }}
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.13"
       - run: python -m pip install -e .
       - run: python scripts/build_conformance_corpus.py dist/tods-conformance-corpus.zip
       - name: Upload to the release
-        if: github.event_name == 'release'
+        if: github.event_name == 'release' || inputs.tag != ''
         env:
           GH_TOKEN: ${{ github.token }}
           # Routed through env rather than interpolated directly into the run:
@@ -50,5 +64,5 @@ jobs:
           # attacker-influenceable in principle (anyone who can create a
           # release chooses it) and this avoids splicing it into the script
           # text before the shell ever sees it.
-          TAG: ${{ github.event.release.tag_name }}
+          TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
         run: gh release upload "$TAG" dist/tods-conformance-corpus.zip --clobber

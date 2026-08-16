@@ -39,6 +39,14 @@ Fixed:
 
 Changed:
 
+- PyPI/GitHub releases now run only from the reviewed workflow on `main` with
+  an existing SSH-signed stable tag. A read-only job verifies signer and main
+  ancestry, the reusable gate checks the exact verified commit, and both
+  checkout-free publishers recheck the tag object before publication. Because
+  the GitHub release is created by the workflow's own token, `docker.yml` and
+  `release-corpus.yml` no longer start from a `release: published` event; both
+  are dispatched with the release tag (the corpus workflow gained the same
+  `tag` input `docker.yml` already had), per the updated release checklist.
 - Supplement rows known to add a GTFS entry now require every field the GTFS
   reference marks Required for that file. Updates and deletes still require
   only their primary-key fields. The check stays permissive when no companion

@@ -21,6 +21,11 @@ on:
         required: false
         type: string
         default: ""
+      commit:
+        description: Exact verified commit to check out for a release.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -39,6 +44,7 @@ jobs:
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
+          ref: ${{ inputs.commit || github.ref }}
           persist-credentials: false
           fetch-depth: 0 # full history + tags: needed for the tag/version checks below
       - uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0

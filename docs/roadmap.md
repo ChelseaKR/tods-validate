@@ -107,18 +107,24 @@ Rows marked "not-yet-built" are honest gaps, not silent omissions; see
 
 ## Release checklist (QM-17)
 
-Run through before creating a GitHub release (tagging triggers
-`pypi-publish.yml`, `docker.yml`, `release-corpus.yml`, each of which
-independently re-runs `make verify` at the tagged commit before publishing):
+Run through before publishing a release. Publication is now dispatch-only:
+`pypi-publish.yml` is run by hand against an existing signed tag, and it —
+not the maintainer — creates the GitHub release. Each release workflow still
+independently re-runs `make verify` at the tagged commit before publishing:
 
 1. `CHANGELOG.md` has a dated section for the version being released
    (`## vX.Y.Z - YYYY-MM-DD`), and `## Unreleased` items have moved into it.
 2. `pyproject.toml` `version` and `CITATION.cff` `version`/`date-released`
    match the tag you are about to create.
 3. Tag it **annotated and signed**: `git tag -s vX.Y.Z -m "release: vX.Y.Z"`
-   (a lightweight or unsigned tag now fails `verify.yml`'s REL-08 check).
-4. Push the tag, then create the GitHub release from it. The three release
-   workflows run automatically; watch that `verify` (and, downstream,
-   `verify-published`) succeed before considering the release done.
-5. Confirm the SBOM, provenance attestation, and (for the image) cosign
+   (a lightweight or unsigned tag now fails `verify.yml`'s REL-08 check;
+   the signer must be listed in `.github/allowed_signers`).
+4. Push the tag, then dispatch **Publish to PyPI** from `main` with the tag.
+   It verifies signer and main ancestry, re-runs the gates at the tagged
+   commit, creates the GitHub release, publishes to PyPI, and re-verifies
+   what landed. Watch `verify` and `verify-published` succeed.
+5. Dispatch **Docker image** and **Conformance corpus** with the same tag.
+   A release created by the publish workflow's own token does not raise a
+   `release: published` event, so these no longer start automatically.
+6. Confirm the SBOM, provenance attestation, and (for the image) cosign
    signature are attached/verifiable, per `SECURITY.md` §Supply chain.
