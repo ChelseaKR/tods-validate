@@ -5,6 +5,18 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+## v0.9.1 - 2026-08-16
+
+A Ko-fi support link in the playground footer. No validator behaviour
+changes: no rule added, removed, renumbered or re-severitied, and the
+CLI and Action contracts are unchanged.
+
+This needed a release because the playground only ever serves a released
+version. `scripts/check-deployed-playground.sh` compares the deployed page
+against `web/index.html` at the latest tag, so a page change on `main`
+cannot reach the site until it is tagged.
+
+
 ## v0.9.0 - 2026-08-16
 
 Behaviour change for Action and CLI consumers: two checks now report findings
