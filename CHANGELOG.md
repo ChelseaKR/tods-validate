@@ -5,8 +5,31 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+## v0.9.0 - 2026-08-16
+
+Behaviour change for Action and CLI consumers: two checks now report findings
+they did not report in v0.8.0, and one stops reporting findings it should never
+have reported. On the same feed, `tods-validate` can therefore exit 1 where
+v0.8.0 exited 0, or exit 0 where v0.8.0 exited 1. Nothing about the exit-code
+contract itself changed (0 clean, 1 findings at or above the threshold, 2 usage
+error), and no rule ID was renumbered, removed, or given a new severity. The
+three checks are, in this section: `TODS-E204` on `employee_run_dates.txt`
+duplicates, `TODS-E201` on supplement rows that add a GTFS entry, and the
+companion-GTFS detection fix.
+
 Fixed:
 
+- CQ-09's lockfile-drift gate was missing the half that fails. Every CI job and
+  the release verification workflow installed with `uv sync --frozen`, which
+  installs exactly what `uv.lock` records and exits 0 whether or not the lock
+  still agrees with `pyproject.toml` -- so a version bump or an added dependency
+  could ship a stale environment with every check green. Measured on this repo:
+  with `pyproject.toml` at 0.9.0 and `uv.lock` still at 0.8.0, `uv sync --frozen
+  --extra dev` exits 0 and installs 0.8.0, while `uv lock --check` exits 1.
+  `uv lock --check` now runs before every `uv sync` in CI and in the release
+  verify workflow, and as the first gate in `make verify` (`make lockfile`).
+  ADR 0005, which asserted that `--frozen` "fails on any lockfile drift",
+  records the correction.
 - The accessibility gate now runs an accessibility check. `make a11y` began
   with `npm audit --audit-level=high`, so once an unpatched HIGH advisory
   appeared in the pa11y-ci development toolchain the recipe aborted on its
