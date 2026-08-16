@@ -4,11 +4,11 @@
 # (REL-14/15). CI additionally runs what needs GitHub itself -- the composite
 # action's self-test, CodeQL, Semgrep and zizmor -- so a green `make verify` is
 # a necessary condition for merge, not a sufficient one.
-.PHONY: verify lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation perf-check
+.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation perf-check
 
 # Every gate `make verify` runs, in reporting order. Each one is independent:
 # see the recipe below for why that matters.
-VERIFY_GATES := lint format typecheck test docs-check contract-check i18n-check \
+VERIFY_GATES := lockfile lint format typecheck test docs-check contract-check i18n-check \
 	audit npm-audit secrets a11y citation
 
 # The gates run one after another and every one of them runs, whatever the ones
@@ -36,6 +36,20 @@ verify:
 		printf '\nmake verify: FAILED:%s\n' "$$failed" >&2; \
 	fi; \
 	exit $$status
+
+# CQ-09's drift half. The standard asks for a "lockfile-drift check + frozen
+# install"; this repo only had the second half. `uv sync --frozen` installs
+# exactly what uv.lock says and exits 0 whether or not the lock still agrees
+# with pyproject.toml, so a bumped version (or an added dependency) shipped a
+# stale environment and every CI job stayed green -- measured, not assumed:
+# with pyproject at 0.9.0 and uv.lock still at 0.8.0, `uv sync --frozen
+# --extra dev` exits 0 and installs 0.8.0, while `uv lock --check` exits 1.
+# ADR 0005 claimed --frozen "fails on any lockfile drift"; it does not, and the
+# ADR now records the correction. Runs first in VERIFY_GATES and as its own
+# step before every `uv sync` in CI, because a check after the install is a
+# check of the wrong thing.
+lockfile:
+	uv lock --check
 
 lint:
 	ruff check src tests scripts
