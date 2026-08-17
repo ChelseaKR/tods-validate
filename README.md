@@ -428,7 +428,7 @@ current state:
 | Security & Supply-Chain | Applies (ships code, parses untrusted input) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#security-and-supply-chain) |
 | CI-CD | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#ci-cd) |
 | RELEASE-AND-VERSIONING | Applies (PyPI + GHCR + GitHub Releases + Action) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#release-and-versioning) |
-| ACCESSIBILITY | Applies, scoped to `--format html` report + `web/` playground | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#accessibility) |
+| ACCESSIBILITY | Applies (scoped to the `--format html` report and the `web/` playground) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#accessibility) |
 | OBSERVABILITY | Applies at Tier C (see `## Observability` above) | Applies — Tier C; N/A — tracing has no network surface, as declared above |
 | INTERNATIONALIZATION | N/A — no user-facing strings requiring translation | N/A — see [docs/I18N.md](docs/I18N.md) |
 | AI Development Measurement | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#ai-development-measurement) |
