@@ -5,6 +5,55 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+## v0.9.1 - 2026-08-18
+
+A patch release that repairs the release pipeline itself and ships one
+playground change. No validator behaviour changes: no rule added, removed,
+renumbered or re-severitied, and the CLI, Action, and report contracts are
+untouched. It matters because the two pipeline defects below are why the
+deployed playground still serves tods-validate 0.7.0 today; this is the
+release that moves it forward.
+
+Fixed:
+
+- The playground deploy no longer races the PyPI upload it depends on. Both
+  `pages.yml` and `pypi-publish.yml` fired on `release: published`, and the
+  page micropip-installs the exact wheel it pins, so the deploy's guard
+  ("refuse to publish a page pinned to a wheel PyPI does not have") checked
+  PyPI seconds after the release was published -- long before the upload
+  finished -- and refused, correctly, on both v0.8.0 and v0.9.0. The deploy is
+  now a `deploy-playground` job at the end of `pypi-publish.yml`, called via
+  `workflow_call` after `verify-published` has re-downloaded the wheel from
+  PyPI and checked its provenance, so the ordering is structural rather than a
+  race. The guard stays, now with a 10-minute retry window for index
+  propagation, and a wheel PyPI never serves still fails the deploy naming the
+  missing wheel -- it never deploys anyway and never skips quietly.
+  `workflow_dispatch` remains for out-of-band deploys.
+- The PyPI publish step accepts what the build backend now produces. v0.9.0
+  built, signed, and attested cleanly, then failed at upload with
+  "'2.5' is not a valid metadata version": the pinned
+  `pypa/gh-action-pypi-publish` commit predated Metadata-Version 2.5. The pin
+  is now v1.14.2, which publishes 2.5 metadata; v0.9.0 reached PyPI through a
+  manual re-run after that fix, and v0.9.1 is the first release to publish
+  through it end to end. (#116)
+
+Added:
+
+- The playground footer has a support link beside the version line -- a plain
+  text link whose text says where it goes, sized to a deliberately spare page.
+  This is the change that needs a release to reach the deployed site: the
+  playground only ever serves `web/index.html` as of the latest tag, which is
+  what `scripts/check-deployed-playground.sh` enforces. (#96)
+
+Docs:
+
+- The README's Action examples pin the current release instead of the
+  previous one; the v0.9.0 miss was corrected in #115 and this release bumps
+  the pins to v0.9.1 in the same commit as the version, so the quickstart
+  cannot trail the release again.
+- The Standards Conformance table's Accessibility row states its scope in the
+  same `Applies (scope)` form as every other row. (#118)
+
 ## v0.9.0 - 2026-08-16
 
 Behaviour change for Action and CLI consumers: two checks now report findings
