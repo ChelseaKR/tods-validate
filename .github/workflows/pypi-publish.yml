@@ -18,6 +18,11 @@ name: Publish to PyPI
 # `verify-published` then re-downloads what was actually published and
 # checks its provenance attestation, so a "succeeded" run means the artifact
 # on PyPI is the one that was verified, not merely that upload didn't error.
+#
+# `deploy-playground` runs last: the GitHub Pages playground pins the wheel
+# this workflow publishes, so its deploy is sequenced after the wheel is
+# confirmed on PyPI rather than triggered by the release event it used to
+# race (and lose, on v0.8.0 and v0.9.0 -- see pages.yml).
 
 on:
   release:
@@ -128,3 +133,21 @@ jobs:
           for f in dist-published/*; do
             gh attestation verify "$f" --owner ChelseaKR
           done
+
+  deploy-playground:
+    # The playground micropip-installs the exact wheel published above, so it
+    # deploys only after `verify-published` has confirmed that wheel is really
+    # on PyPI. Deploying on the release event raced this upload and lost on
+    # v0.8.0 and v0.9.0: pages.yml's guard fired seconds after the release was
+    # published, long before the wheel existed, and the live page stayed on
+    # the previous release. `needs` makes that ordering structural. The guard
+    # in pages.yml still runs, so if PyPI somehow stops serving the wheel the
+    # deploy fails naming it rather than publishing a page that cannot
+    # install itself.
+    needs: [verify-published]
+    if: github.event_name == 'release'
+    permissions:
+      contents: read
+      pages: write # publish the built site to GitHub Pages
+      id-token: write # OIDC to prove the deploying workflow produced the artifact
+    uses: ./.github/workflows/pages.yml

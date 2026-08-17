@@ -3,12 +3,17 @@ name: Deploy playground
 # Publishes web/ (the in-browser Pyodide validator) to GitHub Pages.
 # One-time setup: Settings -> Pages -> Source: "GitHub Actions".
 #
-# Deploys on release, because manual-only dispatch is how the published page
-# came to sit three weeks behind the library at the previous release's rule set
-# with nothing detecting it. The release is also the right moment: the page
-# micropip-installs `tods-validate==<pinned>` from PyPI, so it must not be
-# published before that version exists there -- the job below refuses to deploy
-# until PyPI serves it. workflow_dispatch stays for out-of-band fixes.
+# Runs as the last stage of a release, called from pypi-publish.yml after
+# `verify-published` has confirmed the released wheel is really on PyPI. It
+# used to run on `release: published` directly, which raced the very upload it
+# depends on: the page micropip-installs `tods-validate==<pinned>` from PyPI,
+# and on v0.8.0 and v0.9.0 the guard below fired seconds after the release was
+# published -- correctly refusing a page whose wheel did not exist yet -- so
+# the live playground stayed on the previous release. Sequencing the deploy
+# after the publish removes the race; the guard stays, so a wheel PyPI never
+# serves still fails this workflow loudly instead of deploying anyway or
+# silently skipping. workflow_dispatch stays for out-of-band fixes (deploys
+# main, whose pin the guard checks against PyPI the same way).
 #
 # The verify job below then checks that the deployment actually took effect and
 # that the live page passes WCAG 2.1 AA -- a deploy is not done because a job
@@ -16,8 +21,7 @@ name: Deploy playground
 # .github/workflows/playground-deployment.yml re-runs both checks weekly.
 
 on:
-  release:
-    types: [published]
+  workflow_call:
   workflow_dispatch:
 
 # Least-privilege default; the deploy job escalates only what it needs
@@ -25,12 +29,14 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: pages
-  cancel-in-progress: false
-
 jobs:
   deploy:
+    # Serialize page deploys. Job-level rather than workflow-level so the
+    # group holds both when this workflow is called from pypi-publish.yml and
+    # when it is dispatched directly.
+    concurrency:
+      group: pages
+      cancel-in-progress: false
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -43,15 +49,29 @@ jobs:
         with:
           persist-credentials: false
       - name: Refuse to publish a page pinned to a wheel PyPI does not have
+        env:
+          ATTEMPTS: "20" # x 30s: 10 minutes for the index to settle
         run: |
           set -euo pipefail
           pin="$(sed -n 's/.*TODS_VALIDATE_VERSION = "\([^"]*\)".*/\1/p' web/index.html | head -1)"
           test -n "$pin"
           echo "playground pins tods-validate==$pin"
-          if ! curl -fsSL -o /dev/null "https://pypi.org/pypi/tods-validate/$pin/json"; then
-            echo "::error::PyPI has no tods-validate $pin, so the deployed page could not install itself."
-            exit 1
-          fi
+          # The retry absorbs index propagation right after a publish (the
+          # release path has already re-downloaded the wheel in
+          # verify-published, but this workflow can also be dispatched on its
+          # own). A wheel that never appears still fails, loudly, after the
+          # window -- never deploy a page that cannot install itself, and
+          # never skip quietly.
+          for attempt in $(seq 1 "$ATTEMPTS"); do
+            if curl -fsSL -o /dev/null "https://pypi.org/pypi/tods-validate/$pin/json"; then
+              echo "PyPI serves tods-validate==$pin (attempt $attempt/$ATTEMPTS)"
+              exit 0
+            fi
+            echo "attempt $attempt/$ATTEMPTS: PyPI does not serve tods-validate==$pin yet; waiting 30s"
+            sleep 30
+          done
+          echo "::error::PyPI has no tods-validate==$pin after $ATTEMPTS attempts, so the deployed page could not install itself. Publish the wheel first (pypi-publish.yml), then re-run this deploy."
+          exit 1
       - uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6.0.0
       - uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
         with:
@@ -70,8 +90,8 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
-      # Deliberately no actions/setup-node: this workflow runs on `release`, a
-      # publishing trigger, and zizmor's cache-poisoning audit blocks a
+      # Deliberately no actions/setup-node: this workflow deploys as part of
+      # a release publish, and zizmor's cache-poisoning audit blocks a
       # cache-capable setup action in that context. The runner's preinstalled
       # Node runs pa11y-ci fine, and `npm ci` installs from the committed
       # lockfile either way.
