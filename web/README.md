@@ -27,10 +27,11 @@ version in the `<script src=".../pyodide/vX.Y.Z/...">` tag to the current
 The playground is published at
 <https://chelseakr.github.io/tods-validate/>. GitHub Pages uses the GitHub
 Actions build source; the **Deploy playground** workflow
-(`.github/workflows/pages.yml`) publishes this folder when a release is
-published, and can still be dispatched manually for an out-of-band fix. It
-refuses to deploy a page whose `TODS_VALIDATE_VERSION` pin is not on PyPI yet,
-since the page installs that exact wheel in the browser.
+(`.github/workflows/pages.yml`) publishes this folder as the last stage of a
+release, called from `pypi-publish.yml` only after the released wheel has been
+confirmed on PyPI, and can still be dispatched manually for an out-of-band
+fix. Either way it refuses to deploy a page whose `TODS_VALIDATE_VERSION` pin
+is not on PyPI, since the page installs that exact wheel in the browser.
 
 The deployment is then checked against the live URL, not assumed from a green
 deploy job:
