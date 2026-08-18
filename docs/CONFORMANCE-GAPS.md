@@ -45,9 +45,15 @@ secret-exposure response runbook have not been adopted as one checked contract.
 **Current evidence:** `scripts/benchmark.py`, `scripts/generate_feed.py`, and
 `docs/BENCHMARKS.md` provide repeatable CLI throughput measurements.
 
-**Still open:** the benchmark is not a merge-blocking regression gate, and the
-shipped HTML surfaces have no committed Lighthouse/bundle baseline. This is the
-same open performance-budget boundary recorded under Quality & Metrics.
+**Closed:** the benchmark is a merge-blocking regression gate. QM-02 landed
+`scripts/check_perf_budget.py` behind the `perf` job in `ci.yml` (and `make
+perf-check` locally), which compares 50,000-trip throughput against
+`perf/baseline.json` and fails past its regression factor. See the
+quality-and-metrics section for the full description; this section previously
+still recorded that gate as open after it had shipped.
+
+**Still open:** the shipped HTML surfaces have no committed Lighthouse/bundle
+baseline.
 
 ## code-quality
 
