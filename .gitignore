@@ -1,6 +1,12 @@
-# local working notes, not part of the published repo
+# local working notes, not part of the published repo. AGENTS.md is here for
+# the same reason CLAUDE.md is: the copy that sits in a maintainer's working
+# tree is a scratch brief for a coding agent, and this repo is public, so the
+# default for that filename is "never staged" rather than "remember not to
+# stage it". If this repo ever publishes a real AGENTS.md, add it explicitly
+# with `git add -f AGENTS.md` and drop the line below.
 CLAUDE.md
 CLAUDE-*.md
+AGENTS.md
 
 __pycache__/
 *.py[cod]
