@@ -2,8 +2,11 @@
 
 from pathlib import Path
 
+import pytest
 from click.testing import CliRunner
 
+from tods_validate._pkgio import UnreadableFileError
+from tods_validate.anonymize import anonymize_package
 from tods_validate.cli import main
 from tods_validate.fix import fix_package
 from tods_validate.runner import run
@@ -136,3 +139,76 @@ def test_fix_cli_reports_all_categories(tmp_path: Path) -> None:
     assert "trimmed whitespace" in result.output
     assert "blank row" in result.output
     assert "duplicate row" in result.output
+
+
+# --- a file the loader could not read must never be silently emptied ---------
+#
+# serialize_feed() builds its output from the loader's headers and rows. A file
+# that failed to decode has neither, so re-serializing it wrote a lone newline
+# over the user's data -- and because no trim/blank/duplicate counter moved,
+# `fix` reported "Nothing to fix." while destroying the file.
+
+# Valid CSV, but Latin-1 encoded: the loader records an "encoding" problem and
+# returns a FeedFile with no headers and no rows.
+_LATIN1 = "vehicle_id,vehicle_label\nbus-1,Café\n".encode("latin-1")
+
+
+def _src_with_unreadable(tmp_path: Path) -> Path:
+    src = _src(tmp_path)
+    (src / "vehicles.txt").write_bytes(_LATIN1)
+    return src
+
+
+def test_fix_refuses_to_write_a_package_with_an_unreadable_file(tmp_path: Path) -> None:
+    src = _src_with_unreadable(tmp_path)
+    out = tmp_path / "out"
+    with pytest.raises(UnreadableFileError, match="vehicles.txt"):
+        fix_package(src, output=out)
+    assert not out.exists(), "nothing may be written when the package cannot be rewritten"
+
+
+def test_fix_dry_run_names_the_unreadable_file_instead_of_reporting_nothing_to_fix(
+    tmp_path: Path,
+) -> None:
+    src = _src_with_unreadable(tmp_path)
+    (src / "run_events.txt").write_text(_CLEAN)  # nothing else to fix
+    result = fix_package(src)
+    assert result.unreadable == ["vehicles.txt"]
+    assert not result.changed_any
+
+
+def test_fix_cli_fails_instead_of_emptying_the_file(tmp_path: Path) -> None:
+    src = _src_with_unreadable(tmp_path)
+    before = (src / "vehicles.txt").read_bytes()
+    out = tmp_path / "out"
+    result = CliRunner().invoke(main, ["fix", str(src), "-o", str(out)])
+    assert result.exit_code != 0
+    assert "vehicles.txt" in result.output
+    assert (src / "vehicles.txt").read_bytes() == before  # input untouched
+    assert not out.exists()
+
+
+def test_fix_cli_dry_run_discloses_the_unreadable_file(tmp_path: Path) -> None:
+    src = _src_with_unreadable(tmp_path)
+    (src / "run_events.txt").write_text(_CLEAN)
+    result = CliRunner().invoke(main, ["fix", str(src)])
+    assert result.exit_code == 0
+    assert "vehicles.txt" in result.output
+    assert "could not be read" in result.output
+
+
+def test_anonymize_refuses_to_write_a_package_with_an_unreadable_file(tmp_path: Path) -> None:
+    src = _src_with_unreadable(tmp_path)
+    out = tmp_path / "anon"
+    with pytest.raises(UnreadableFileError, match="vehicles.txt"):
+        anonymize_package(src, out, salt="t")
+    assert not out.exists()
+
+
+def test_readable_package_is_unaffected(tmp_path: Path) -> None:
+    # The guard must not fire on the problems that still yield parsed content.
+    src = _src(tmp_path)
+    out = tmp_path / "out"
+    result = fix_package(src, output=out)
+    assert result.unreadable == []
+    assert "run_events.txt" in result.written

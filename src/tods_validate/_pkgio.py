@@ -10,8 +10,54 @@ from __future__ import annotations
 import csv
 import io
 import zipfile
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:  # pragma: no cover - import cycle guard, types only
+    from .loader import FeedFile
+
+# Loader problem codes that mean the file's contents never reached memory: the
+# decode or the CSV parse failed, so the loader holds no headers and no rows for
+# it. Every other problem code ("empty", "ragged", "duplicate_header") still
+# yields real parsed content.
+UNREADABLE_CODES = frozenset({"encoding", "csv_error"})
+
+
+class UnreadableFileError(Exception):
+    """A package cannot be rewritten because a file in it could not be read.
+
+    ``serialize_feed`` builds its output from the loader's headers and rows, and
+    a file that failed to decode or parse has neither. Re-serializing it yields
+    a lone newline, so writing the package would replace the user's data with an
+    empty file while every counter stayed at zero and the command reported that
+    it had changed nothing. Refusing to write is the only outcome that cannot
+    destroy the input.
+    """
+
+
+def unreadable_files(files: Mapping[str, FeedFile]) -> list[str]:
+    """Names of files the loader could not read, sorted; empty when all parsed."""
+    return sorted(
+        name
+        for name, feed in files.items()
+        if any(problem.code in UNREADABLE_CODES for problem in feed.problems)
+    )
+
+
+def reject_unreadable(files: Mapping[str, FeedFile], command: str) -> None:
+    """Raise :class:`UnreadableFileError` if any file could not be read."""
+    unreadable = unreadable_files(files)
+    if not unreadable:
+        return
+    names = ", ".join(unreadable)
+    raise UnreadableFileError(
+        f"{command} will not write this package: {names} could not be read, and rewriting "
+        f"the package would replace {'them' if len(unreadable) > 1 else 'it'} with an empty "
+        "file. Run `tods-validate validate` to see the read error (TODS-E103), fix the "
+        "file's encoding or CSV syntax, then re-run. `--encoding` overrides the decoder if "
+        "the file is deliberately in another encoding."
+    )
 
 
 def serialize_feed(headers: Sequence[str], rows: list[dict[str, str]]) -> bytes:

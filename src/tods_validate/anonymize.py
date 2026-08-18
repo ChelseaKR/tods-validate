@@ -32,7 +32,7 @@ import secrets
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ._pkgio import serialize_feed, write_package
+from ._pkgio import reject_unreadable, serialize_feed, write_package
 from .loader import load_package
 from .schema import TABLES, FieldType
 
@@ -109,6 +109,10 @@ def anonymize_package(  # noqa: C901 - the pseudonymization pass tracks several 
     """
     salt = salt if salt is not None else secrets.token_hex(8)
     package = load_package(path, encoding=encoding)
+    # An unreadable file has no headers and no rows, so it would be written out
+    # empty *and* omitted from the "carried through unprotected" table -- the
+    # disclosure this command exists to make would be silently incomplete.
+    reject_unreadable(package.files, "anonymize")
     result = AnonymizeResult()
 
     # vehicle_id is pseudonymized consistently across vehicles.txt and
