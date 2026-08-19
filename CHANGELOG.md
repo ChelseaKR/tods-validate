@@ -17,6 +17,39 @@ Fixed:
   the offending file; `fix`'s dry run reports it instead of claiming there was
   nothing to fix. Use `--encoding` if the file is deliberately not UTF-8.
   Packages that load cleanly are unaffected.
+- `--format github` now discloses the checks that did not run. It is the only
+  format the composite action emits, and it was the one format that never
+  carried the coverage manifest: `render_github` took no `coverage` argument
+  at all, so a feed validated without a companion GTFS feed printed
+  `0 error(s), 0 warning(s), 0 info` and stopped there, while 16 of 42 checks
+  had not run, 9 of them ERROR-severity. An agency or vendor who left the
+  `gtfs:` input out of the workflow got a green check and had no way to learn
+  that no reference was ever resolved. The summary line now carries the run's
+  scope, and each reason a check did not run becomes its own `::notice`
+  annotation naming the rules, so the disclosure reaches the pull request's
+  Checks tab and not only the log.
+- Every report format now names the rules that did not run, not just how many,
+  and a run that skipped nothing says so (`Every applicable check ran (42 of
+  42).`) rather than staying silent. Silence could not be told apart from a
+  format that does not disclose, which is how this defect survived.
+- The Markdown report states its rule-set coverage with or without `--stamp`.
+  The block used to be printed only under `--stamp`, which tied a statement of
+  what the run checked to a statement of when it ran; the unstamped report is
+  the default and the one people paste into issues.
+
+Added:
+
+- `--require-complete-run` fails the run when a check could not run because an
+  input was missing, such as a companion GTFS feed that was not given. Skips
+  the caller asked for (`--ignore`, opt-in rules left off, `--spec-version`
+  scoping) are disclosed but do not fail it. The GitHub Action exposes it as
+  the `require-complete-run` input.
+- **A skipped check still does not change the exit code by default.** That is
+  deliberate: this tool has shipped as a merge gate since 0.1.0 and every feed
+  validated without a companion GTFS feed skips 16 checks, so failing on a
+  skip would turn existing pipelines red on upgrade for something they never
+  asked the tool to promise. The README now states it instead of leaving `0`
+  to be read as "fully checked".
 
 ## v0.9.1 - 2026-08-18
 

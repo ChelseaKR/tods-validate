@@ -803,6 +803,19 @@ _STATUS_REASON = {
     STATUS_SKIPPED_SPEC_VERSION: "not defined by the requested --spec-version",
 }
 
+# What a report says when nothing was skipped. A run that discloses skips only
+# when there are some cannot be told apart from a run whose report format never
+# discloses anything, so the complete case states itself rather than staying
+# silent.
+ALL_CHECKS_RAN = "Every applicable check ran"
+
+# The skips the invocation did not ask for. --ignore, opt-in rules left off,
+# and --spec-version scoping are all choices the caller made; a missing (or
+# unusable) companion GTFS feed is not, so these two are the statuses that mean
+# "this run wanted to check something and could not". --require-complete-run
+# gates on exactly this set; see RunCoverage.unrequested_skips.
+UNREQUESTED_SKIP_STATUSES = frozenset({STATUS_SKIPPED_NEEDS_GTFS, STATUS_SKIPPED_NEEDS_GTFS_TABLE})
+
 
 @dataclass(frozen=True)
 class RuleOutcome:
@@ -840,6 +853,15 @@ class RunCoverage:
     @property
     def skipped(self) -> tuple[RuleOutcome, ...]:
         return tuple(o for o in self.outcomes if not o.ran)
+
+    @property
+    def unrequested_skips(self) -> tuple[RuleOutcome, ...]:
+        """Rules that could not run because an input was missing.
+
+        Distinct from :attr:`skipped`, which also counts the skips the caller
+        asked for. See UNREQUESTED_SKIP_STATUSES.
+        """
+        return tuple(o for o in self.outcomes if o.status in UNREQUESTED_SKIP_STATUSES)
 
     def skipped_by_reason(self) -> dict[str, list[RuleOutcome]]:
         """Skipped rules grouped by status, in a stable status order.
@@ -900,6 +922,43 @@ class RunCoverage:
             return None
         parts = [f"{len(members)} {_STATUS_REASON[status]}" for status, members in groups.items()]
         return "Checks skipped: " + "; ".join(parts) + "."
+
+    def scope_line(self) -> str:
+        """One line stating what the run covered. Never empty.
+
+        Where :meth:`summary_line` returns None on a complete run, this states
+        the complete case positively. That difference is the point: a reader who
+        sees no coverage line cannot tell "nothing was skipped" from "this
+        format does not disclose skips", and the second is exactly how a feed
+        validated without its companion GTFS feed came to read as fully checked.
+        """
+        skipped = self.summary_line()
+        ran, total = len(self.ran), len(self.outcomes)
+        if skipped is None:
+            return f"{ALL_CHECKS_RAN} ({ran} of {total})."
+        return f"{ran} of {total} checks ran. {skipped}"
+
+    def skipped_detail_lines(self) -> list[str]:
+        """One line per skip reason, naming every rule it covers.
+
+        A count cannot be acted on. Deciding whether a clean report means
+        anything takes the rule IDs, and above all how many of them are
+        ERROR-severity: those are the checks a green result is being read as
+        having passed.
+        """
+        lines = []
+        for status, members in self.skipped_by_reason().items():
+            severities = ", ".join(
+                f"{count} {name}"
+                for name, count in (
+                    (severity.name, sum(1 for o in members if o.severity is severity))
+                    for severity in (Severity.ERROR, Severity.WARNING, Severity.INFO)
+                )
+                if count
+            )
+            ids = ", ".join(o.id for o in members)
+            lines.append(f"Not run, {_STATUS_REASON[status]} ({severities}): {ids}")
+        return lines
 
 
 def rule(
@@ -1022,8 +1081,10 @@ def all_rules() -> Iterable[Rule]:
 from . import coverage, fields, references, semantics, structure  # noqa: E402,F401
 
 __all__ = [
+    "ALL_CHECKS_RAN",
     "EXAMPLES",
     "REGISTRY",
+    "UNREQUESTED_SKIP_STATUSES",
     "Rule",
     "RuleOutcome",
     "RunCoverage",

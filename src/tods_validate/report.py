@@ -174,6 +174,22 @@ def _max_findings(findings: list[Finding], limit: int | None) -> tuple[list[Find
     return findings[:limit], len(findings) - limit
 
 
+def _coverage_lines(coverage: RunCoverage | None, indent: str = "") -> list[str]:
+    """The run's scope statement, plus one line per skip reason naming its rules.
+
+    Emitted by every report format, on every run. The scope statement is always
+    present, so "no coverage line" never has to be read as either "nothing was
+    skipped" or "this format does not say"; the detail lines name the rules,
+    because a bare count of skipped checks cannot be acted on.
+    """
+    if coverage is None:
+        return []
+    return [
+        f"Rule-set coverage: {coverage.scope_line()}",
+        *(f"{indent}{line}" for line in coverage.skipped_detail_lines()),
+    ]
+
+
 def render_text(  # noqa: C901 - causality grouping and severity disclosure add display branches
     findings: list[Finding],
     source: str,
@@ -186,8 +202,7 @@ def render_text(  # noqa: C901 - causality grouping and severity disclosure add 
     lines: list[str] = [f"tods-validate: {source} (TODS v{spec_version})", ""]
     if not findings:
         lines.append("No problems found.")
-        if coverage is not None and (scope := coverage.summary_line()) is not None:
-            lines.append(f"Rule-set coverage: {scope}")
+        lines.extend(_coverage_lines(coverage, indent="  "))
         return "\n".join(lines)
 
     counts = summarize(findings)
@@ -246,8 +261,7 @@ def render_text(  # noqa: C901 - causality grouping and severity disclosure add 
         f"{counts[Severity.WARNING]} warning(s), "
         f"{counts[Severity.INFO]} info."
     )
-    if coverage is not None and (scope := coverage.summary_line()) is not None:
-        lines.append(scope)
+    lines.extend(_coverage_lines(coverage, indent="  "))
     return "\n".join(lines)
 
 
@@ -308,9 +322,14 @@ def render_markdown(  # noqa: C901 -- pragmatic complexity; ratchet tracked in d
     With ``stamp=True`` the report carries a provenance footer (tool version,
     spec version, UTC timestamp) for use as a citable compliance artifact. The
     stamp is opt-in because the timestamp makes output non-reproducible.
+
+    The rule-set coverage block is *not* opt-in. It used to be printed only
+    under ``stamp``, which tied a statement of what the run checked to a
+    statement of when it ran; an unstamped report -- the default, and the one
+    people paste into issues -- disclosed nothing.
     """
     counts = summarize(findings)
-    scope = coverage.summary_line() if stamp and coverage is not None else None
+    scope_lines = _coverage_lines(coverage)
     lines = [
         "# TODS validation report",
         "",
@@ -319,9 +338,10 @@ def render_markdown(  # noqa: C901 -- pragmatic complexity; ratchet tracked in d
     ]
     if not findings:
         lines.append("No problems found.")
-        if scope is not None:
+        if scope_lines:
             lines.append("")
-            lines.append(f"Rule-set coverage: {scope}")
+            lines.append(scope_lines[0])
+            lines.extend(f"- {line}" for line in scope_lines[1:])
     else:
         lines.append(
             f"**{counts[Severity.ERROR]} error(s), {counts[Severity.WARNING]} warning(s), "
@@ -334,9 +354,10 @@ def render_markdown(  # noqa: C901 -- pragmatic complexity; ratchet tracked in d
         lines.append(f"By rule: {breakdown}")
         for hint in _cluster_hints(findings):
             lines.append(f"> hint: {hint}")
-        if scope is not None:
+        if scope_lines:
             lines.append("")
-            lines.append(scope)
+            lines.append(scope_lines[0])
+            lines.extend(f"- {line}" for line in scope_lines[1:])
         disclosure = _disclosure_lines(findings)
         if disclosure:
             lines.append("")
@@ -443,10 +464,21 @@ def _escape_annotation_property(text: str) -> str:
     return _escape_annotation(text).replace(",", "%2C").replace(":", "%3A")
 
 
-def render_github(findings: list[Finding], source: str) -> str:
+def render_github(
+    findings: list[Finding], source: str, *, coverage: RunCoverage | None = None
+) -> str:
     """Workflow command format; one annotation per finding.
 
     See https://docs.github.com/actions/reference/workflow-commands-for-github-actions
+
+    This is the only format the composite action emits, so it is the format a
+    transit agency or vendor actually reads. It took no ``coverage`` argument
+    at all until 0.9.2: a feed validated without its companion GTFS feed
+    printed "0 error(s), 0 warning(s), 0 info" and nothing else, while 16 of
+    42 checks -- 9 of them ERROR-severity -- had not run. The summary line now
+    always carries the run's scope, and each reason a check did not run
+    becomes its own ``::notice`` annotation naming the rules, so the
+    disclosure reaches the pull request's Checks tab and not only the log.
     """
     lines = []
     for f in findings:
@@ -461,11 +493,17 @@ def render_github(findings: list[Finding], source: str) -> str:
         message += _remap_note(f)
         lines.append(f"::{command} {','.join(properties)}::{_escape_annotation(message)}")
     counts = summarize(findings)
-    lines.append(
+    summary = (
         f"tods-validate: {counts[Severity.ERROR]} error(s), "
         f"{counts[Severity.WARNING]} warning(s), {counts[Severity.INFO]} info "
         f"in {source}."
     )
+    if coverage is not None:
+        summary = f"{summary} {coverage.scope_line()}"
+    lines.append(summary)
+    if coverage is not None:
+        for detail in coverage.skipped_detail_lines():
+            lines.append(f"::notice title=Checks that did not run::{_escape_annotation(detail)}")
     for line in _disclosure_lines(findings):
         lines.append(f"::notice::{_escape_annotation(line.strip())}")
     return "\n".join(lines)
@@ -827,8 +865,13 @@ def render_html(
     """
     counts = summarize(findings)
     esc = html.escape
-    scope = coverage.summary_line() if coverage is not None else None
-    scope_html = f"<p class='scope'>{esc(scope)}</p>" if scope is not None else ""
+    scope_lines = _coverage_lines(coverage)
+    scope_html = ""
+    if scope_lines:
+        details = "".join(f"<li>{esc(line)}</li>" for line in scope_lines[1:])
+        scope_html = f"<p class='scope'>{esc(scope_lines[0])}</p>" + (
+            f"<ul class='scope-detail'>{details}</ul>" if details else ""
+        )
     disclosure_lines = _disclosure_lines(findings)
     disclosure_html = (
         "<p class='disclosure'>" + "<br>".join(esc(line) for line in disclosure_lines) + "</p>"

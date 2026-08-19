@@ -175,8 +175,7 @@ def _render(
             spec_version=spec_version,
             timeline_package=package if timeline else None,
         )
-    # github annotations carry no manifest; coverage is disclosed by the other formats.
-    return render_github(findings, source)
+    return render_github(findings, source, coverage=coverage)
 
 
 class _DefaultToValidate(click.Group):
@@ -275,6 +274,15 @@ def main() -> None:
     help="A previous JSON report; only findings new since it affect the exit code.",
 )
 @click.option(
+    "--require-complete-run",
+    is_flag=True,
+    help=(
+        "Also fail when a check could not run because an input was missing, such as "
+        "a companion GTFS feed that was not given. Skips you asked for (--ignore, "
+        "opt-in rules left off, --spec-version scoping) still exit 0."
+    ),
+)
+@click.option(
     "--max-findings",
     type=int,
     default=None,
@@ -324,6 +332,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
     profile: str | None,
     spec_version: str | None,
     baseline_path: str | None,
+    require_complete_run: bool,
     max_findings: int | None,
     quiet: bool,
     suggest: bool,
@@ -367,7 +376,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
     _check_rule_ids(tuple(policy.ignore))
     severity_remap = dict(config.severity_remap)
 
-    def _validate_once() -> list[Finding]:
+    def _validate_once() -> tuple[list[Finding], RunCoverage]:
         package, found, coverage = run_with_coverage(
             path,
             gtfs_path,
@@ -409,7 +418,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
 
             click.echo("")
             click.echo(render_suggestions(suggest_for_findings(gate.kept, package), output_format))
-        return gate.kept
+        return gate.kept, coverage
 
     if watch:
         from .watch import watch as watch_feed
@@ -429,7 +438,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
         return
 
     try:
-        findings = _validate_once()
+        findings, coverage = _validate_once()
     except PackageNotFoundError as exc:
         _fail(str(exc))
     _write_github_outputs(findings)
@@ -437,8 +446,23 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
     # The exit code considers only findings new since the baseline, if given
     # (policy.apply already filtered `findings` for --ignore, so re-running it
     # here just applies the baseline narrowing on top of the same kept list).
+    #
+    # A skipped check does not by itself change the exit code. That is a
+    # deliberate choice, not an oversight: this tool has shipped as a merge
+    # gate since 0.1.0, and every feed validated without a companion GTFS feed
+    # skips 16 checks, so failing on a skip would turn those pipelines red on
+    # an upgrade for something they never asked the tool to promise. The
+    # report says what did not run instead, in every format, and
+    # --require-complete-run is how a pipeline opts in to gating on it.
     gate = policy.apply(findings)
-    sys.exit(EXIT_FINDINGS if gate.failed else EXIT_CLEAN)
+    incomplete = coverage.unrequested_skips if require_complete_run else ()
+    if incomplete:
+        click.echo(
+            f"tods-validate: --require-complete-run: {len(incomplete)} check(s) could not "
+            f"run because an input was missing: {', '.join(o.id for o in incomplete)}.",
+            err=True,
+        )
+    sys.exit(EXIT_FINDINGS if gate.failed or incomplete else EXIT_CLEAN)
 
 
 @main.command()
