@@ -5,6 +5,19 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+Fixed:
+
+- `fix -o OUT` and `anonymize -o OUT` no longer destroy a file the loader could
+  not read. Both commands rebuild every file from the loader's headers and rows;
+  a file whose decode or CSV parse failed has neither, so it was written out as a
+  single newline — the user's data replaced by an empty file. `fix` compounded it
+  by printing `Nothing to fix.`, because no trim/blank/duplicate counter had
+  moved, so the run reported that it had changed nothing while it was the run
+  that lost the data. Both commands now refuse to write such a package and name
+  the offending file; `fix`'s dry run reports it instead of claiming there was
+  nothing to fix. Use `--encoding` if the file is deliberately not UTF-8.
+  Packages that load cleanly are unaffected.
+
 ## v0.9.1 - 2026-08-18
 
 A patch release that repairs the release pipeline itself and ships one

@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING, NoReturn
 import click
 
 from . import __version__
+from ._pkgio import UnreadableFileError
 from .anonymize import AlreadyProtectedError, anonymize_package
 from .baseline import diff_findings, load_baseline_identities
 from .config import PROFILES, Config, ConfigError, _merge, _profile_config, load_config
@@ -833,6 +834,8 @@ def anonymize(
         _fail(str(exc))
     except AlreadyProtectedError as exc:
         _fail(str(exc))
+    except UnreadableFileError as exc:
+        _fail(str(exc))
     for target, count in sorted(result.replacements.items()):
         click.echo(f"{target}: {count} value(s) pseudonymized")
     click.echo(f"Wrote {len(result.written)} file(s) to {output_path}.")
@@ -869,7 +872,13 @@ def fix(path: str, output_path: str | None, encoding: str | None) -> None:
         result = fix_package(path, Path(output_path) if output_path is not None else None, encoding)
     except PackageNotFoundError as exc:
         _fail(str(exc))
+    except UnreadableFileError as exc:
+        _fail(str(exc))
     click.echo(f"tods-validate fix: {result.source}")
+    for name in result.unreadable:
+        # Said before the "Nothing to fix." line, which otherwise reads as
+        # "this package is fine" when a file in it was never read.
+        click.echo(f"  {name}: could not be read; not analyzed and not fixable (see TODS-E103)")
     if not result.changed_any:
         click.echo("  Nothing to fix.")
         return

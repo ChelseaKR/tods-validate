@@ -21,7 +21,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from ._pkgio import serialize_feed, write_package
+from ._pkgio import reject_unreadable, serialize_feed, unreadable_files, write_package
 from .loader import load_package
 
 
@@ -36,6 +36,9 @@ class FixResult:
     duplicate_rows_dropped: dict[str, int] = field(default_factory=dict)
     # filenames written when an output path was given (empty on a dry run)
     written: list[str] = field(default_factory=list)
+    # filenames the loader could not read at all. A dry run reports these
+    # instead of claiming there was nothing to fix; writing is refused.
+    unreadable: list[str] = field(default_factory=list)
 
     @property
     def total_trimmed(self) -> int:
@@ -65,7 +68,12 @@ def fix_package(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/
     error) are dropped.
     """
     package = load_package(path, encoding=encoding)
-    result = FixResult(source=package.source)
+    if output is not None:
+        # Before anything is written, not after: a file the loader could not
+        # read has no headers and no rows, so re-serializing it would write an
+        # empty file over the user's data without incrementing any counter.
+        reject_unreadable(package.files, "fix")
+    result = FixResult(source=package.source, unreadable=unreadable_files(package.files))
     entries: dict[str, bytes] = {}
     for name, feed in package.files.items():
         trimmed = 0
