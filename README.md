@@ -75,9 +75,14 @@ $ tods-validate examples/sample-feed
 tods-validate: examples/sample-feed (TODS v2.1.0)
 
 No problems found.
+Rule-set coverage: 39 of 42 checks ran. Checks skipped: 3 opt-in rule not enabled (use --enable).
+  Not run, opt-in rule not enabled (use --enable) (3 INFO): TODS-I501, TODS-I502, TODS-I601
 $ echo $?
 0
 ```
+
+A clean report always says what it covered; see
+[Rule-set coverage](#rule-set-coverage).
 
 On a feed with problems, each finding names the file, row, field, and what good
 looks like:
@@ -97,14 +102,47 @@ The exit code is 0 when no errors are found, 1 when there are errors, and 2
 when the package cannot be read at all. Warnings do not fail the run unless
 you pass `--fail-on warning`.
 
+## Rule-set coverage
+
+Not every check applies to every run. A feed validated without a companion
+GTFS feed cannot resolve a `trip_id`, so the 16 rules that read GTFS files do
+not run; opt-in rules stay off until `--enable` turns them on; `--ignore`
+withholds a rule's findings; `--spec-version` narrows the catalog.
+
+Every report says which of those happened, and names the rules:
+
+```console
+$ tods-validate validate exports/tods
+tods-validate: exports/tods (TODS v2.1.0)
+
+No problems found.
+Rule-set coverage: 25 of 42 checks ran. Checks skipped: 16 no companion GTFS feed was provided; 1 opt-in rule not enabled (use --enable).
+  Not run, no companion GTFS feed was provided (9 ERROR, 5 WARNING, 2 INFO): TODS-I501, TODS-I502, TODS-E205, TODS-E307, TODS-E308, TODS-E309, TODS-E310, TODS-W315, TODS-W316, TODS-E311, TODS-E312, TODS-W313, TODS-E314, TODS-E405, TODS-W406, TODS-W407
+  Not run, opt-in rule not enabled (use --enable) (1 INFO): TODS-I601
+```
+
+A run that skipped nothing says so, rather than staying silent: `Rule-set
+coverage: Every applicable check ran (42 of 42).` Silence would be ambiguous,
+so there is none.
+
+**A skipped check does not change the exit code.** A partial run still exits
+0, because that is what every release since 0.1.0 has done and pipelines gate
+on it. Pass `--require-complete-run` to exit 1 instead when a check could not
+run because an input was missing, such as a companion GTFS feed that was not
+given. Skips you asked for (`--ignore`, opt-in rules left off, `--spec-version`
+scoping) do not fail that gate; they are still disclosed.
+
 Other output formats:
 
-- `--format json` prints a stable JSON document for tooling.
+- `--format json` prints a stable JSON document for tooling. Its `coverage`
+  block carries the same manifest, per rule, in machine form.
 - `--format markdown` prints a report suitable for pasting into an issue
   (`--stamp` adds a provenance footer for a citable compliance artifact).
-- `--format github` prints GitHub Actions workflow annotations.
+- `--format github` prints GitHub Actions workflow annotations. Each reason a
+  check did not run becomes its own `::notice` annotation, so the disclosure
+  appears in the pull request and not just in the log.
 - `--format sarif` prints SARIF for GitHub code-scanning and security
-  dashboards.
+  dashboards; the manifest rides under `invocations`.
 - `--format html` prints a standalone, shareable report. Add `--timeline` to
   include a visual time rail and equivalent event table for each run.
 
@@ -339,6 +377,13 @@ jobs:
           path: feed/tods
           gtfs: feed/gtfs        # omit if GTFS files sit next to the TODS files
 ```
+
+The action runs `--format github`, so the annotations it leaves on the pull
+request include the checks that did not run and why (see
+[Rule-set coverage](#rule-set-coverage)). Leaving `gtfs`
+out is the case worth knowing about: 16 reference checks cannot run, 9 of them
+ERROR-severity, and the job still passes. Add
+`require-complete-run: "true"` to fail it instead.
 
 The action installs `tods-validate` from a hash-verified
 [`requirements-action.lock`](requirements-action.lock) (`pip install

@@ -26,6 +26,14 @@ inputs:
       experimental, or specific rule IDs).
     required: false
     default: ""
+  require-complete-run:
+    description: >-
+      Set to "true" to also fail the job when a check could not run because an
+      input was missing, such as a companion GTFS feed that was not given. Off
+      by default, so a partial run still passes; the annotations name every
+      check that did not run either way.
+    required: false
+    default: ""
 
 outputs:
   error-count:
@@ -67,6 +75,7 @@ runs:
         TODS_FAIL_ON: ${{ inputs['fail-on'] }}
         TODS_GTFS: ${{ inputs.gtfs }}
         TODS_ENABLE: ${{ inputs.enable }}
+        TODS_REQUIRE_COMPLETE_RUN: ${{ inputs['require-complete-run'] }}
       run: |
         args=("$TODS_PATH" --format github --fail-on "$TODS_FAIL_ON")
         if [ -n "$TODS_GTFS" ]; then
@@ -75,4 +84,7 @@ runs:
         for token in $TODS_ENABLE; do
           args+=(--enable "$token")
         done
+        if [ "$TODS_REQUIRE_COMPLETE_RUN" = "true" ]; then
+          args+=(--require-complete-run)
+        fi
         tods-validate "${args[@]}"
