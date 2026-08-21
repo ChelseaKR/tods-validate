@@ -42,6 +42,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from .findings import Finding, fingerprint_from_parts
+from .rules import RunCoverage
 
 # A finding's identity is either its content fingerprint (a hex SHA-256
 # string) or, for baseline entries too old to carry a fingerprint or `data`,
@@ -145,18 +146,57 @@ class Diff:
     # underlying problem. Reported separately from ``persisting`` so churn is
     # visible without being counted as ``introduced``.
     moved: list[Finding]
+    # An OLD finding whose identity is absent from NEW, but whose rule did
+    # not run in NEW (dropped or newly unreadable companion GTFS, a
+    # --spec-version that no longer defines the rule, an opt-in rule left
+    # disabled) rather than running and finding nothing. Absence-without-a-
+    # check-having-run is not evidence of a fix -- see #126 -- so these are
+    # never counted in ``fixed``, and a caller gating on regressions should
+    # treat a nonempty ``unknown`` as "this comparison cannot vouch for that
+    # rule," not as silence. Note this is about the rule *running*, not about
+    # --ignore: an --ignore'd rule's findings are dropped from both ``old``
+    # and ``new`` by the caller's GatingPolicy before they ever reach this
+    # function, so they never appear as OLD-only in the first place.
+    unknown: list[Finding]
 
 
-def diff_findings(old: list[Finding], new: list[Finding]) -> Diff:
+def diff_findings(
+    old: list[Finding], new: list[Finding], *, new_coverage: RunCoverage | None = None
+) -> Diff:
+    """Compare OLD's findings against NEW's.
+
+    ``new_coverage`` is NEW's RunCoverage (see runner.run_with_coverage), used
+    to tell a genuine fix (the rule ran in NEW and found nothing) apart from a
+    rule that simply stopped running (dropped or newly unreadable companion
+    GTFS, most often) and so could not have reported the old finding either
+    way -- see #126, and ``Diff.unknown`` above. Without it (the default),
+    every OLD-only finding is reported ``fixed``, the old, uncorrected
+    behavior; callers with a real coverage manifest for NEW should always
+    pass it.
+    """
     old_ids: dict[Identity, Finding] = {finding_identity(f): f for f in old}
     new_ids: dict[Identity, Finding] = {finding_identity(f): f for f in new}
-    fixed = sorted(
-        (old_ids[k] for k in old_ids if k not in new_ids),
-        key=lambda f: (f.rule_id, f.pointer() or "", f.message),
-    )
+    ran_in_new = {o.id for o in new_coverage.ran} if new_coverage is not None else None
+    fixed: list[Finding] = []
+    unknown: list[Finding] = []
+    for k, f in old_ids.items():
+        if k in new_ids:
+            continue
+        if ran_in_new is not None and f.rule_id not in ran_in_new:
+            unknown.append(f)
+        else:
+            fixed.append(f)
+
+    def _sort_key(f: Finding) -> tuple[str, str, str]:
+        return (f.rule_id, f.pointer() or "", f.message)
+
+    fixed.sort(key=_sort_key)
+    unknown.sort(key=_sort_key)
     introduced = [f for k, f in new_ids.items() if k not in old_ids]
     moved = [f for k, f in new_ids.items() if k in old_ids and f.pointer() != old_ids[k].pointer()]
     persisting = [
         f for k, f in new_ids.items() if k in old_ids and f.pointer() == old_ids[k].pointer()
     ]
-    return Diff(fixed=fixed, introduced=introduced, persisting=persisting, moved=moved)
+    return Diff(
+        fixed=fixed, introduced=introduced, persisting=persisting, moved=moved, unknown=unknown
+    )

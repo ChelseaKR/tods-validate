@@ -19,6 +19,20 @@ Fixed:
   discloses that the file could not be read (pointing to `TODS-E103` for the
   reason on the TODS side), instead of silently reporting `has no <file>` or,
   worse, inventing errors against it.
+- `diff OLD NEW` reported a rule's old finding "fixed" whenever it was absent
+  from NEW, without checking whether the rule ran in NEW at all. A rule that
+  stopped running — a companion GTFS feed dropped, or newly unreadable
+  (#125), between OLD and NEW — makes its old findings disappear the same
+  way a genuine fix does, and `diff` could not tell them apart: comparing
+  `tests/fixtures/invalid/TODS-E307` (a bad `trip_id` reference) against the
+  same package with the companion `trips.txt` removed reported `fixed: 1`
+  and exit 0, when the bad reference was never re-checked, let alone fixed.
+  `diff` now uses `run_with_coverage` and only counts an OLD-only finding
+  `fixed` when its rule ran in NEW; otherwise it lands in a new `unknown`
+  bucket, named in the counts line. Every rule that ran in OLD and not in
+  NEW is also named below the findings, whether or not it had a finding to
+  lose — a dropped companion can zero out 16 checks with 0 findings on
+  either side, which used to read as a silently clean diff.
 - `batch` used the two-tuple `run()` wrapper, so none of its three formats
   (text, `--format json`, `--format markdown`) had a coverage manifest to
   disclose: a TODS-only feed in a fleet run skipped 16 of 42 checks, 9 of
