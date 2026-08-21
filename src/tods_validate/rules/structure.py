@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterator
 
 from ..findings import Finding, Severity
+from ..loader import BLOCKING_PROBLEM_CODES
 from ..schema import GTFS_FILENAMES, SPEC_URL, Presence, spec_link
 from . import ValidationContext, rule
 
@@ -88,7 +89,7 @@ def file_unreadable(context: ValidationContext) -> Iterator[Finding]:
         if name not in context.tables:
             continue
         for problem in feed.problems:
-            if problem.code in ("encoding", "empty", "csv_error"):
+            if problem.code in BLOCKING_PROBLEM_CODES:
                 yield Finding(
                     rule_id="TODS-E103",
                     severity=Severity.ERROR,

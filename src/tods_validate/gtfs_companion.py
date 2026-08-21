@@ -18,7 +18,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import date, timedelta
 
-from .loader import FeedFile, Package
+from .loader import BLOCKING_PROBLEM_CODES, FeedFile, Package
 from .schema import GTFS_PRIMARY_KEYS
 from .supplement import apply_supplement
 
@@ -59,6 +59,13 @@ class CompanionGTFS:
     source: str
     # Which GTFS base files were actually present (affects what can be checked).
     present: set[str] = field(default_factory=set)
+    # Base files that were in the package but could not be parsed at all (see
+    # loader.BLOCKING_PROBLEM_CODES), keyed to why. Treated as absent from
+    # `present` -- an unreadable file parsed no rows, so treating it as
+    # present would make every reference into it read as dangling instead of
+    # unresolvable (#125). TODS-W302 discloses the reason from this map
+    # rather than reporting the table simply missing.
+    unreadable: dict[str, str] = field(default_factory=dict)
     trip_service: dict[str, str] = field(default_factory=dict)
     trip_block: dict[str, str] = field(default_factory=dict)
     stop_ids: set[str] = field(default_factory=set)
@@ -117,6 +124,35 @@ def _calendar_dates_for(
     return {k: frozenset(v) for k, v in dates.items()}
 
 
+def _blocking_reason(feed: FeedFile) -> str:
+    """The LoadProblem message that made ``feed`` unreadable.
+
+    Callers only reach here when ``feed.readable`` is False, which by
+    definition means one of BLOCKING_PROBLEM_CODES is present.
+    """
+    for problem in feed.problems:
+        if problem.code in BLOCKING_PROBLEM_CODES:
+            return problem.message
+    raise AssertionError(f"{feed.name}: not readable but no blocking problem recorded")
+
+
+def _resolve_base(
+    gtfs: Package | None, base_name: str, companion: CompanionGTFS
+) -> FeedFile | None:
+    """The base FeedFile to read for ``base_name``, or None if absent or unreadable.
+
+    A file present in the package but that failed to parse outright (no
+    headers, no rows) is folded into the "absent" case here, so every other
+    caller keeps the already-correct missing-file behavior; the reason is
+    recorded in ``companion.unreadable`` for TODS-W302 to report (#125).
+    """
+    base = gtfs.get(base_name) if gtfs is not None else None
+    if base is not None and not base.readable:
+        companion.unreadable[base_name] = _blocking_reason(base)
+        return None
+    return base
+
+
 def build_companion(gtfs: Package | None, tods: Package, source: str) -> CompanionGTFS:
     """Build the supplemented GTFS view.
 
@@ -127,7 +163,7 @@ def build_companion(gtfs: Package | None, tods: Package, source: str) -> Compani
     companion = CompanionGTFS(source=source)
 
     def effective(base_name: str) -> dict[tuple[str, ...], dict[str, str]]:
-        base = gtfs.get(base_name) if gtfs is not None else None
+        base = _resolve_base(gtfs, base_name, companion)
         supplement = tods.get(base_name.removesuffix(".txt") + "_supplement.txt")
         pk = GTFS_PRIMARY_KEYS[base_name]
         if base is not None:

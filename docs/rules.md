@@ -379,11 +379,11 @@ run_id 2 has no run_events.txt rows under service_id daily; point at a run that 
 
 Spec reference: <https://tods-transit.org/spec/#employee_run_datestxt>
 
-### TODS-W302: Referenced file is missing, references not checked
+### TODS-W302: Referenced file is missing or unreadable, references not checked
 
 Severity: WARNING.
 
-A file references another file that is not in the package (or, for GTFS targets, not in the companion feed), so those references could not be validated.
+A file references another file that is not in the package (or, for GTFS targets, not in the companion feed) or that could not be read (TODS-E103), so those references could not be validated.
 
 Example (`employee_run_dates.txt`):
 

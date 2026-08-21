@@ -45,6 +45,17 @@ class Row:
     extra_cells: tuple[str, ...] = ()
 
 
+# Problem codes that stop parsing outright, so the file has no headers and no
+# rows (see the early `return feed` for each in _parse_csv). "ragged" and
+# "duplicate_header" are per-row/per-column defects on an otherwise-parsed
+# file, so they leave FeedFile.readable True. This is the single source of
+# truth for that split: TODS-E103 reports the file, and anything that reads
+# another file's rows to resolve a reference (gtfs_companion.build_companion,
+# TODS-E301/E303/W302) must treat a False here as absent, not present-but-
+# empty -- see #125.
+BLOCKING_PROBLEM_CODES = frozenset({"encoding", "empty", "csv_error"})
+
+
 @dataclass
 class LoadProblem:
     """A structural defect found while reading a file."""
@@ -70,6 +81,11 @@ class FeedFile:
 
     def column(self, name: str) -> bool:
         return name in self.headers
+
+    @property
+    def readable(self) -> bool:
+        """False if the file could not be parsed at all: see BLOCKING_PROBLEM_CODES."""
+        return not any(p.code in BLOCKING_PROBLEM_CODES for p in self.problems)
 
 
 @dataclass
@@ -117,8 +133,11 @@ def _parse_csv(name: str, data: bytes, encoding: str | None = None) -> FeedFile:
             LoadProblem(
                 code="encoding",
                 message=(
-                    f"{name} is not valid {codec} (byte {exc.start}). TODS files must be "
-                    f"UTF-8 encoded, like GTFS.{hint}"
+                    # _parse_csv reads both the TODS package and (via
+                    # gtfs_companion) a companion GTFS feed, so this must not
+                    # claim either format by name -- see #125.
+                    f"{name} is not valid {codec} (byte {exc.start}). Transit data files "
+                    f"must be UTF-8 encoded.{hint}"
                 ),
             )
         )

@@ -51,6 +51,20 @@ def _rows(context: ValidationContext, filename: str) -> list[Row]:
     return feed.rows if feed is not None else []
 
 
+def _present(package: Package, filename: str) -> bool:
+    """Whether ``filename`` is in the package and was parsed successfully.
+
+    A file that failed to parse (TODS-E103) is still in ``package.files``,
+    but with no rows, so treating it as present would make a rule that reads
+    its rows to resolve references find nothing and report every real ID as
+    dangling. Everywhere a rule reads *another* file's rows to check *this*
+    file's references, gate on this, not on ``package.get(...) is not None``
+    (#125).
+    """
+    feed = package.get(filename)
+    return feed is not None and feed.readable
+
+
 def _run_pairs(context: ValidationContext) -> set[tuple[str, str]]:
     # Thin wrapper kept so call sites read the same as before; the set is
     # derived once per validation and cached on the context (see
@@ -97,8 +111,8 @@ def _routes_available(context: ValidationContext) -> bool:
 )
 def employee_run_missing(context: ValidationContext) -> Iterator[Finding]:
     feed = context.package.get("employee_run_dates.txt")
-    if feed is None or context.package.get("run_events.txt") is None:
-        return  # absence of run_events.txt is TODS-W302's concern
+    if feed is None or not _present(context.package, "run_events.txt"):
+        return  # absence (or unreadability) of run_events.txt is TODS-W302's concern
     pairs = _run_pairs(context)
     for row in feed.rows:
         service_id = row.values.get("service_id", "")
@@ -133,11 +147,11 @@ def employee_run_missing(context: ValidationContext) -> Iterator[Finding]:
     spec_versions=_V2_ONLY,
     id="TODS-W302",
     severity=Severity.WARNING,
-    title="Referenced file is missing, references not checked",
+    title="Referenced file is missing or unreadable, references not checked",
     description=(
         "A file references another file that is not in the package (or, for GTFS "
-        "targets, not in the companion feed), so those references could not be "
-        "validated."
+        "targets, not in the companion feed) or that could not be read (TODS-E103), "
+        "so those references could not be validated."
     ),
     spec_section=SPEC_URL,
 )
@@ -148,16 +162,27 @@ def referenced_file_missing(context: ValidationContext) -> Iterator[Finding]:
         ("vehicle_assignments.txt", "vehicles.txt", "vehicle_id values"),
     ]
     for source, target, what in targets:
-        if package.get(source) is not None and package.get(target) is None:
-            yield Finding(
-                rule_id="TODS-W302",
-                severity=Severity.WARNING,
-                file=source,
-                message=(
-                    f"{source} is present but {target} is not, so its {what} could not be checked."
-                ),
-                suggestion=f"Include {target} in the package.",
+        if package.get(source) is None:
+            continue
+        target_feed = package.get(target)
+        if target_feed is None:
+            message = (
+                f"{source} is present but {target} is not, so its {what} could not be checked."
             )
+        elif not target_feed.readable:
+            message = (
+                f"{source} is present but {target} could not be read (see TODS-E103), "
+                f"so its {what} could not be checked."
+            )
+        else:
+            continue
+        yield Finding(
+            rule_id="TODS-W302",
+            severity=Severity.WARNING,
+            file=source,
+            message=message,
+            suggestion=f"Include a readable {target} in the package.",
+        )
     if context.gtfs is not None:
         gtfs_needs: list[tuple[str, bool, str]] = [
             (
@@ -189,14 +214,25 @@ def referenced_file_missing(context: ValidationContext) -> Iterator[Finding]:
         ]
         for source, available, target in gtfs_needs:
             if package.get(source) is not None and not available:
+                unreadable = [
+                    name for name in target.split(" or ") if name in context.gtfs.unreadable
+                ]
+                if unreadable:
+                    reasons = "; ".join(context.gtfs.unreadable[name] for name in unreadable)
+                    message = (
+                        f"The companion GTFS feed's {' and '.join(unreadable)} could not be "
+                        f"read ({reasons}), so {source} references into it could not be checked."
+                    )
+                else:
+                    message = (
+                        f"The companion GTFS feed has no {target}, so {source} "
+                        "references into it could not be checked."
+                    )
                 yield Finding(
                     rule_id="TODS-W302",
                     severity=Severity.WARNING,
                     file=source,
-                    message=(
-                        f"The companion GTFS feed has no {target}, so {source} "
-                        "references into it could not be checked."
-                    ),
+                    message=message,
                 )
 
 
@@ -218,8 +254,8 @@ def _uses_column(package: Package, filename: str, column: str) -> bool:
 def vehicle_missing(context: ValidationContext) -> Iterator[Finding]:
     assignments = context.package.get("vehicle_assignments.txt")
     vehicles = context.package.get("vehicles.txt")
-    if assignments is None or vehicles is None:
-        return
+    if assignments is None or vehicles is None or not vehicles.readable:
+        return  # absence (or unreadability) of vehicles.txt is TODS-W302's concern
     known = {row.values.get("vehicle_id", "") for row in vehicles.rows} - {""}
     for row in assignments.rows:
         vehicle_id = row.values.get("vehicle_id", "")
