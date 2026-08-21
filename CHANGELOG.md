@@ -7,6 +7,10 @@ new checks may be added in minor releases.
 
 Fixed:
 
+- `uv.lock` pins `pip` at 26.2.1, past `PYSEC-2026-3721` (disclosed after
+  26.1.2 was pinned). Vendored only as a transitive build/audit tool, never
+  imported by `tods_validate` itself, but it was failing `make audit` (and
+  would fail it for any PR, unrelated to that PR's own change) until bumped.
 - `fix -o OUT` and `anonymize -o OUT` no longer destroy a file the loader could
   not read. Both commands rebuild every file from the loader's headers and rows;
   a file whose decode or CSV parse failed has neither, so it was written out as a
