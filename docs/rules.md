@@ -353,6 +353,30 @@ Leading/trailing spaces are kept as part of the value by most parsers and silent
 
 Spec reference: <https://tods-transit.org/spec/>
 
+### TODS-E207: Value is not a valid color
+
+Severity: ERROR.
+
+A GTFS Color field is not six hexadecimal digits (0-9, A-F), with no leading '#'. routes_supplement.txt's route_color and route_text_color inherit their type from GTFS routes.txt; a value here becomes the effective color in the TODS-Supplemented GTFS the same way a bad value in routes.txt itself would be invalid, even though this file is not GTFS and this validator does not otherwise re-check the base feed.
+
+Example (`routes_supplement.txt`):
+
+Before:
+```csv
+route_id,route_color
+R1,red
+```
+
+After:
+```csv
+route_id,route_color
+R1,FF0000
+```
+
+GTFS Color fields are six hex digits with no leading '#'; a named color like 'red' is not valid.
+
+Spec reference: <https://tods-transit.org/spec/#supplement-files>
+
 ## References between files (TODS-x3xx)
 
 ### TODS-E301: Employee assignment points to a run that does not exist

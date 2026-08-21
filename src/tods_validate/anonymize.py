@@ -40,7 +40,9 @@ _VEHICLE_PREFIX = "veh"
 
 # Field types whose values are structured/enumerated rather than free text, so
 # they are not reported as a residual re-identification risk even when left
-# unpseudonymized (e.g. a NON_NEGATIVE_INTEGER sequence number).
+# unpseudonymized (e.g. a NON_NEGATIVE_INTEGER sequence number). COLOR (route
+# branding hex) is included for the same reason: a six-hex-digit color does
+# not identify a person.
 _STRUCTURED_TYPES = frozenset(
     {
         FieldType.ID,
@@ -48,6 +50,7 @@ _STRUCTURED_TYPES = frozenset(
         FieldType.NON_NEGATIVE_INTEGER,
         FieldType.DATE,
         FieldType.TIME,
+        FieldType.COLOR,
     }
 )
 
