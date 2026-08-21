@@ -83,6 +83,15 @@ Fixed:
 
 Added:
 
+- `TODS-E207` checks that `routes_supplement.txt`'s `route_color` and
+  `route_text_color` are valid GTFS Color values: six hexadecimal digits, no
+  leading `#` (GTFS reference, "Field Types > Color"). Every other field a
+  supplement file inherits from its GTFS base is typed `Text` by
+  `schema._supplement()` regardless of the base file's real GTFS type, so
+  these two carried no format check at all before this; `_supplement()`
+  gained a `field_types` override used only for these two fields, rather
+  than transcribing the full GTFS field-type inventory for a single rule.
+  (#101)
 - `--require-complete-run` fails the run when a check could not run because an
   input was missing, such as a companion GTFS feed that was not given. Skips
   the caller asked for (`--ignore`, opt-in rules left off, `--spec-version`

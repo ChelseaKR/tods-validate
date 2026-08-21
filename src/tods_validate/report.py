@@ -393,10 +393,10 @@ def _combined_batch_coverage(coverages: list[RunCoverage | None]) -> RunCoverage
 
     Reuses RunCoverage's own ``scope_line``/``skipped_detail_lines`` to state
     the batch's aggregate scope instead of re-deriving that logic here: the
-    "42 checks" a single feed states become "42 x N feeds attempted" for the
-    fleet, and the same disclosure machinery names which rules and how many
-    of each severity did not run, batch-wide. None for an all-error batch (no
-    feed loaded far enough to have a manifest).
+    total checks a single feed states become that many times N feeds
+    attempted for the fleet, and the same disclosure machinery names which
+    rules and how many of each severity did not run, batch-wide. None for an
+    all-error batch (no feed loaded far enough to have a manifest).
     """
     outcomes = tuple(o for c in coverages if c is not None for o in c.outcomes)
     return RunCoverage(outcomes) if outcomes else None

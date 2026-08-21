@@ -17,6 +17,7 @@ RULES = (
     "TODS-E204",
     "TODS-E205",
     "TODS-W206",
+    "TODS-E207",
 )
 
 
@@ -215,6 +216,31 @@ def test_negative_non_negative_float_is_flagged(tmp_path: Path) -> None:
     _, findings = run(tmp_path, spec_version="1.0.0")
     e203 = [f for f in findings if f.rule_id == "TODS-E203" and f.field == "shape_dist_traveled"]
     assert {f.row for f in e203} == {2, 3}
+
+
+def test_invalid_color_message_and_edge_cases(tmp_path: Path) -> None:
+    # route_color/route_text_color are TEXT-typed in every other supplement
+    # column and only these two are given FieldType.COLOR (#101); pin the
+    # exact set of values that are and are not valid.
+    (tmp_path / "routes_supplement.txt").write_text(
+        "route_id,route_color,route_text_color\n"
+        "R1,red,\n"  # named color, not hex: invalid
+        "R2,#FF0000,000000\n"  # leading '#': invalid
+        "R3,FF00,000000\n"  # too short: invalid
+        "R4,ff0000,ABCDEF\n"  # lowercase and uppercase hex: both valid
+        "R5,,\n",  # blank: valid (GTFS Color fields are Optional)
+    )
+    _, findings = run(tmp_path)
+    e207 = [f for f in findings if f.rule_id == "TODS-E207"]
+    assert {(f.row, f.field) for f in e207} == {
+        (2, "route_color"),
+        (3, "route_color"),
+        (4, "route_color"),
+    }
+    named_color = next(f for f in e207 if f.row == 2)
+    assert "route_color" in named_color.message
+    assert "'red'" in named_color.message
+    assert "FF0000" in named_color.message  # the worked-good-example value
 
 
 def test_enum_message_lists_allowed_values() -> None:

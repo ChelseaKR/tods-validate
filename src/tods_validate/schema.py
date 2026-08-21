@@ -62,6 +62,13 @@ class FieldType(Enum):
     LATITUDE = "Latitude"
     LONGITUDE = "Longitude"
     NON_NEGATIVE_FLOAT = "Non-negative float"
+    # GTFS's Color field type (six hex digits, no leading '#'; GTFS reference
+    # spec, "Field Types"), carried into v2.1.0 supplement files via the
+    # "fields match GTFS" rule (TODS spec, "Supplement Files > Structure").
+    # routes.txt:route_color/route_text_color are the only Color-typed GTFS
+    # fields a supplement file can carry today (see _supplement()'s
+    # field_types override). See rule TODS-E207.
+    COLOR = "Color"
 
 
 class Presence(Enum):
@@ -249,11 +256,28 @@ GTFS_REQUIRED_FIELDS: dict[str, tuple[str, ...]] = {
 TODS_DELETE = FieldSpec("TODS_delete", FieldType.ENUM, Presence.OPTIONAL, enum_values=("", "1"))
 
 
-def _supplement(filename: str, gtfs_base: str, extra: tuple[FieldSpec, ...] = ()) -> TableSpec:
+def _supplement(
+    filename: str,
+    gtfs_base: str,
+    extra: tuple[FieldSpec, ...] = (),
+    field_types: dict[str, FieldType] | None = None,
+) -> TableSpec:
+    """Build a supplement TableSpec from the GTFS base file's field inventory.
+
+    A supplement row need only carry the fields it changes ("As blank fields
+    are ignored", spec "Supplement Files > Implications and Guidance"), so
+    every non-key field defaults to Optional -- the base file's own Required
+    fields, if any, are GTFS_REQUIRED_FIELDS' concern for an *added* row, not
+    this table's static Presence. Fields default to FieldType.TEXT because
+    the GTFS reference field-type inventory is not transcribed here in full;
+    ``field_types`` overrides specific fields where a spec-cited check exists
+    for them (see e.g. FieldType.COLOR, rule TODS-E207).
+    """
     pk = GTFS_PRIMARY_KEYS[gtfs_base]
+    field_types = field_types or {}
     key_fields = tuple(FieldSpec(name, FieldType.ID, Presence.REQUIRED) for name in pk)
     other_fields = tuple(
-        FieldSpec(name, FieldType.TEXT, Presence.OPTIONAL)
+        FieldSpec(name, field_types.get(name, FieldType.TEXT), Presence.OPTIONAL)
         for name in GTFS_FIELDS[gtfs_base]
         if name not in pk
     )
@@ -363,7 +387,14 @@ STOPS_SUPPLEMENT = _supplement(
     extra=(FieldSpec("TODS_location_type", FieldType.TEXT, Presence.OPTIONAL),),
 )
 STOP_TIMES_SUPPLEMENT = _supplement("stop_times_supplement.txt", "stop_times.txt")
-ROUTES_SUPPLEMENT = _supplement("routes_supplement.txt", "routes.txt")
+ROUTES_SUPPLEMENT = _supplement(
+    "routes_supplement.txt",
+    "routes.txt",
+    # GTFS reference, "Field Types > Color" and routes.txt's route_color/
+    # route_text_color rows: "A color encoded as a six-digit hexadecimal
+    # number" (no leading '#'). See rule TODS-E207.
+    field_types={"route_color": FieldType.COLOR, "route_text_color": FieldType.COLOR},
+)
 CALENDAR_SUPPLEMENT = _supplement("calendar_supplement.txt", "calendar.txt")
 CALENDAR_DATES_SUPPLEMENT = _supplement("calendar_dates_supplement.txt", "calendar_dates.txt")
 

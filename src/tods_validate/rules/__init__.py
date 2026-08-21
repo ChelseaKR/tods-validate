@@ -286,6 +286,15 @@ EXAMPLES: dict[str, RuleExample] = {
             "automatically."
         ),
     ),
+    "TODS-E207": RuleExample(
+        file="routes_supplement.txt",
+        before="route_id,route_color\nR1,red",
+        after="route_id,route_color\nR1,FF0000",
+        note=(
+            "GTFS Color fields are six hex digits with no leading '#'; a named color "
+            "like 'red' is not valid."
+        ),
+    ),
     "TODS-E301": RuleExample(
         file="employee_run_dates.txt",
         before="date,service_id,run_id,employee_id\n20260106,daily,2,emp-1",

@@ -429,8 +429,11 @@ def test_github_format_names_the_checks_that_did_not_run() -> None:
     )
     # The summary line -- the one line a reader takes the result from -- is
     # qualified rather than standing alone as "0 error(s), 0 warning(s)".
+    # Derived from the coverage manifest itself, not hardcoded, so this does
+    # not silently go stale (and false-pass on a different total) every time
+    # a rule is added to the registry.
     summary = next(line for line in out.splitlines() if line.startswith("tods-validate:"))
-    assert "25 of 42 checks ran" in summary or "of 42 checks ran" in summary
+    assert f"{len(coverage.ran)} of {len(coverage.outcomes)} checks ran" in summary
     assert "Checks skipped:" in summary
 
 
