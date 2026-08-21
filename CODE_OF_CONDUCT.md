@@ -65,3 +65,4 @@ available at <https://www.contributor-covenant.org/translations>.
 
 [homepage]: https://www.contributor-covenant.org
 [mozilla]: https://github.com/mozilla/diversity
+# bounty-fix-ref: https://github.com/ChelseaKR/tods-validate/issues/101
