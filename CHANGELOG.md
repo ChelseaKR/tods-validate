@@ -95,6 +95,19 @@ Added:
   asked the tool to promise. The README now states it instead of leaving `0`
   to be read as "fully checked".
 
+Docs:
+
+- The Standards Conformance section's intro paragraph enumerated eleven
+  standards ("code quality, security & supply chain, ... AI-evaluation") while
+  the table below it declares fifteen -- Performance, Incident Response, Data
+  Governance, and AI Development Measurement were in the table and missing
+  from the prose. v0.9.1 (#118) fixed the table itself (a comma in the
+  Accessibility row's state broke the vendored portfolio-standards v2.0.0
+  DOC-11 checker, which the prose drift did not: the checker grades the
+  table, not the paragraph above it); this is the second, smaller half of
+  #113. The paragraph now points at the table instead of maintaining a second,
+  driftable count.
+
 ## v0.9.1 - 2026-08-18
 
 A patch release that repairs the release pipeline itself and ships one

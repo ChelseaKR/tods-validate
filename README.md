@@ -465,11 +465,8 @@ Observability: Tier C — OTel tracing out-of-scope (no network surface). Opt-in
 
 ## Standards Conformance
 
-`tods-validate` is developed against a shared set of engineering standards
-(code quality, security & supply chain, CI/CD, release & versioning,
-accessibility, observability, documentation, quality & metrics,
-responsible-tech, internationalization, AI-evaluation). Applicability and
-current state:
+`tods-validate` is developed against the fifteen portfolio standards below.
+Applicability and current state:
 
 | Standard | Applies? | State |
 |---|---|---|
