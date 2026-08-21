@@ -99,13 +99,65 @@ def test_batch_json() -> None:
     assert payload["feeds"][0]["errors"] >= 1
 
 
+def test_batch_json_carries_coverage_per_feed() -> None:
+    # #127: batch used the two-tuple run() wrapper, so its JSON carried no
+    # coverage manifest at all -- a TODS-only feed's `status: pass` and
+    # `0 error(s)` could not be told apart from a fully-checked feed.
+    result = invoke("batch", "--format", "json", str(FIXTURES / "invalid" / "TODS-W101"))
+    feed = json.loads(result.output)["feeds"][0]
+    assert feed["status"] == "pass"
+    assert feed["checksNotRun"] > 0  # the GTFS reference rules could not run
+    assert feed["coverage"]["skipped"] == feed["checksNotRun"]
+    assert feed["coverage"]["total"] == feed["coverage"]["ran"] + feed["coverage"]["skipped"]
+
+
 def test_batch_markdown() -> None:
     result = invoke("batch", "--format", "markdown", E201, str(FIXTURES / "invalid" / "TODS-W101"))
     assert "# TODS fleet compliance report" in result.output
-    assert "| source | errors | warnings | infos | status |" in result.output
+    assert "| source | errors | warnings | infos | checks not run | status |" in result.output
     assert "| fail |" in result.output
     assert "| pass |" in result.output
     assert result.exit_code == 1
+
+
+def test_batch_markdown_discloses_fleet_wide_coverage() -> None:
+    # A TODS-only feed's row must carry its skip count beside "pass", and the
+    # roll-up must state the fleet's aggregate scope -- the same disclosure
+    # every single-feed format already carries (#127).
+    result = invoke("batch", "--format", "markdown", str(FIXTURES / "invalid" / "TODS-W101"))
+    assert "Rule-set coverage:" in result.output
+    lines = [line for line in result.output.splitlines() if line.startswith("| `")]
+    assert len(lines) == 1
+    # "| `source` | errors | warnings | infos | checks not run | status |"
+    cells = [c.strip() for c in lines[0].strip().strip("|").split("|")]
+    assert cells[-1] == "pass"
+    assert int(cells[-2]) > 0  # checks not run, right beside "pass"
+
+
+def test_batch_text_discloses_fleet_wide_coverage() -> None:
+    result = invoke("batch", str(FIXTURES / "invalid" / "TODS-W101"))
+    assert "not run" in result.output
+    assert "Rule-set coverage:" in result.output
+    data_line = next(line for line in result.output.splitlines() if "TODS-W101" in line)
+    assert int(data_line.split()[3]) > 0  # errors warnings infos "not run" source
+
+
+def test_batch_require_complete_run_fails_a_partial_feed() -> None:
+    # The GTFS reference rules are unrequested skips on this TODS-only feed
+    # (no --gtfs, no --ignore, no opt-out asked for), so --require-complete-run
+    # must fail it even though it has zero findings of its own.
+    without = invoke("batch", "--format", "json", str(FIXTURES / "invalid" / "TODS-W101"))
+    assert without.exit_code == 0  # a skip alone does not fail a feed by default
+    assert json.loads(without.output)["feeds"][0]["status"] == "pass"
+    with_flag = invoke(
+        "batch",
+        "--format",
+        "json",
+        "--require-complete-run",
+        str(FIXTURES / "invalid" / "TODS-W101"),
+    )
+    assert with_flag.exit_code == 1
+    assert json.loads(with_flag.output)["feeds"][0]["status"] == "fail"
 
 
 def test_batch_markdown_stamp() -> None:
