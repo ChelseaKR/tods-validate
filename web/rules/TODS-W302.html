@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>TODS-W302: Referenced file is missing, references not checked — tods-validate rule catalog</title>
+    <title>TODS-W302: Referenced file is missing or unreadable, references not checked — tods-validate rule catalog</title>
     <style>
       :root { color-scheme: light dark; }
       body {
@@ -37,9 +37,9 @@
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
     <p class="id">TODS-W302</p>
-    <h1>Referenced file is missing, references not checked</h1>
+    <h1>Referenced file is missing or unreadable, references not checked</h1>
     <p class="meta"><span class="badge">WARNING</span></p>
-    <p>A file references another file that is not in the package (or, for GTFS targets, not in the companion feed), so those references could not be validated.</p>
+    <p>A file references another file that is not in the package (or, for GTFS targets, not in the companion feed) or that could not be read (TODS-E103), so those references could not be validated.</p>
     <p>Spec reference: <a href="https://tods-transit.org/spec/">https://tods-transit.org/spec/</a></p>
   </body>
 </html>

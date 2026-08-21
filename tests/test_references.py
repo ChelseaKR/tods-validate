@@ -163,6 +163,58 @@ def test_time_check_skips_mid_trip_events(tmp_path: Path) -> None:
     assert not any(f.rule_id == "TODS-W316" for f in findings)
 
 
+def test_unreadable_vehicles_file_does_not_invent_e303(tmp_path: Path) -> None:
+    # #125: an undecodable vehicles.txt used to count as present-but-empty,
+    # so every real vehicle_id in vehicle_assignments.txt read as undefined.
+    (tmp_path / "vehicles.txt").write_bytes(b"\xff\xfe\x00\x01garbage-not-utf8")
+    (tmp_path / "vehicle_assignments.txt").write_text(
+        "block_id,vehicle_id,service_id\nB1,bus-1,weekday\n"
+    )
+    _, findings = run(tmp_path)
+    assert "TODS-E303" not in rule_ids(findings)
+    assert "TODS-E103" in rule_ids(findings)  # the file itself is reported unreadable
+    w302 = [f for f in findings if f.rule_id == "TODS-W302"]
+    assert w302, "expected TODS-W302 to disclose that vehicles.txt could not be read"
+    assert "vehicles.txt could not be read" in w302[0].message
+    assert "TODS-E103" in w302[0].message
+
+
+def test_unreadable_run_events_file_does_not_invent_e301(tmp_path: Path) -> None:
+    # Same shape as above, on employee_run_dates.txt -> run_events.txt.
+    (tmp_path / "run_events.txt").write_bytes(b"\xff\xfe\x00\x01garbage-not-utf8")
+    (tmp_path / "employee_run_dates.txt").write_text(
+        "employee_id,service_id,run_id,date\nE1,weekday,1,20260105\n"
+    )
+    _, findings = run(tmp_path)
+    assert "TODS-E301" not in rule_ids(findings)
+    assert "TODS-E103" in rule_ids(findings)
+    w302 = [f for f in findings if f.rule_id == "TODS-W302"]
+    assert w302, "expected TODS-W302 to disclose that run_events.txt could not be read"
+    assert "run_events.txt could not be read" in w302[0].message
+
+
+def test_unreadable_companion_trips_does_not_invent_e307(tmp_path: Path) -> None:
+    # #125's headline repro: an undecodable companion trips.txt used to count
+    # as present, so run_events.txt's trip_id references resolved against an
+    # empty table and every one read as a dangling TODS-E307.
+    (tmp_path / "trips.txt").write_bytes(b"\xff\xfe\x00\x01garbage-not-utf8")
+    (tmp_path / "calendar.txt").write_text(
+        "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,"
+        "start_date,end_date\nweekday,1,1,1,1,1,0,0,20260101,20261231\n"
+    )
+    (tmp_path / "stops.txt").write_text("stop_id\nS1\n")
+    (tmp_path / "run_events.txt").write_text(
+        "service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,"
+        "end_location,end_time\nweekday,1,10,operator,T1,S1,09:00:00,S1,10:00:00\n"
+    )
+    _, findings = run(tmp_path)
+    assert "TODS-E307" not in rule_ids(findings)
+    w302 = [f for f in findings if f.rule_id == "TODS-W302" and "trips.txt" in f.message]
+    assert w302, "expected TODS-W302 to disclose that the companion trips.txt could not be read"
+    assert "could not be read" in w302[0].message
+    assert "has no trips.txt" not in w302[0].message  # distinct from the missing-file wording
+
+
 def test_time_check_treats_2400_as_midnight(tmp_path: Path) -> None:
     # The event ends at 24:00:00 and the trip arrives at 24:00:00: equal, no W316.
     (tmp_path / "trips.txt").write_text("trip_id,route_id,service_id\nT1,R1,weekday\n")

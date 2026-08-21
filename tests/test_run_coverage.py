@@ -274,6 +274,27 @@ def test_rules_whose_gtfs_table_is_absent_are_skipped_not_run(tmp_path: Path) ->
     assert missing_gtfs_tables(by_rule["TODS-E309"], companion) == ()
 
 
+def test_unreadable_gtfs_table_is_skipped_not_run_with_invented_errors(tmp_path: Path) -> None:
+    # #125's headline repro: an undecodable trips.txt used to be recorded
+    # `ran` in the coverage manifest (it was "present" per build_companion)
+    # and produced invented TODS-E307 errors for every real trip_id, exit 1
+    # on a feed with nothing actually wrong, instead of being disclosed as
+    # unreadable and skipped the way a genuinely missing trips.txt already was.
+    package = _copy_valid_tods(tmp_path)
+    for source in VALID_GTFS.iterdir():
+        (package / source.name).write_bytes(source.read_bytes())
+    (package / "trips.txt").write_bytes(b"\xff\xfe\x00\x01garbage-not-utf8")
+    _, findings, coverage = run_with_coverage(package, enabled=frozenset(CATEGORIES))
+    by_id = {o.id: o.status for o in coverage.outcomes}
+    assert by_id["TODS-E307"] == STATUS_SKIPPED_NEEDS_GTFS_TABLE
+    assert "TODS-E307" not in {f.rule_id for f in findings}
+    # TODS-E103 only scans TODS files (context.tables), not the companion
+    # GTFS side, so TODS-W302 is where an unreadable trips.txt is disclosed.
+    w302 = [f for f in findings if f.rule_id == "TODS-W302" and "trips.txt" in f.message]
+    assert w302, "expected TODS-W302 to disclose that the companion trips.txt could not be read"
+    assert "could not be read" in w302[0].message
+
+
 def test_a_supplement_alone_does_not_make_a_gtfs_table_checkable(tmp_path: Path) -> None:
     # trips_supplement.txt modifies trips.txt; it is not trips.txt. With no base
     # table the supplemented view holds only the supplement's own rows, so every

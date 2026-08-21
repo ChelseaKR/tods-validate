@@ -91,6 +91,31 @@ def test_base_keys_track_pre_supplement_rows(tmp_path: Path) -> None:
     assert companion.stop_ids == {"s1", "s2"}
 
 
+def test_unreadable_base_file_is_treated_as_absent(tmp_path: Path) -> None:
+    # An undecodable trips.txt must not count as present: every reference
+    # into it would otherwise resolve against an empty table and read as
+    # dangling instead of correctly unresolvable (#125).
+    (tmp_path / "trips.txt").write_bytes(b"\xff\xfe\x00\x01garbage-not-utf8")
+    package = load_package(tmp_path)
+    companion = build_companion(package, package, source="test")
+    assert "trips.txt" not in companion.present
+    assert companion.trip_service == {}
+    assert companion.trip_block == {}
+    assert "trips.txt" in companion.unreadable
+    assert "trips.txt" in companion.unreadable["trips.txt"]  # names itself, like TODS-E103
+
+
+def test_header_only_base_file_is_still_present(tmp_path: Path) -> None:
+    # Contrast with the unreadable case above: a file that parses fine but
+    # happens to have zero data rows is a legitimately empty table, not an
+    # unreadable one, and must still count as present.
+    _write(tmp_path, "trips.txt", "route_id,service_id,trip_id,block_id\n")
+    package = load_package(tmp_path)
+    companion = build_companion(package, package, source="test")
+    assert "trips.txt" in companion.present
+    assert companion.unreadable == {}
+
+
 def test_parse_gtfs_date() -> None:
     assert parse_gtfs_date("20260229") is None  # 2026 is not a leap year
     assert parse_gtfs_date("2026-01-05") is None

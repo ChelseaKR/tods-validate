@@ -7,6 +7,18 @@ new checks may be added in minor releases.
 
 Fixed:
 
+- A companion GTFS file that could not be decoded (bad encoding, empty,
+  unparseable CSV) counted as present. The reference rules that read it ran
+  against an empty table instead of being skipped, invented ERRORs against
+  every real ID in the TODS file that referenced it, and the coverage
+  manifest recorded them `ran`. The same shape reached two TODS-internal
+  checks: an unreadable `run_events.txt` or `vehicles.txt` produced invented
+  `TODS-E301`/`TODS-E303` findings the same way. All three now treat an
+  unreadable file the same as a missing one — the rule is skipped
+  (`skipped:needs_gtfs_table` for the companion-GTFS case), and `TODS-W302`
+  discloses that the file could not be read (pointing to `TODS-E103` for the
+  reason on the TODS side), instead of silently reporting `has no <file>` or,
+  worse, inventing errors against it.
 - `uv.lock` pins `pip` at 26.2.1, past `PYSEC-2026-3721` (disclosed after
   26.1.2 was pinned). Vendored only as a transitive build/audit tool, never
   imported by `tods_validate` itself, but it was failing `make audit` (and
