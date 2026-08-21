@@ -262,6 +262,16 @@ are a floor, not evidence of screen-reader usability. The next accessibility
 artifact should therefore be the manual keyboard and assistive-technology
 walkthrough, not another scanner.
 
+**2026-08-21:** an attempt at that walkthrough (#74) could not proceed --
+no browser tool was available in that session, so it recorded a static
+source review instead (`docs/a11y/2026-08-21-automated-only-not-a-substitute.md`,
+explicitly not a substitute for the real thing) and surfaced a live-site
+blocker: `web/index.html` pins `micropip.install("tods-validate==0.9.1")`,
+and PyPI's latest published version is still 0.9.0 (v0.9.1 was tagged and
+signed but never actually released -- #136). If that holds in a real
+browser, the deployed playground does not currently boot at all, which
+would block the walkthrough itself until #136 is resolved.
+
 ## quality-and-metrics
 
 **Closed today:** `DEFINITION_OF_DONE.md` (root) and
