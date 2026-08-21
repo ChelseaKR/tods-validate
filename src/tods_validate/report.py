@@ -388,33 +388,58 @@ def render_markdown(  # noqa: C901 -- pragmatic complexity; ratchet tracked in d
     return "\n".join(lines)
 
 
-def render_batch_markdown(rows: list[dict[str, object]], *, stamp: bool = False) -> str:
+def _combined_batch_coverage(coverages: list[RunCoverage | None]) -> RunCoverage | None:
+    """Pool every feed's per-rule outcomes into one fleet-wide RunCoverage.
+
+    Reuses RunCoverage's own ``scope_line``/``skipped_detail_lines`` to state
+    the batch's aggregate scope instead of re-deriving that logic here: the
+    "42 checks" a single feed states become "42 x N feeds attempted" for the
+    fleet, and the same disclosure machinery names which rules and how many
+    of each severity did not run, batch-wide. None for an all-error batch (no
+    feed loaded far enough to have a manifest).
+    """
+    outcomes = tuple(o for c in coverages if c is not None for o in c.outcomes)
+    return RunCoverage(outcomes) if outcomes else None
+
+
+def render_batch_markdown(
+    rows: list[dict[str, object]],
+    coverages: list[RunCoverage | None] | None = None,
+    *,
+    stamp: bool = False,
+) -> str:
     """A single stamped multi-agency (fleet) compliance report.
 
     ``rows`` mirrors the structure ``cli.batch`` already builds: one dict per
     feed with either ``{"source", "errors", "warnings", "infos", "status"}``
     for a feed that was read successfully, or ``{"source", "error"}`` for one
     that raised ``PackageNotFoundError`` — those render with an "error"
-    status distinct from "pass"/"fail".
+    status distinct from "pass"/"fail". ``coverages`` is parallel to ``rows``
+    (one ``RunCoverage`` per feed that loaded, ``None`` for one that did not);
+    it adds a "checks not run" column so ``status: pass`` is never left to
+    stand alone as "everything was checked" (#127), plus a fleet-wide
+    Rule-set coverage line in the roll-up, the same disclosure every
+    single-feed format already carries.
 
     With ``stamp=True`` the report carries the same provenance footer as
     ``render_markdown``, making it a citable artifact for a whole fleet/
     portfolio of agencies in one document instead of a per-feed report.
     """
+    coverages = coverages if coverages is not None else [None] * len(rows)
     lines = [
         "# TODS fleet compliance report",
         "",
         f"{len(rows)} feed(s) validated against TODS v{SPEC_VERSION} by tods-validate.",
         "",
-        "| source | errors | warnings | infos | status |",
-        "| --- | --- | --- | --- | --- |",
+        "| source | errors | warnings | infos | checks not run | status |",
+        "| --- | --- | --- | --- | --- | --- |",
     ]
     total_errors = total_warnings = total_infos = 0
     passed = failed = errored = 0
-    for row in rows:
+    for row, coverage in zip(rows, coverages, strict=True):
         if "error" in row:
             errored += 1
-            lines.append(f"| `{row['source']}` | - | - | - | error |")
+            lines.append(f"| `{row['source']}` | - | - | - | - | error |")
             continue
         status = row.get("status", "pass")
         if status == "fail":
@@ -424,9 +449,10 @@ def render_batch_markdown(rows: list[dict[str, object]], *, stamp: bool = False)
         total_errors += cast(int, row["errors"])
         total_warnings += cast(int, row["warnings"])
         total_infos += cast(int, row["infos"])
+        not_run = len(coverage.skipped) if coverage is not None else 0
         lines.append(
             f"| `{row['source']}` | {row['errors']} | {row['warnings']} | "
-            f"{row['infos']} | {status} |"
+            f"{row['infos']} | {not_run} | {status} |"
         )
     lines.append("")
     lines.append(
@@ -434,9 +460,42 @@ def render_batch_markdown(rows: list[dict[str, object]], *, stamp: bool = False)
         f"{total_infos} info across {len(rows)} feed(s) "
         f"({passed} pass, {failed} fail, {errored} error).**"
     )
+    combined = _combined_batch_coverage(coverages)
+    if combined is not None:
+        lines.append("")
+        lines.append(f"Rule-set coverage: {combined.scope_line()}")
+        lines.extend(combined.skipped_detail_lines())
     if stamp:
         lines.append("")
         lines.append(_stamp_footer())
+    return "\n".join(lines)
+
+
+def render_batch_text(
+    rows: list[dict[str, object]], coverages: list[RunCoverage | None] | None = None
+) -> str:
+    """The ``batch`` command's default terminal roll-up table.
+
+    See ``render_batch_markdown`` for what ``rows``/``coverages`` carry; this
+    is the same disclosure (a "not run" column plus a fleet-wide Rule-set
+    coverage line) in fixed-width form.
+    """
+    coverages = coverages if coverages is not None else [None] * len(rows)
+    lines = [f"{'errors':>7} {'warnings':>9} {'infos':>6} {'not run':>8}  source"]
+    for row, coverage in zip(rows, coverages, strict=True):
+        if "error" in row:
+            lines.append(f"{'-':>7} {'-':>9} {'-':>6} {'-':>8}  {row['source']} ({row['error']})")
+            continue
+        not_run = len(coverage.skipped) if coverage is not None else 0
+        lines.append(
+            f"{row['errors']:>7} {row['warnings']:>9} {row['infos']:>6} "
+            f"{not_run:>8}  {row['source']}"
+        )
+    combined = _combined_batch_coverage(coverages)
+    if combined is not None:
+        lines.append("")
+        lines.append(f"Rule-set coverage: {combined.scope_line()}")
+        lines.extend(f"  {line}" for line in combined.skipped_detail_lines())
     return "\n".join(lines)
 
 

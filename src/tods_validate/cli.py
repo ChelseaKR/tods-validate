@@ -38,6 +38,7 @@ from .policy import EXIT_CLEAN, EXIT_FINDINGS, EXIT_USAGE, GatingPolicy
 from .report import (
     RENDERERS,
     render_batch_markdown,
+    render_batch_text,
     render_github,
     render_html,
     render_json,
@@ -625,6 +626,16 @@ def drift(
     help="Exit non-zero if any feed has findings at or above this severity.  [default: error]",
 )
 @click.option(
+    "--require-complete-run",
+    is_flag=True,
+    help=(
+        "Also fail a feed when a check could not run because an input was missing, "
+        "such as a companion GTFS feed that was not given. Skips a feed asked for "
+        "(--ignore, opt-in rules left off) still leave it passing. See validate's "
+        "flag of the same name."
+    ),
+)
+@click.option(
     "--stamp",
     is_flag=True,
     help=(
@@ -665,6 +676,7 @@ def batch(
     gtfs_path: str | None,
     output_format: str,
     fail_on: str | None,
+    require_complete_run: bool,
     stamp: bool,
     ignore_ids: tuple[str, ...],
     history_dir: str | None,
@@ -683,26 +695,41 @@ def batch(
     severity_remap = dict(config.severity_remap)
 
     rows: list[dict[str, object]] = []
+    coverages: list[RunCoverage | None] = []
     any_failed = False
     for path in paths:
         try:
-            package, findings = run(path, gtfs_path, severity_remap=severity_remap)
+            package, findings, coverage = run_with_coverage(
+                path, gtfs_path, severity_remap=severity_remap
+            )
         except PackageNotFoundError as exc:
             rows.append({"source": path, "error": str(exc)})
+            coverages.append(None)
             any_failed = True
             continue
         gate = policy.apply(findings)
         counts = gate.counts
+        # A skipped check does not by itself fail a feed here either (see the
+        # matching comment on validate's exit code): --require-complete-run is
+        # how a fleet run opts in to that. What batch must never do is publish
+        # status: pass on a partial run without saying so -- every row below
+        # carries checksNotRun/coverage beside it regardless of this flag
+        # (#127); this only decides whether an incomplete run also fails.
+        incomplete = coverage.unrequested_skips if require_complete_run else ()
+        failed = gate.failed or bool(incomplete)
         rows.append(
             {
                 "source": package.source,
                 "errors": counts.get(Severity.ERROR, 0),
                 "warnings": counts.get(Severity.WARNING, 0),
                 "infos": counts.get(Severity.INFO, 0),
-                "status": "fail" if gate.failed else "pass",
+                "status": "fail" if failed else "pass",
+                "checksNotRun": len(coverage.skipped),
+                "coverage": coverage.to_dict(),
             }
         )
-        if gate.failed:
+        coverages.append(coverage)
+        if failed:
             any_failed = True
         if effective_history is not None:
             record = build_record(
@@ -713,16 +740,9 @@ def batch(
     if output_format == "json":
         click.echo(json.dumps({"feeds": rows}, indent=2))
     elif output_format == "markdown":
-        click.echo(render_batch_markdown(rows, stamp=stamp))
+        click.echo(render_batch_markdown(rows, coverages, stamp=stamp))
     else:
-        click.echo(f"{'errors':>7} {'warnings':>9} {'infos':>6}  source")
-        for row in rows:
-            if "error" in row:
-                click.echo(f"{'-':>7} {'-':>9} {'-':>6}  {row['source']} ({row['error']})")
-            else:
-                click.echo(
-                    f"{row['errors']:>7} {row['warnings']:>9} {row['infos']:>6}  {row['source']}"
-                )
+        click.echo(render_batch_text(rows, coverages))
     sys.exit(EXIT_FINDINGS if any_failed else EXIT_CLEAN)
 
 

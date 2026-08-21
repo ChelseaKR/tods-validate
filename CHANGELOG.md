@@ -19,6 +19,20 @@ Fixed:
   discloses that the file could not be read (pointing to `TODS-E103` for the
   reason on the TODS side), instead of silently reporting `has no <file>` or,
   worse, inventing errors against it.
+- `batch` used the two-tuple `run()` wrapper, so none of its three formats
+  (text, `--format json`, `--format markdown`) had a coverage manifest to
+  disclose: a TODS-only feed in a fleet run skipped 16 of 42 checks, 9 of
+  them ERROR-severity, and its row read `0 0 0 pass` — exactly the numbers a
+  fleet compliance artifact is read for, with nothing saying the run was
+  partial. `batch` now uses `run_with_coverage`. Every format carries the
+  manifest: text and Markdown gain a "checks not run" column beside each
+  feed's status plus a fleet-wide `Rule-set coverage` line in the roll-up
+  (pooling every feed's outcomes, the same disclosure a single-feed report
+  already carries); `--format json` adds a per-feed `checksNotRun` count and
+  a `coverage` block matching `validate --format json`'s.
+  `--require-complete-run` (#124) is now available on `batch` too: a feed
+  with an unrequested skip (missing/unreadable companion GTFS) fails that
+  feed, the same as it does for `validate`.
 - `uv.lock` pins `pip` at 26.2.1, past `PYSEC-2026-3721` (disclosed after
   26.1.2 was pinned). Vendored only as a transitive build/audit tool, never
   imported by `tods_validate` itself, but it was failing `make audit` (and
