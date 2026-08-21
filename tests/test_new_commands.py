@@ -87,6 +87,38 @@ def test_diff_reports_introduced_and_exit_code() -> None:
     assert result.exit_code == 1
 
 
+def test_diff_does_not_report_a_dropped_companion_as_a_fix(tmp_path: Path) -> None:
+    # #126's repro shape: a companion GTFS trip_id reference (TODS-E307) in
+    # OLD, with trips.txt dropped in NEW (calendar.txt/stops.txt held
+    # constant so TODS-W302 doesn't also fire in OLD and confound the
+    # count). Nothing was fixed, TODS-E307 simply stopped running, but it
+    # used to be reported "fixed" with exit code 0.
+    old_dir, new_dir = tmp_path / "old", tmp_path / "new"
+    old_dir.mkdir()
+    new_dir.mkdir()
+    calendar = (
+        "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,"
+        "start_date,end_date\nweekday,1,1,1,1,1,0,0,20260101,20261231\n"
+    )
+    run_events = (
+        "service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,"
+        "end_location,end_time\nweekday,1,10,operator,ghost-trip,S1,09:00:00,S1,10:00:00\n"
+    )
+    for d in (old_dir, new_dir):
+        (d / "calendar.txt").write_text(calendar)
+        (d / "stops.txt").write_text("stop_id\nS1\n")
+        (d / "run_events.txt").write_text(run_events)
+    (old_dir / "trips.txt").write_text("trip_id,route_id,service_id\nT1,R1,weekday\n")
+    # new_dir intentionally has no trips.txt.
+
+    result = invoke("diff", str(old_dir), str(new_dir))
+    assert "fixed: 0" in result.output
+    assert "unknown: 1" in result.output
+    assert "? TODS-E307" in result.output
+    assert "rule(s) that ran in OLD do not run in NEW" in result.output
+    assert "TODS-E307" in result.output.split("do not run in NEW")[1]
+
+
 def test_batch_rolls_up_and_fails_on_any_error() -> None:
     result = invoke("batch", E201, str(FIXTURES / "invalid" / "TODS-W101"))
     assert result.exit_code == 1

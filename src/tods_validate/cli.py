@@ -48,7 +48,7 @@ from .report import (
     summarize,
 )
 from .rules import CATEGORIES, RunCoverage, all_rules, render_rule_detail
-from .runner import run, run_with_coverage
+from .runner import run_with_coverage
 from .schema import SPEC_VERSION, SUPPORTED_SPEC_VERSIONS
 from .stats import (
     collect_cross_stats,
@@ -506,6 +506,14 @@ def diff(
     Reports which findings were fixed, newly introduced, or still present, so a
     change to a feed can be reviewed for regressions. Honors the same
     --config/--ignore/--fail-on policy as validate.
+
+    A finding present in OLD and absent from NEW is only reported "fixed"
+    when its rule actually ran in NEW. A rule that stopped running (a
+    dropped or newly unreadable companion GTFS feed, most often) also makes
+    its old findings disappear, but that is not evidence anything was fixed
+    -- see #126 -- so those land in a separate "unknown" bucket instead, and
+    any rule that ran in OLD but not in NEW is named, whether or not it had
+    findings to lose.
     """
     config = _resolve_config(config_path)
     policy = GatingPolicy.from_config(fail_on=fail_on, config=config, ignore_ids=ignore_ids)
@@ -513,18 +521,23 @@ def diff(
     severity_remap = dict(config.severity_remap)
 
     try:
-        _, old_findings = run(old, gtfs_path, severity_remap=severity_remap)
-        _, new_findings_list = run(new, gtfs_path, severity_remap=severity_remap)
+        _, old_findings, old_coverage = run_with_coverage(
+            old, gtfs_path, severity_remap=severity_remap
+        )
+        _, new_findings_list, new_coverage = run_with_coverage(
+            new, gtfs_path, severity_remap=severity_remap
+        )
     except PackageNotFoundError as exc:
         _fail(str(exc))
 
     old_kept = policy.apply(old_findings).kept
     new_kept = policy.apply(new_findings_list).kept
-    result = diff_findings(old_kept, new_kept)
+    result = diff_findings(old_kept, new_kept, new_coverage=new_coverage)
     click.echo(f"tods-validate diff: {old} -> {new}")
     click.echo(
         f"  fixed: {len(result.fixed)}, introduced: {len(result.introduced)}, "
-        f"persisting: {len(result.persisting)}, moved: {len(result.moved)}"
+        f"persisting: {len(result.persisting)}, moved: {len(result.moved)}, "
+        f"unknown: {len(result.unknown)}"
     )
     for finding in result.introduced:
         loc = finding.location()
@@ -547,6 +560,28 @@ def diff(
             if loc
             else f"  ~ {finding.rule_id} {finding.message}"
         )
+    for finding in result.unknown:
+        loc = finding.location()
+        click.echo(
+            f"  ? {finding.rule_id} [{loc}] {finding.message} (rule did not run in NEW)"
+            if loc
+            else f"  ? {finding.rule_id} {finding.message} (rule did not run in NEW)"
+        )
+
+    # Rules that ran in OLD and not in NEW, named even when they had nothing
+    # to lose: a companion GTFS dropped between OLD and NEW can zero out 16
+    # checks with 0 findings on either side, which the counts line above
+    # would otherwise report as a silently clean diff (#126, same class as
+    # #124's "clean report understates its own scope").
+    regressed_ids = {o.id for o in old_coverage.ran} - {o.id for o in new_coverage.ran}
+    if regressed_ids:
+        regressed = RunCoverage(tuple(o for o in new_coverage.outcomes if o.id in regressed_ids))
+        click.echo(
+            f"  {len(regressed_ids)} rule(s) that ran in OLD do not run in NEW "
+            "(their old findings, if any, are 'unknown' above, not 'fixed'):"
+        )
+        for line in regressed.skipped_detail_lines():
+            click.echo(f"    {line}")
 
     gate = policy.apply(result.introduced)
     sys.exit(EXIT_FINDINGS if gate.failed else EXIT_CLEAN)

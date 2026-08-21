@@ -20,6 +20,12 @@ from tods_validate.baseline import (
     new_findings,
 )
 from tods_validate.findings import Finding, Severity
+from tods_validate.rules import (
+    STATUS_RAN,
+    STATUS_SKIPPED_NEEDS_GTFS_TABLE,
+    RuleOutcome,
+    RunCoverage,
+)
 
 
 def _finding(
@@ -141,6 +147,50 @@ def test_diff_findings_true_fix_and_introduction() -> None:
     assert [f.data["value"] for f in result.fixed] == ["trip-2"]  # type: ignore[index]
     assert [f.data["value"] for f in result.persisting] == ["trip-1"]  # type: ignore[index]
     assert result.moved == []
+
+
+def _coverage(*, ran: set[str] = frozenset(), skipped: set[str] = frozenset()) -> RunCoverage:
+    outcomes = tuple(
+        RuleOutcome(id=rid, severity=Severity.ERROR, category="core", status=STATUS_RAN)
+        for rid in ran
+    ) + tuple(
+        RuleOutcome(
+            id=rid,
+            severity=Severity.ERROR,
+            category="core",
+            status=STATUS_SKIPPED_NEEDS_GTFS_TABLE,
+        )
+        for rid in skipped
+    )
+    return RunCoverage(outcomes)
+
+
+def test_diff_findings_skipped_in_new_is_unknown_not_fixed() -> None:
+    # #126: a rule that stopped running in NEW (dropped companion GTFS, most
+    # often) never got a chance to re-check the old finding, so its absence
+    # from NEW is not evidence it was fixed.
+    old = [_finding(4, "trip-1")]
+    coverage = _coverage(skipped={"TODS-E307"})
+    result = diff_findings(old, [], new_coverage=coverage)
+    assert result.fixed == []
+    assert [f.data["value"] for f in result.unknown] == ["trip-1"]  # type: ignore[index]
+
+
+def test_diff_findings_ran_in_new_and_silent_is_a_true_fix() -> None:
+    old = [_finding(4, "trip-1")]
+    coverage = _coverage(ran={"TODS-E307"})
+    result = diff_findings(old, [], new_coverage=coverage)
+    assert [f.data["value"] for f in result.fixed] == ["trip-1"]  # type: ignore[index]
+    assert result.unknown == []
+
+
+def test_diff_findings_without_coverage_keeps_old_behavior() -> None:
+    # No manifest given: every OLD-only finding still reports fixed, for a
+    # caller with no RunCoverage to check the claim against.
+    old = [_finding(4, "trip-1")]
+    result = diff_findings(old, [])
+    assert [f.data["value"] for f in result.fixed] == ["trip-1"]  # type: ignore[index]
+    assert result.unknown == []
 
 
 def test_excellent_looks_like_500_findings_shift_by_one_row() -> None:

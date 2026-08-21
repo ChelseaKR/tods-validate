@@ -294,7 +294,11 @@ not on one that was honestly skipped.
   path among several is reported in place rather than aborting the rest.
 - `tods-validate diff old/ new/` validates two versions of a feed and reports
   which findings were fixed, newly introduced, or still present; it exits
-  non-zero only on newly introduced errors, which is useful in review.
+  non-zero only on newly introduced errors, which is useful in review. An
+  OLD finding absent from NEW is reported "fixed" only when its rule
+  actually ran in NEW — one that stopped running (a dropped or newly
+  unreadable companion GTFS feed, most often) lands in a separate "unknown"
+  bucket instead, and any rule that ran in OLD but not NEW is named.
 - `tods-validate drift old-gtfs/ new-gtfs/ --tods feed/` diagnoses the "your
   GTFS moved under your TODS" failure directly: given a TODS package and two
   versions of its companion GTFS feed, it reports exactly which referenced
