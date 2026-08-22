@@ -5,7 +5,10 @@
 # against the advisory id, the package, and the severity, all three. A new
 # advisory, the same advisory on a different package, or the same advisory
 # escalated to a higher severity is not covered by any entry here and fails
-# the gate. An expired or malformed entry accepts nothing.
+# the gate. `kind: playground-version-pin` waivers are matched by
+# tests/test_playground.py against the playground's pinned version and
+# pyproject.toml's project version, both. An expired or malformed entry
+# accepts nothing.
 version: 1
 
 waivers:
@@ -40,3 +43,30 @@ waivers:
     granted: 2026-08-15
     expires: 2026-11-15
     link: https://github.com/advisories/GHSA-jmr9-qjv8-65gv
+
+  - id: WVR-002
+    control: SEC-10
+    repo: tods-validate
+    kind: playground-version-pin
+    check: tests/test_playground.py::test_playground_installs_this_projects_version
+    pinned_version: 0.9.0
+    project_version: 0.9.1
+    reason: >-
+      v0.9.1 was tagged and signed (commit edd2ea1) but its GitHub Release
+      object was never created, so pypi-publish.yml never ran: PyPI's latest
+      published version is still 0.9.0 and `pip install --dry-run
+      tods-validate==0.9.1` fails (#136). web/index.html's
+      TODS_VALIDATE_VERSION is repinned to 0.9.0 -- the version the live
+      playground can actually install -- while pyproject.toml stays at
+      0.9.1 on the owner's explicit decision not to re-publish a tag whose
+      tree predates eight fixes merged since. The test this waives is
+      correct going forward (a left-behind pin is a real bug, see #136's
+      root cause); it is wrong only about this one already-diagnosed gap
+      between "the repo builds" and "the repo has published." Retire this
+      waiver the moment a new release lands and the pin and the project
+      version agree again, whether that release supersedes 0.9.1 or moves
+      past it.
+    owner: chelseakr
+    granted: 2026-08-21
+    expires: 2026-09-21
+    link: https://github.com/ChelseaKR/tods-validate/issues/136
