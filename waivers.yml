@@ -43,33 +43,3 @@ waivers:
     granted: 2026-08-15
     expires: 2026-11-15
     link: https://github.com/advisories/GHSA-jmr9-qjv8-65gv
-
-  - id: WVR-002
-    control: SEC-10
-    repo: tods-validate
-    kind: playground-version-pin
-    check: tests/test_playground.py::test_playground_installs_this_projects_version
-    pinned_version: 0.9.0
-    project_version: 0.10.0
-    reason: >-
-      v0.9.1 was tagged and signed (commit edd2ea1) but its GitHub Release
-      object was never created, so pypi-publish.yml never ran: PyPI's latest
-      published version was still 0.9.0 and `pip install --dry-run
-      tods-validate==0.9.1` failed (#136). web/index.html's
-      TODS_VALIDATE_VERSION was repinned to 0.9.0 -- the version the live
-      playground could actually install -- in #139. pyproject.toml now reads
-      0.10.0 (this release), which supersedes the never-published 0.9.1
-      rather than re-using its number, since main carried real behavior
-      changes past that tag. Until this release finishes publishing to PyPI
-      and web/index.html is repinned to 0.10.0 in the follow-up PR, the pin
-      and pyproject.toml necessarily disagree; this waiver's project_version
-      tracks pyproject.toml so the gap it excuses stays exactly the current,
-      diagnosed one and nothing wider. The test this waives is correct going
-      forward (a left-behind pin is a real bug, see #136's root cause); it is
-      wrong only about this one already-diagnosed gap between "the repo
-      builds" and "the repo has published." Retire this waiver the moment
-      v0.10.0 is confirmed on PyPI and the pin is repinned to match.
-    owner: chelseakr
-    granted: 2026-08-21
-    expires: 2026-09-21
-    link: https://github.com/ChelseaKR/tods-validate/issues/136
