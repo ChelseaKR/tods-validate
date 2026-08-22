@@ -5,6 +5,30 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+## v0.10.0 - 2026-08-21
+
+`v0.9.1` was tagged and signed (commit `edd2ea1`) but its GitHub Release
+object was never created, so `pypi-publish.yml` never ran: PyPI's latest
+published version stayed 0.9.0 while `pyproject.toml` and the tag said 0.9.1
+(#136). Sixteen PRs landed on `main` after that tag, several changing
+validator behavior, so re-publishing the number `0.9.1` would misdescribe
+what actually ships. This release supersedes it. The `v0.9.1` tag is left in
+place, signed and unmoved, and is not the version anyone should install;
+`v0.10.0` is.
+
+The version is a MINOR bump, not a PATCH, because two of the changes below
+are not backward-compatible: the Python floor rises to 3.12 (drops installs
+on 3.11), and `TODS-E301`/`TODS-E303`/companion-GTFS reference checks now
+fail closed on an unreadable file instead of silently skipping or inventing
+findings, which can change a previously-clean run's exit code. Per this
+repo's pre-1.0 SemVer policy (`docs/standards/RELEASE-AND-VERSIONING-STANDARD.md`
+REL-05), a `0.y.z` MINOR release may carry a breaking change; this is not
+yet the v1.0.0 release described in `docs/v1-contract-audit.md`, which is
+reserved for a conformance-only release after the contract snapshot has
+gone unchanged for one full release cycle. This one does not qualify --
+it adds a rule (`TODS-E207`) and changes coverage-manifest behavior in three
+commands.
+
 Fixed:
 
 - A companion GTFS file that could not be decoded (bad encoding, empty,

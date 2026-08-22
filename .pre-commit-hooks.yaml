@@ -1,7 +1,7 @@
 # Use from another repository's .pre-commit-config.yaml:
 #
 #   - repo: https://github.com/ChelseaKR/tods-validate
-#     rev: v0.9.1  # pin to the latest tag; see the project's releases page
+#     rev: v0.10.0  # pin to the latest tag; see the project's releases page
 #     hooks:
 #       - id: tods-validate
 #         args: [feed/tods, --gtfs, feed/gtfs]
