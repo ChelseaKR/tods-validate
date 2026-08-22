@@ -1,6 +1,6 @@
 # 0001 — Python floor stays at 3.11; dev interpreter pinned to CI's gate version
 
-- Status: accepted (backfilled 2026-07-09; decision in force since the first release)
+- Status: superseded by 0006 (2026-08-21; decision was in force 2026-07-09 to 2026-08-21)
 - Date: 2026-07-09
 
 ## Context

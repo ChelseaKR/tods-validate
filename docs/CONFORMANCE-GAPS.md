@@ -76,9 +76,15 @@ runs `uv sync --frozen` (lockfile-drift check for free); `CODEOWNERS` added
 
 **Closed 2026-07-09:** the ADR log exists — `docs/adr/0000` (the practice)
 plus backfills 0001 (3.11 floor, closing **CQ-44/45**'s first item and, with
-the committed `.python-version` pinned to CI's 3.12 gate version, **CQ-01**),
-0002 (i18n N/A), 0003 (`editor/vscode` nesting, closing **CQ-26**),
-0004 (rules-as-registry), 0005 (uv/lockfile adoption).
+the committed `.python-version` pinned to CI's 3.12 gate version, **CQ-01**
+via a declared deviation), 0002 (i18n N/A), 0003 (`editor/vscode` nesting,
+closing **CQ-26**), 0004 (rules-as-registry), 0005 (uv/lockfile adoption).
+
+**Updated 2026-08-21:** `requires-python` raised to `>=3.12` (#72), closing
+**CQ-01** directly against the standard's stated floor instead of via a
+declared deviation. `docs/adr/0006-python-312-floor.md` supersedes 0001;
+0001 stays in the log as the record of why the deviation existed from
+2026-07-09 to 2026-08-21.
 
 **Still open:**
 - **CQ-27** — dev deps still live in `[project.optional-dependencies].dev`,

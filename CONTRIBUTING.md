@@ -7,7 +7,7 @@ count.
 
 ## Setup
 
-Requires Python 3.11 or newer. Dependencies are locked with
+Requires Python 3.12 or newer. Dependencies are locked with
 [uv](https://docs.astral.sh/uv/); CI installs from `uv.lock` with
 `uv sync --frozen`, which also fails the build if the lockfile has drifted
 from `pyproject.toml` (CQ-09). Using uv locally keeps your environment

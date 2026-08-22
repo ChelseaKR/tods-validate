@@ -34,7 +34,7 @@ runs locally in your browser; feed files are not uploaded.
 
 ## Install
 
-Requires Python 3.11 or newer.
+Requires Python 3.12 or newer.
 
 ```sh
 pipx install tods-validate

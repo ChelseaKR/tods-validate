@@ -81,6 +81,16 @@ Fixed:
   what the run checked to a statement of when it ran; the unstamped report is
   the default and the one people paste into issues.
 
+Changed:
+
+- Minimum supported Python raised from 3.11 to 3.12 (#72), closing CQ-01
+  directly against the standard's stated floor (Python 3.10 reaches EOL
+  October 2026) instead of via the declared deviation `docs/adr/0001` had
+  recorded since 2026-07-09. `docs/adr/0006-python-312-floor.md` supersedes
+  0001. `README.md` and `CONTRIBUTING.md` now say "Requires Python 3.12 or
+  newer"; CI's test matrix is `3.12`/`3.13` (3.11 dropped). Installed
+  releases are unaffected; this binds new installs, upgrades, and local dev.
+
 Added:
 
 - `TODS-E207` checks that `routes_supplement.txt`'s `route_color` and
