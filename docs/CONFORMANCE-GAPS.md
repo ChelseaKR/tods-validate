@@ -86,10 +86,11 @@ declared deviation. `docs/adr/0006-python-312-floor.md` supersedes 0001;
 0001 stays in the log as the record of why the deviation existed from
 2026-07-09 to 2026-08-21.
 
+**Updated 2026-08-24:** dev dependencies migrated from
+`[project.optional-dependencies].dev` to PEP 735 `[dependency-groups].dev` (#145),
+closing **CQ-27**. CI workflows, Makefile, and docs updated to `uv sync --group dev`.
+
 **Still open:**
-- **CQ-27** — dev deps still live in `[project.optional-dependencies].dev`,
-  not PEP 735 `[dependency-groups]`. `uv` (adopted 2026-07-05) reads
-  `dependency-groups` natively, so this is a clean follow-up, not urgent.
 - **CQ-37–43** — no committed branch-ruleset artifact (PR-required, stale-
   review dismissal, required status checks, linear history, no
   force-push, no admin bypass). ⛔ **Needs a live GitHub Settings change**

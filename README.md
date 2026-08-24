@@ -496,8 +496,8 @@ create` away; see that file's header).
 ```sh
 git clone https://github.com/ChelseaKR/tods-validate
 cd tods-validate
-python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
+uv sync --group dev
+. .venv/bin/activate
 pytest
 ```
 

@@ -45,6 +45,12 @@ lsp = ["pygls>=2"]
 # tods_validate.read.to_dataframe(); the rest of the read namespace has no
 # dependency on pandas.
 dataframe = ["pandas>=2"]
+# Advisory mutation testing (not part of the gate). Kept out of `dev` so the CI
+# gate install stays lean; installed only where mutation runs. See
+# docs/mutation-testing.md.
+mutation = ["mutmut>=3.6"]
+
+[dependency-groups]
 dev = [
     "pytest>=8",
     "pytest-cov>=5",
@@ -56,10 +62,6 @@ dev = [
     "pip-audit>=2.7",
     "hypothesis>=6.100",
 ]
-# Advisory mutation testing (not part of the gate). Kept out of `dev` so the CI
-# gate install stays lean; installed only where mutation runs. See
-# docs/mutation-testing.md.
-mutation = ["mutmut>=3.6"]
 
 [tool.ruff]
 line-length = 100

@@ -81,7 +81,7 @@ i18n-check:
 # dependency is still audited.
 audit:
 	req="$$(mktemp)" && \
-	uv export --frozen --extra dev --no-emit-project --no-hashes --quiet \
+	uv export --frozen --group dev --no-emit-project --no-hashes --quiet \
 		--format requirements-txt -o "$$req" && \
 	pip-audit --strict --no-deps -r "$$req"; \
 	rc=$$?; rm -f "$$req"; exit $$rc

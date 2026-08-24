@@ -22,10 +22,12 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
-      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+      - uses: astral-sh/setup-uv@1edb523b8f893444ab315e1074e64f78e03e5c94 # v5
         with:
-          python-version: "3.12"
-      - run: python -m pip install -e ".[dev,mutation]"
+          version: "latest"
+          enable-cache: true
+      - run: uv sync --group dev --extra mutation
+      - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - name: Run mutation testing on the rules engine
         run: mutmut run || true
       - name: Summarize survivors
