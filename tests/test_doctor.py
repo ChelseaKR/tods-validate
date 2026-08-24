@@ -94,3 +94,56 @@ def test_doctor_valid_feed_alone_no_gtfs_flag() -> None:
     result = invoke("doctor", str(VALID_TODS))
     assert result.exit_code == 0, result.output
     assert "== Merge: RAN ==" in result.output
+
+
+def test_doctor_malformed_gtfs_validator_report_fails_honestly(
+    tmp_path, monkeypatch
+) -> None:
+    import shutil
+    import subprocess
+    from pathlib import Path
+
+    from tods_validate.doctor import _run_gtfs_validator_stage
+
+    monkeypatch.setattr(shutil, "which", lambda name: "/usr/bin/java")
+    fake_jar = tmp_path / "fake-validator.jar"
+    fake_jar.write_text("fake jar content")
+
+    # Test cases where report.json parses as valid JSON but is not the expected shape:
+    # 1. raw is null / int / list / string (not a dict)
+    # 2. raw is a dict missing "notices" key
+    # 3. raw is a dict where "notices" is not a list
+    bad_contents = [
+        "null",
+        "[]",
+        '"just a string"',
+        "123",
+        '{"some_other_key": 1}',
+        '{"notices": "not a list"}',
+    ]
+
+    for bad_content in bad_contents:
+        def fake_run(cmd, capture_output, text, timeout, check, content=bad_content):
+            # cmd[-1] is output report_dir
+            out_dir = Path(cmd[-1])
+            out_dir.mkdir(parents=True, exist_ok=True)
+            (out_dir / "report.json").write_text(content, encoding="utf-8")
+            return subprocess.CompletedProcess(args=cmd, returncode=0, stdout="", stderr="")
+
+        monkeypatch.setattr(subprocess, "run", fake_run)
+
+        merged_zip = tmp_path / "merged.zip"
+        merged_zip.write_text("fake zip")
+        report_dir = tmp_path / f"report_{hash(bad_content)}"
+
+        stage_res = _run_gtfs_validator_stage(
+            merged_output=merged_zip,
+            run_gtfs_validator=True,
+            report_dir=report_dir,
+            jar_path=str(fake_jar),
+        )
+
+        assert stage_res.status == "failed"
+        assert "expected shape" in (stage_res.reason or "")
+
+

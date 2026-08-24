@@ -184,7 +184,17 @@ def _run_gtfs_validator_stage(  # noqa: C901 - stage has several user-facing ski
             reason=f"could not parse gtfs-validator report.json: {exc}",
         )
 
-    notices: list[object] = raw.get("notices", []) if isinstance(raw, dict) else []
+    if not isinstance(raw, dict) or "notices" not in raw or not isinstance(raw["notices"], list):
+        return StageResult(
+            name=name,
+            status="failed",
+            reason=(
+                "gtfs-validator's report.json did not have the expected shape "
+                "(no top-level 'notices' array)."
+            ),
+        )
+
+    notices: list[object] = raw["notices"]
     error_notices = 0
     warning_notices = 0
     info_notices = 0
