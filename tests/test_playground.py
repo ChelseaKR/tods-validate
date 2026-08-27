@@ -2,8 +2,9 @@
 
 The playground runs hardcoded Python in Pyodide, so the only thing that can
 silently break it from this side is renaming the API it imports. These guards
-fail loudly if that happens. (The page itself needs a browser to test end to
-end; see web/README.md.)
+fail loudly if that happens. (The page itself needs a browser, so it is tested
+end to end by scripts/check-playground-boots.cjs against the deployed URL,
+not from here; see web/README.md.)
 """
 
 import importlib.util

@@ -22,6 +22,14 @@ with problems to confirm findings render. If Pyodide fails to load, update the
 version in the `<script src=".../pyodide/vX.Y.Z/...">` tag to the current
 [Pyodide release](https://github.com/pyodide/pyodide/releases).
 
+To drive that same round trip without doing it by hand, point the deployment's
+boot check at your local server (it needs `npm ci` first, for the browser the
+accessibility toolchain already installs):
+
+```sh
+PLAYGROUND_URL=http://localhost:8000/index.html node scripts/check-playground-boots.cjs
+```
+
 ## Deployment
 
 The playground is published at
@@ -39,12 +47,25 @@ deploy job:
 - `scripts/check-deployed-playground.sh` fails if the served page is not
   byte-identical to the page this repository publishes — run right after each
   deploy against the tree that was just uploaded, and weekly
-  (`.github/workflows/playground-deployment.yml`) against `web/index.html` at
-  the most recent release tag.
+  (`.github/workflows/playground-deployment.yml`) against `web/index.html` on
+  the default branch. It compared against the most recent release tag until
+  2026-08-26, which held the weekly check red against a correct deployment:
+  `v0.10.0` tags a page still pinned to `0.9.0`, the repin landed after the tag
+  (#142), and a tag cannot be corrected in place.
+- `scripts/check-playground-boots.cjs` drives the live page in a real browser:
+  it waits for Pyodide to load and micropip to install the pinned wheel from
+  PyPI, uploads a synthetic fixture, and fails unless the rendered report
+  contains the finding that fixture triggers. This is the only check that shows
+  the playground *works*. The two checks around it are both satisfied by a page
+  that is byte-perfect, accessible, and broken for every visitor, which is what
+  #136 shipped: a pin PyPI did not serve, so `micropip.install` rejected it for
+  everyone while every gate stayed green.
 - `scripts/pa11y-ci-live.cjs` runs axe and HTML_CodeSniffer at WCAG2AA against
   the live page. `make a11y` audits this folder's copy, which is the source of
   the deployment and not the deployment itself; this is what holds the artifact
-  people actually open to the same standard.
+  people actually open to the same standard. It loads the page with
+  `?a11y-static=1`, which skips the Pyodide boot on purpose, so a green
+  accessibility run says nothing about whether validation works.
 
 `tests/test_playground.py` pins `TODS_VALIDATE_VERSION` to the version in
 `pyproject.toml`, so the repository copy cannot be left behind either.

@@ -7,19 +7,31 @@ name: Playground deployment check
 # whole time -- it audits a copy of web/index.html from a temp directory, which
 # is the source of the deployment, not the deployment.
 #
-# Two things are checked, both against the live page:
+# Three things are checked, all against the live page:
 #
-# 1. Drift: the served index.html must be byte-identical to web/index.html at
-#    the most recent release tag. That is the version the deployment is supposed
-#    to be, so a main branch that has moved on since the release is not drift.
-# 2. Accessibility: pa11y-ci (axe + HTML_CodeSniffer, WCAG2AA) against the live
+# 1. Drift: the served index.html must be byte-identical to web/index.html on
+#    the default branch, which is the page this repository publishes. This used
+#    to compare against the most recent release tag, which was wrong: the tag
+#    is not what workflow_dispatch deploys, and a tag is immutable, so the one
+#    that shipped a stale pin (v0.10.0, still pinned to 0.9.0 -- see #142) held
+#    this check red against a deployment that was correct. See the commentary
+#    in scripts/check-deployed-playground.sh.
+# 2. Boot and validate: the page is driven in a real browser until it has
+#    loaded Pyodide, micropip-installed its pinned wheel from PyPI, and
+#    rendered a report for a synthetic fixture. Checks 1 and 3 are both
+#    satisfied by a page that is byte-perfect, accessible, and broken for
+#    every visitor -- which this project has shipped (#136). Nothing verified
+#    the playground actually runs until this job existed (#146).
+# 3. Accessibility: pa11y-ci (axe + HTML_CodeSniffer, WCAG2AA) against the live
 #    URL, so the page people actually open is held to the standard the
-#    repository copy is already held to.
+#    repository copy is already held to. Note that it loads the page with
+#    ?a11y-static=1, which deliberately skips the Pyodide boot: it audits the
+#    static rendering and is not evidence that the playground works.
 #
-# Weekly and on demand. pages.yml runs the same two checks immediately after it
-# deploys, so a deploy that silently failed to take effect is caught there.
-# Neither is a pull-request gate: a PR that edits web/index.html is *supposed*
-# to differ from what is deployed until the next release.
+# Weekly and on demand. pages.yml runs the same three checks immediately after
+# it deploys, so a deploy that silently failed to take effect is caught there.
+# None is a pull-request gate: a PR that edits web/index.html is *supposed*
+# to differ from what is deployed until it merges and is deployed.
 
 on:
   schedule:
@@ -38,12 +50,40 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
+      # No fetch-depth: 0. The expected page is web/index.html in this
+      # checkout; the deep fetch was only ever there to resolve release tags.
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
           persist-credentials: false
-          fetch-depth: 0 # release tags: the deployed page is compared against one
-      - name: Compare the deployed page with web/index.html at the latest release
+      - name: Compare the deployed page with web/index.html on the default branch
         run: ./scripts/check-deployed-playground.sh
+
+  boots:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: package-lock.json
+      - run: npm ci --ignore-scripts
+      - name: Select the hosted Chrome binary
+        run: |
+          boot_chrome="$(command -v google-chrome)"
+          test -x "$boot_chrome"
+          echo "PUPPETEER_EXECUTABLE_PATH=$boot_chrome" >> "$GITHUB_ENV"
+      - name: Boot the deployed page and validate a fixture through it
+        run: |
+          set -euo pipefail
+          # The pin this repository publishes. The live page must not merely
+          # boot, it must boot on the release the repository stands behind.
+          pin="$(sed -n 's/.*TODS_VALIDATE_VERSION = "\([^"]*\)".*/\1/p' web/index.html | head -1)"
+          test -n "$pin"
+          PLAYGROUND_EXPECTED_PIN="$pin" node scripts/check-playground-boots.cjs
 
   accessibility:
     runs-on: ubuntu-latest
