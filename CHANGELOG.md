@@ -5,6 +5,34 @@ new checks may be added in minor releases.
 
 ## Unreleased
 
+Fixed:
+
+- The weekly **Playground deployment check** failed on `main` from 2026-08-24
+  against a deployment that was correct. Its drift job compared the live page
+  with `web/index.html` at the most recent release tag, and `v0.10.0` tags a
+  page still pinned to `0.9.0`: the repin landed on `main` after the tag
+  (#142) and was dispatched live, so the served page was right and the
+  expectation was stale. A tag cannot be corrected in place, so the check
+  could never have gone green again. It now compares against `web/index.html`
+  on the default branch, which is both what `workflow_dispatch` deploys and
+  the honest answer to "the page this repository publishes", and which goes
+  green again on the deploy that resolves any real drift.
+
+Added:
+
+- `scripts/check-playground-boots.cjs`, the first check that shows the
+  deployed playground actually works. It drives the live page in a real
+  browser, waits for Pyodide to load and micropip to install the pinned wheel
+  from PyPI, uploads a synthetic fixture, and fails unless the rendered report
+  contains the finding that fixture triggers. Every previous playground gate
+  was satisfiable by a page that is byte-perfect, accessible, and broken for
+  every visitor: the drift check compares bytes, and the live accessibility
+  audit loads the page with `?a11y-static=1`, the parameter that deliberately
+  skips the Pyodide boot. This project has shipped exactly that failure (#136:
+  a pin PyPI did not serve, so `micropip.install` rejected it for every
+  visitor while every gate stayed green). Runs in `pages.yml` after each
+  deploy and weekly in `playground-deployment.yml` (#146).
+
 ## v0.10.0 - 2026-08-21
 
 `v0.9.1` was tagged and signed (commit `edd2ea1`) but its GitHub Release

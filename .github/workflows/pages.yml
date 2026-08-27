@@ -15,10 +15,11 @@ name: Deploy playground
 # silently skipping. workflow_dispatch stays for out-of-band fixes (deploys
 # main, whose pin the guard checks against PyPI the same way).
 #
-# The verify job below then checks that the deployment actually took effect and
-# that the live page passes WCAG 2.1 AA -- a deploy is not done because a job
-# went green, it is done when the page people open is the page that was built.
-# .github/workflows/playground-deployment.yml re-runs both checks weekly.
+# The verify job below then checks that the deployment actually took effect,
+# that the deployed page really boots and validates a feed, and that it passes
+# WCAG 2.1 AA -- a deploy is not done because a job went green, it is done when
+# the page people open is the page that was built and it works.
+# .github/workflows/playground-deployment.yml re-runs all three checks weekly.
 
 on:
   workflow_call:
@@ -85,7 +86,10 @@ jobs:
   verify:
     needs: deploy
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # 20, not 15: the boot check below can spend several minutes waiting on
+    # Pyodide and micropip. Its own timeouts are shorter, so a real failure
+    # reports the page's last status rather than being killed with the job.
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -104,5 +108,17 @@ jobs:
           a11y_chrome="$(command -v google-chrome)"
           test -x "$a11y_chrome"
           echo "PUPPETEER_EXECUTABLE_PATH=$a11y_chrome" >> "$GITHUB_ENV"
+      # The step above proves the right bytes are being served and the step
+      # below proves they render accessibly with Pyodide switched off. Neither
+      # opens the playground the way a person does. This one does: it waits for
+      # micropip to install the pinned wheel from PyPI and runs a fixture
+      # through it, so a release cannot report a green deploy of a page that
+      # cannot install itself.
+      - name: Boot the deployed page and validate a fixture through it
+        run: |
+          set -euo pipefail
+          pin="$(sed -n 's/.*TODS_VALIDATE_VERSION = "\([^"]*\)".*/\1/p' web/index.html | head -1)"
+          test -n "$pin"
+          PLAYGROUND_EXPECTED_PIN="$pin" node scripts/check-playground-boots.cjs
       - name: Audit the deployed page (WCAG 2.1 AA)
         run: ./node_modules/.bin/pa11y-ci --config scripts/pa11y-ci-live.cjs
