@@ -86,7 +86,7 @@ Mutation testing is not installed by the default `dev` extra. Install it on
 demand:
 
 ```sh
-pip install ".[mutation]"
+pip install -e . --group mutation
 mutmut run          # generate and test mutants (a few minutes)
 mutmut results      # list survivors
 mutmut show <id>    # see the exact source change for one survivor

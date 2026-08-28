@@ -1407,6 +1407,11 @@ dependencies = [
 dataframe = [
     { name = "pandas" },
 ]
+lsp = [
+    { name = "pygls" },
+]
+
+[package.dev-dependencies]
 dev = [
     { name = "hypothesis" },
     { name = "jsonschema" },
@@ -1416,10 +1421,8 @@ dev = [
     { name = "pygls" },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "pyyaml" },
     { name = "ruff" },
-]
-lsp = [
-    { name = "pygls" },
 ]
 mutation = [
     { name = "mutmut" },
@@ -1428,20 +1431,25 @@ mutation = [
 [package.metadata]
 requires-dist = [
     { name = "click", specifier = ">=8.1" },
-    { name = "hypothesis", marker = "extra == 'dev'", specifier = ">=6.100" },
-    { name = "jsonschema", marker = "extra == 'dev'", specifier = ">=4.21" },
-    { name = "mutmut", marker = "extra == 'mutation'", specifier = ">=3.6" },
-    { name = "mypy", marker = "extra == 'dev'", specifier = ">=1.18" },
     { name = "pandas", marker = "extra == 'dataframe'", specifier = ">=2" },
-    { name = "pip-audit", marker = "extra == 'dev'", specifier = ">=2.7" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=3.7" },
-    { name = "pygls", marker = "extra == 'dev'", specifier = ">=2" },
     { name = "pygls", marker = "extra == 'lsp'", specifier = ">=2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=5" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15" },
 ]
-provides-extras = ["lsp", "dataframe", "dev", "mutation"]
+provides-extras = ["lsp", "dataframe"]
+
+[package.metadata.requires-dev]
+dev = [
+    { name = "hypothesis", specifier = ">=6.100" },
+    { name = "jsonschema", specifier = ">=4.21" },
+    { name = "mypy", specifier = ">=1.18" },
+    { name = "pip-audit", specifier = ">=2.7" },
+    { name = "pre-commit", specifier = ">=3.7" },
+    { name = "pygls", specifier = ">=2" },
+    { name = "pytest", specifier = ">=8" },
+    { name = "pytest-cov", specifier = ">=5" },
+    { name = "pyyaml", specifier = ">=6" },
+    { name = "ruff", specifier = ">=0.15" },
+]
+mutation = [{ name = "mutmut", specifier = ">=3.6" }]
 
 [[package]]
 name = "tomli"

@@ -89,3 +89,37 @@ def test_the_snapshot_must_carry_the_unchecked_fields(
     monkeypatch.setattr(checker, "SNAPSHOT", truncated)
     with pytest.raises(SystemExit):
         checker.drift()
+
+
+def test_a_declared_export_the_module_no_longer_defines_is_caught(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The third field that was compared against itself. `pythonExports` read
+    # each module's `__all__`, so a rename that left the list behind removed
+    # `tods_validate.suggest_fixes` from the package while `__all__`, the
+    # snapshot and this comparison all still agreed: the gate printed "v1
+    # public-contract candidate is current", exited 0, and the whole test
+    # suite passed with a public export that no longer imported.
+    import tods_validate
+
+    checker = _checker()
+    monkeypatch.delattr(tods_validate, "suggest_fixes")
+    with pytest.raises(SystemExit, match="suggest_fixes"):
+        checker.drift()
+
+
+def test_every_declared_export_resolves_today() -> None:
+    # Positive control for the test above: the three published modules really
+    # do define every name they list. A change that made `_exports` raise
+    # unconditionally would satisfy that test and fail this one.
+    import tods_validate
+    import tods_validate.read
+    import tods_validate.testing
+
+    checker = _checker()
+    for name, module in (
+        ("tods_validate", tods_validate),
+        ("tods_validate.read", tods_validate.read),
+        ("tods_validate.testing", tods_validate.testing),
+    ):
+        assert checker._exports(name, module) == list(module.__all__)

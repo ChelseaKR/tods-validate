@@ -55,6 +55,24 @@ class Row:
 # empty -- see #125.
 BLOCKING_PROBLEM_CODES = frozenset({"encoding", "empty", "csv_error"})
 
+# Codes that leave the file parsed but not fully read: the header and rows are
+# there, but some values did not survive the read. "ragged" means a row's
+# values do not line up with the header, so any field of that row may hold a
+# neighbouring column's value or nothing at all; "duplicate_header" means a
+# column was declared twice and the second column's values were dropped. On a
+# TODS file these are findings in their own right (TODS-E104, TODS-E105).
+# On a file whose rows another check reads to resolve a reference, they are
+# something else: the reader's view of that file is incomplete, and an ID it
+# did not read is indistinguishable from an ID the feed does not contain. See
+# ADR 0007 and FeedFile.fully_read.
+DEGRADING_PROBLEM_CODES = frozenset({"ragged", "duplicate_header"})
+
+# Every code _parse_csv can record is in exactly one of the two sets above.
+# tests/test_loader.py asserts that against the codes the parser actually
+# emits, so a code added later cannot quietly default to "harmless": it has to
+# be classified, and until it is, the assertion fails.
+PROBLEM_CODES = BLOCKING_PROBLEM_CODES | DEGRADING_PROBLEM_CODES
+
 
 @dataclass
 class LoadProblem:
@@ -86,6 +104,19 @@ class FeedFile:
     def readable(self) -> bool:
         """False if the file could not be parsed at all: see BLOCKING_PROBLEM_CODES."""
         return not any(p.code in BLOCKING_PROBLEM_CODES for p in self.problems)
+
+    @property
+    def fully_read(self) -> bool:
+        """False if any value in this file did not survive the read.
+
+        Strictly weaker than :attr:`readable`: a file can parse and still have
+        lost values, which is the case ``readable`` alone cannot express. The
+        test is "were any problems recorded", not "were any *known* degrading
+        problems recorded", so a problem code introduced later counts as
+        incomplete until someone decides otherwise, rather than the other way
+        round.
+        """
+        return not self.problems
 
 
 @dataclass

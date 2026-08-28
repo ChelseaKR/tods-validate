@@ -6,12 +6,17 @@ then compared to the snapshot reports a pass it did not earn: ``contractVersion`
 used to be read straight out of the file it was checked against, so it could not
 mismatch under any code change, and ``cliExitCodes`` was three literals retyped
 inside this script rather than the numbers the CLI exits with.
+
+``pythonExports`` was the third of those, less obviously: it read each module's
+``__all__``, which is a declaration of the export list and not the export list
+itself. See :func:`_exports`.
 """
 
 from __future__ import annotations
 
 import json
 from pathlib import Path
+from types import ModuleType
 
 import tods_validate
 import tods_validate.read
@@ -29,6 +34,28 @@ REPORT_SCHEMA = ROOT / "docs" / "report.schema.json"
 # than describing the implementation, so there is nothing to derive it from and
 # nothing it could disagree with. main() checks it is present and non-empty.
 UNCHECKED_FIELDS = ("contractVersion",)
+
+
+def _exports(name: str, module: ModuleType) -> list[str]:
+    """``module.__all__``, resolved against the module rather than trusted.
+
+    ``__all__`` is what a module *says* it exports. The v1 contract is a
+    promise about what ``from tods_validate import X`` does, and the two part
+    company on any rename that leaves the list behind: the name disappears
+    from the package while the list, the snapshot, and this comparison all
+    still agree with each other. Reading the list alone made this field the
+    same self-comparison ``contractVersion`` used to be, and a stale
+    ``tods_validate.__all__`` entry passed this gate and the entire test suite
+    with the export gone.
+    """
+    unresolved = [export for export in module.__all__ if not hasattr(module, export)]
+    if unresolved:
+        raise SystemExit(
+            f"{name} lists {', '.join(unresolved)} in __all__ but does not define "
+            f"{'them' if len(unresolved) > 1 else 'it'}: the published export is broken, "
+            "so there is no contract to compare."
+        )
+    return list(module.__all__)
 
 
 def _actual_contract() -> dict[str, object]:
@@ -49,9 +76,12 @@ def _actual_contract() -> dict[str, object]:
             "requiredFindingFields": finding_schema["required"],
         },
         "pythonExports": {
-            "tods_validate": tods_validate.__all__,
-            "tods_validate.read": tods_validate.read.__all__,
-            "tods_validate.testing": tods_validate.testing.__all__,
+            name: _exports(name, module)
+            for name, module in (
+                ("tods_validate", tods_validate),
+                ("tods_validate.read", tods_validate.read),
+                ("tods_validate.testing", tods_validate.testing),
+            )
         },
         "rules": [
             [rule.id, rule.severity.name, rule.category]

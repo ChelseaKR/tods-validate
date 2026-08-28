@@ -116,6 +116,63 @@ def test_header_only_base_file_is_still_present(tmp_path: Path) -> None:
     assert companion.unreadable == {}
 
 
+def test_ragged_base_file_is_treated_as_absent(tmp_path: Path) -> None:
+    # A trips.txt with a ragged row parses, so it used to count as present and
+    # the reader silently held whatever the short row happened to yield. The
+    # dropped trip_id is reported nowhere -- TODS-E104 scans the TODS package,
+    # never the companion feed -- so every reference to it read as dangling.
+    _write(
+        tmp_path,
+        "trips.txt",
+        "route_id,service_id,trip_id,block_id\nR1,weekday,T1,B1\nR1,weekday\n",
+    )
+    package = load_package(tmp_path)
+    companion = build_companion(package, package, source="test")
+    assert "trips.txt" not in companion.present
+    assert companion.trip_service == {}
+    assert companion.unreadable == {}  # it parsed; this is the other failure
+    assert "trips.txt" in companion.degraded
+    assert "row 3" in companion.degraded["trips.txt"]  # names where to look
+
+
+def test_duplicate_column_base_file_is_treated_as_absent(tmp_path: Path) -> None:
+    # The other degrading code: a column declared twice means the second
+    # column's values were dropped, so the reader's ID set is short in a way
+    # nothing on the TODS side reports.
+    _write(tmp_path, "stops.txt", "stop_id,stop_name,stop_id\nS1,One,S2\n")
+    package = load_package(tmp_path)
+    companion = build_companion(package, package, source="test")
+    assert "stops.txt" not in companion.present
+    assert companion.stop_ids == set()
+    assert "stops.txt" in companion.degraded
+    assert "stop_id" in companion.degraded["stops.txt"]
+
+
+def test_degraded_reason_counts_the_problems_it_did_not_quote(tmp_path: Path) -> None:
+    # One quoted message plus a count, so the report does not imply that
+    # fixing the first ragged row is the whole job.
+    _write(
+        tmp_path,
+        "trips.txt",
+        "route_id,service_id,trip_id,block_id\nR1,weekday\nR1,weekday\nR1,weekday\n",
+    )
+    package = load_package(tmp_path)
+    companion = build_companion(package, package, source="test")
+    assert "And 2 further problem(s) in the same file." in companion.degraded["trips.txt"]
+
+
+def test_a_clean_base_file_is_present_and_not_degraded(tmp_path: Path) -> None:
+    # Positive control for the three tests above. A change that emptied
+    # `present` unconditionally would satisfy them and fail this one.
+    _write(tmp_path, "trips.txt", "route_id,service_id,trip_id,block_id\nR1,weekday,T1,B1\n")
+    package = load_package(tmp_path)
+    companion = build_companion(package, package, source="test")
+    assert "trips.txt" in companion.present
+    assert companion.trip_service == {"T1": "weekday"}
+    assert companion.degraded == {}
+    assert companion.unreadable == {}
+
+
 def test_parse_gtfs_date() -> None:
     assert parse_gtfs_date("20260229") is None  # 2026 is not a leap year
     assert parse_gtfs_date("2026-01-05") is None

@@ -1,7 +1,9 @@
 # v1 public-contract audit
 
-Status: candidate, reviewed for v0.9.0. This becomes the v1 contract only when
-v1.0.0 is released.
+Status: candidate, reviewed for v0.9.0, re-reviewed 2026-08-27. This becomes
+the v1 contract only when v1.0.0 is released, and only after the preconditions
+in [Before this becomes the contract](#before-this-becomes-the-contract) are
+met. It is still a candidate today; every one of them is open.
 
 The machine-readable snapshot is
 [`v1-contract-candidate.json`](v1-contract-candidate.json). CI compares it to
@@ -53,3 +55,41 @@ downstream behavior is not release-eligible until the upstream wording lands.
 The v1.0.0 release review should confirm this snapshot after one conformance-
 only release has shipped without unreviewed rule-ID, severity, exit-code, or
 report-schema drift.
+
+## Before this becomes the contract
+
+Phase 2 of [`MULTIYEAR-PLAN.md`](MULTIYEAR-PLAN.md) owns the promotion. As of
+2026-08-27 these are what stand between the candidate and the contract. None
+of them is an engineering task this repository can finish on its own, which is
+why the document still says "candidate".
+
+1. **A conformance-only release has to ship first**, and none has. The
+   snapshot's promise is that it went one full release cycle unchanged;
+   `v0.10.0` disqualified itself in its own release note (it added
+   `TODS-E207` and changed coverage-manifest behavior in three commands), and
+   the current `Unreleased` section changes validator behavior again. So the
+   next release cannot be the qualifying one either, and the one after it can
+   only qualify if it changes no rule ID, severity, category, exit code,
+   export, or report schema field. Nothing enforces that but the reviewer;
+   `make contract-check` tells you whether the snapshot drifted, not whether
+   the release was allowed to.
+2. **The `employee_run_dates.txt` primary key is undecided upstream.**
+   [PR #156](https://github.com/MobilityData/transit-operational-data-standard/pull/156)
+   was still open and last updated 2026-07-17 when this was written. Until it
+   lands, `TODS-E204` versus `TODS-W408` is this repository's reading of a
+   response in an issue thread, not published spec text, and freezing a
+   contract on it would freeze a guess. This is the single hardest blocker,
+   and it is gated on other people.
+3. **The branch ruleset has to be live**, not only committed.
+   [`rulesets/main.json`](rulesets/main.json) exists and is checked against the
+   workflows, but no ruleset is enabled on the repository, so the release
+   process is not yet the one `DEFINITION_OF_DONE.md` describes.
+4. **`CICD-06`**, the PyPI trusted-publisher environment scoping, is still
+   unset. Both halves are live settings changes.
+
+What this pass did instead of promoting the document: closed the fail-open in
+the gate the promotion would rest on. `pythonExports` was compared against
+each module's `__all__`, so a rename that left the list behind passed this
+gate, and the whole test suite, with a public export that no longer imported.
+Freezing a contract verified that way would have frozen the verification
+defect with it.

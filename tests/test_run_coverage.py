@@ -566,3 +566,39 @@ def test_unrequested_skips_are_exactly_the_missing_input_statuses() -> None:
     assert {o.id for o in coverage.unrequested_skips} == NEEDS_GTFS
     # The opt-in rule skipped in the same run is not one of them.
     assert all(o.status != STATUS_SKIPPED_DISABLED for o in coverage.unrequested_skips)
+
+
+def test_ragged_gtfs_table_is_skipped_not_reported_as_a_complete_run(tmp_path: Path) -> None:
+    # The coverage half of the same defect. With one ragged row in the
+    # companion trips.txt, every trips-reading rule recorded `ran`, the text
+    # report said "No problems found" and named only the opt-in skips, and the
+    # gate exited 0. Nothing in the run disclosed that the reader had held a
+    # short list of trips, because no rule scans the companion feed's own
+    # structure. The manifest must now say the checks did not run.
+    package = _copy_valid_tods(tmp_path)
+    for source in VALID_GTFS.iterdir():
+        (package / source.name).write_bytes(source.read_bytes())
+    trips = (package / "trips.txt").read_text(encoding="utf-8")
+    (package / "trips.txt").write_text(trips + "12,daily\n", encoding="utf-8")
+    _, findings, coverage = run_with_coverage(package, enabled=frozenset(CATEGORIES))
+    by_id = {o.id: o.status for o in coverage.outcomes}
+    assert by_id["TODS-E307"] == STATUS_SKIPPED_NEEDS_GTFS_TABLE
+    assert coverage.unrequested_skips, "a run that could not read a table has not run complete"
+    assert ALL_CHECKS_RAN not in coverage.scope_line()
+    w302 = [f for f in findings if f.rule_id == "TODS-W302" and "trips.txt" in f.message]
+    assert w302, "expected TODS-W302 to disclose that the companion trips.txt was short-read"
+    assert "could not be read in full" in w302[0].message
+
+
+def test_a_complete_companion_feed_still_reports_every_check_as_run(tmp_path: Path) -> None:
+    # Positive control for the test above: the same package with trips.txt
+    # left intact. If the change had made every companion table unusable, the
+    # test above would still be green and this one would fail.
+    package = _copy_valid_tods(tmp_path)
+    for source in VALID_GTFS.iterdir():
+        (package / source.name).write_bytes(source.read_bytes())
+    _, _, coverage = run_with_coverage(package, enabled=frozenset(CATEGORIES))
+    by_id = {o.id: o.status for o in coverage.outcomes}
+    assert by_id["TODS-E307"] == STATUS_RAN
+    assert coverage.unrequested_skips == ()
+    assert ALL_CHECKS_RAN in coverage.scope_line()

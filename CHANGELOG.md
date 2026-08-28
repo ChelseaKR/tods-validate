@@ -3,9 +3,43 @@
 Notable changes to tods-validate. Rule IDs are never renumbered or reused;
 new checks may be added in minor releases.
 
-## Unreleased
+## [Unreleased]
 
 Fixed:
+
+- The v1 public-contract gate verified `pythonExports` against each module's
+  `__all__`, which is a declaration of the export list rather than the export
+  list. A rename that left the list behind removed `tods_validate.suggest_fixes`
+  from the package while `__all__`, `docs/v1-contract-candidate.json` and the
+  comparison all still agreed with each other: `scripts/check_public_contract.py`
+  printed "v1 public-contract candidate is current", exited 0, and all 707
+  tests passed with a public export that no longer imported. Every declared
+  name is now resolved against its module, and an unresolvable one fails the
+  gate by name. This is the third field found comparing itself, after
+  `contractVersion` and `cliExitCodes`, and it matters more than either: the
+  public Python exports are one of the four things v1 promises.
+
+- A companion GTFS file that parsed but did not read in full counted as a
+  clean read. `loader.py` splits CSV defects into ones that stop parsing
+  (`encoding`, `empty`, `csv_error`) and ones that leave the file parsed but
+  drop values (`ragged`, `duplicate_header`). #125 fixed the first kind for
+  companion files; the second kind still counted the file as `present`, so
+  every rule reading it recorded `ran` in the coverage manifest. Nothing
+  reported the defect either way, because TODS-E103/E104/E105 scan the TODS
+  package and never the companion feed. One short row in a companion
+  `trips.txt` therefore did one of two things: dropped a `block_id`, leaving
+  the run to report "No problems found", "Every applicable check ran" and
+  exit 0; or dropped a `trip_id`, and reported `TODS-E307` against the
+  producer's `run_events.txt`, an ERROR asserting that a trip "does not exist
+  in the companion GTFS trips.txt" when it did. Such a file is now not
+  available to resolve references against, exactly as an unreadable one
+  already was not: dependent rules are recorded `skipped:needs_gtfs_table`,
+  the skip counts as unrequested so `--require-complete-run` fails on it, and
+  `TODS-W302` discloses it with the loader's own message so the producer gets
+  the row or column number. `loader.PROBLEM_CODES` now closes the code space,
+  with a test that reads the parser's own source, so a defect code added later
+  cannot default to harmless. See
+  [ADR 0007](docs/adr/0007-companion-gtfs-partial-read-is-not-a-read.md).
 
 - Three checks that read a document produced outside this repository could
   report success without having read it. Each now fails closed and says what
@@ -52,7 +86,47 @@ Fixed:
   the honest answer to "the page this repository publishes", and which goes
   green again on the deploy that resolves any real drift.
 
+Changed:
+
+- Development dependencies moved from the `dev` extra to a PEP 735
+  `[dependency-groups]` table (CQ-27, #145), so no linter, type checker, or
+  test runner is installable as an extra of the published distribution.
+  Install with `uv sync --group dev` or `pip install -e . --group dev` (pip
+  25.1 or newer); `[project.optional-dependencies]` now holds only the `lsp`
+  and `dataframe` runtime extras. `tests/test_packaging.py` is the AUTO-GATE
+  the standard's CQ-27 row asks for and fails if development tooling
+  reappears as an extra. ADR 0005 carries an amendment noting the move.
+- CHANGELOG section headings adopt the Keep a Changelog form,
+  `## [X.Y.Z] - YYYY-MM-DD` (DOC-07/REL-10). The release gate's
+  CHANGELOG-section grep in `verify.yml` moved with them, and
+  `tests/test_changelog.py` now runs that grep, extracted from the workflow,
+  against this file: the two can no longer drift apart without the ordinary
+  test suite saying so, instead of the mismatch surfacing on a release tag.
+
+- **TODS-W302**'s title becomes "Referenced file is missing or was not read in
+  full, references not checked" (from "missing or unreadable"), and its
+  description covers the third case. Its ID, severity and category are
+  unchanged, so `docs/v1-contract-candidate.json` is unaffected.
+- The `skipped:needs_gtfs_table` reason in the coverage manifest widens from
+  "the companion GTFS feed has none of the files the check reads" to the same
+  wording plus ", or could not read one of them in full". The old wording was
+  already inaccurate for the unreadable companion files v0.10.0 introduced:
+  the file was there.
+
 Added:
+
+- [`docs/rulesets/main.json`](docs/rulesets/main.json), the branch ruleset for
+  `main` as a reviewable artifact rather than a paragraph of prose in
+  `docs/CONFORMANCE-GAPS.md` (CQ-37 to 43, CICD-03/11-18). **It is not
+  applied**; enabling a ruleset is a live settings change no automated pass
+  makes, and `docs/rulesets/README.md` says so and gives the command.
+  `tests/test_branch_ruleset.py` keeps its required-status-check list in step
+  with the checks the workflows actually report, in both directions. Writing
+  the prose down as a file immediately found a defect in the prose: it named
+  `zizmor` among the required checks, and `zizmor.yml` is path-filtered on
+  `pull_request`, so on a pull request touching no workflow file the check
+  never reports and the merge could never happen. It is excluded, with a test
+  that keeps it excluded until the filter goes away.
 
 - [`docs/MULTIYEAR-PLAN.md`](docs/MULTIYEAR-PLAN.md), which sequences the
   remaining work in `docs/roadmap.md`, `docs/CONFORMANCE-GAPS.md`, and
@@ -73,7 +147,7 @@ Added:
   visitor while every gate stayed green). Runs in `pages.yml` after each
   deploy and weekly in `playground-deployment.yml` (#146).
 
-## v0.10.0 - 2026-08-21
+## [0.10.0] - 2026-08-21
 
 `v0.9.1` was tagged and signed (commit `edd2ea1`) but its GitHub Release
 object was never created, so `pypi-publish.yml` never ran: PyPI's latest
@@ -219,7 +293,7 @@ Docs:
   #113. The paragraph now points at the table instead of maintaining a second,
   driftable count.
 
-## v0.9.1 - 2026-08-18
+## [0.9.1] - 2026-08-18
 
 A patch release that repairs the release pipeline itself and ships one
 playground change. No validator behaviour changes: no rule added, removed,
@@ -268,7 +342,7 @@ Docs:
 - The Standards Conformance table's Accessibility row states its scope in the
   same `Applies (scope)` form as every other row. (#118)
 
-## v0.9.0 - 2026-08-16
+## [0.9.0] - 2026-08-16
 
 Behaviour change for Action and CLI consumers: two checks now report findings
 they did not report in v0.8.0, and one stops reporting findings it should never
@@ -374,7 +448,7 @@ Added:
   runner is not reported as a regression, and the check fails rather than
   passes when it has no baseline to compare against.
 
-## v0.8.0 - 2026-07-16
+## [0.8.0] - 2026-07-16
 
 This release broadens compatibility and makes operational changes easier to
 inspect: TODS v1 feeds can be validated directly, GTFS changes can be checked
@@ -443,7 +517,7 @@ Fixed:
   AI Evaluation, and Responsible-Tech Framework labels consumed by the
   portfolio conformance checker.
 
-## v0.7.0 - 2026-07-11
+## [0.7.0] - 2026-07-11
 
 Findings now reach the editor (a language server with hovers and quick fixes,
 plus a thin VS Code client), reports state exactly which checks ran and which
@@ -592,7 +666,7 @@ Security / process (2026-07-05 standards-conformance remediation):
 - No user-facing behavior changed in this entry; see `docs/CONFORMANCE-GAPS.md`
   for the full list of what closed and what remains open.
 
-## v0.6.0 - 2026-06-29
+## [0.6.0] - 2026-06-29
 
 New surfaces for working with a feed live (`--watch`, browser playground),
 acting on findings (`fix`), and sharing results (`stats --format markdown`,
@@ -621,7 +695,7 @@ Added:
   another validator can run the suite without cloning the repo
   (`scripts/build_conformance_corpus.py`).
 
-## v0.5.0 - 2026-06-22
+## [0.5.0] - 2026-06-22
 
 Correctness fixes (no rule IDs changed), a runnable bundled sample feed with a
 fixed quickstart, and a conformance check that runs the spec's own examples.
@@ -653,7 +727,7 @@ Other:
   README quickstart at it, so a new install has something that passes on the
   first run. The GitHub Action now sets up Python explicitly.
 
-## v0.4.0 - 2026-06-20
+## [0.4.0] - 2026-06-20
 
 Distribution, reporting, and analysis surfaces. No rule IDs changed; the JSON
 report gained fields (it is now `reportVersion` 1.1.0) without removing any.
@@ -689,7 +763,7 @@ Added:
   defenses, size limits) and a `SECURITY.md`.
 - `scripts/benchmark.py` for throughput measurement on large synthetic feeds.
 
-## v0.3.0 - 2026-06-12
+## [0.3.0] - 2026-06-12
 
 - New `merge` subcommand writes the "TODS-Supplemented GTFS" dataset (the
   GTFS feed after supplement rows are applied) to a directory or .zip, with
@@ -701,7 +775,7 @@ Added:
   `tods-validate PATH` without a subcommand still validates, so existing
   invocations and the GitHub Action are unaffected.
 
-## v0.2.0 - 2026-06-12
+## [0.2.0] - 2026-06-12
 
 - `--ignore RULE_ID` (repeatable) suppresses specific rules.
 - Optional `tods-validate.toml` configuration file (`ignore`, `fail-on`),
@@ -709,7 +783,7 @@ Added:
 - `--format markdown`: a report suitable for pasting into an issue or a
   working-group thread.
 
-## v0.1.0 - 2026-06-12
+## [0.1.0] - 2026-06-12
 
 First release: 35 checks against TODS v2.1.0 covering file structure, field
 values, references (including into the companion GTFS feed after supplements

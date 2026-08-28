@@ -47,7 +47,7 @@ jobs:
       # CQ-09 drift half of the gate; see the note in the Makefile's `lockfile`
       # target for why `uv sync --frozen` alone cannot fail on a stale lock.
       - run: uv lock --check
-      - run: uv sync --frozen --extra dev
+      - run: uv sync --frozen --group dev
       - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
@@ -82,8 +82,8 @@ jobs:
             echo "::error::Version mismatch: tag=$TAG_VERSION pyproject=$PYPROJECT_VERSION CITATION.cff=$CFF_VERSION"
             exit 1
           fi
-          if ! grep -qE "^## v?${TAG_VERSION//./\\.}( |$)" CHANGELOG.md; then
-            echo "::error::CHANGELOG.md has no section heading for version $TAG_VERSION (expected a line matching '## v$TAG_VERSION - YYYY-MM-DD')."
+          if ! grep -qE "^## \\[${TAG_VERSION//./\\.}\\]( |$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no section heading for version $TAG_VERSION (expected a line matching '## [$TAG_VERSION] - YYYY-MM-DD')."
             exit 1
           fi
 

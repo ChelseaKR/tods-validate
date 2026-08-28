@@ -1,12 +1,22 @@
 """Loader behavior: directories, zips, encodings, malformed CSV."""
 
+import re
 import zipfile
 from pathlib import Path
 
 import pytest
 
 from conftest import VALID_TODS
-from tods_validate.loader import PackageNotFoundError, load_package
+from tods_validate import loader
+from tods_validate.loader import (
+    BLOCKING_PROBLEM_CODES,
+    DEGRADING_PROBLEM_CODES,
+    PROBLEM_CODES,
+    PackageNotFoundError,
+    load_package,
+)
+
+LOADER_SOURCE = Path(loader.__file__).read_text(encoding="utf-8")
 
 
 def test_loads_directory() -> None:
@@ -85,3 +95,34 @@ def test_regular_file_that_is_not_a_zip_raises(tmp_path: Path) -> None:
     plain.write_text("not a package", encoding="utf-8")
     with pytest.raises(PackageNotFoundError):
         load_package(plain)
+
+
+def test_every_problem_code_the_parser_emits_is_classified() -> None:
+    # BLOCKING_PROBLEM_CODES and DEGRADING_PROBLEM_CODES together decide
+    # whether a file is trustworthy enough to resolve another file's
+    # references against. A code that belongs to neither would be read as
+    # harmless by default, which is the fail-open this split exists to close.
+    emitted = set(re.findall(r'code="([a-z_]+)"', LOADER_SOURCE))
+    assert emitted, "expected to find problem codes in the loader source"
+    assert emitted == PROBLEM_CODES
+    assert not (BLOCKING_PROBLEM_CODES & DEGRADING_PROBLEM_CODES)
+
+
+def test_fully_read_is_stricter_than_readable(tmp_path: Path) -> None:
+    # A ragged row leaves the file readable: it has a header and rows. It does
+    # not leave it fully read, because the row's values could not be placed.
+    (tmp_path / "trips.txt").write_text("route_id,service_id,trip_id\nR1,weekday\n")
+    feed = load_package(tmp_path).files["trips.txt"]
+    assert feed.readable
+    assert not feed.fully_read
+    assert [p.code for p in feed.problems] == ["ragged"]
+
+
+def test_a_clean_file_is_both_readable_and_fully_read(tmp_path: Path) -> None:
+    # Positive control for the two tests above: without this, a bug that made
+    # fully_read always False would still turn them green.
+    (tmp_path / "trips.txt").write_text("route_id,service_id,trip_id\nR1,weekday,T1\n")
+    feed = load_package(tmp_path).files["trips.txt"]
+    assert feed.readable
+    assert feed.fully_read
+    assert feed.problems == []

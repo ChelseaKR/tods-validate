@@ -66,6 +66,17 @@ class CompanionGTFS:
     # unresolvable (#125). TODS-W302 discloses the reason from this map
     # rather than reporting the table simply missing.
     unreadable: dict[str, str] = field(default_factory=dict)
+    # Base files that parsed but did not read in full (see
+    # loader.DEGRADING_PROBLEM_CODES), keyed to why. Treated as absent from
+    # `present` for the same reason as `unreadable`: the reader holds an
+    # incomplete set of IDs, and an ID it dropped is indistinguishable from an
+    # ID the feed never had, so every reference to a dropped ID would be
+    # reported as a dangling reference against the *TODS* file. Kept in its own
+    # map rather than folded into `unreadable` because the two say different
+    # things to a producer: an unreadable file has to be re-exported, while a
+    # file that read but lost values has a named row or column to fix.
+    # TODS-W302 discloses this map. See ADR 0007.
+    degraded: dict[str, str] = field(default_factory=dict)
     trip_service: dict[str, str] = field(default_factory=dict)
     trip_block: dict[str, str] = field(default_factory=dict)
     stop_ids: set[str] = field(default_factory=set)
@@ -136,19 +147,58 @@ def _blocking_reason(feed: FeedFile) -> str:
     raise AssertionError(f"{feed.name}: not readable but no blocking problem recorded")
 
 
+def _degraded_reason(feed: FeedFile) -> str:
+    """Why ``feed`` parsed but did not read in full, as one sentence.
+
+    Callers only reach here when ``feed.readable`` is True and
+    ``feed.fully_read`` is False, so at least one problem is recorded and none
+    of them is blocking. The first message is quoted and the rest counted: a
+    producer needs one concrete row or column to open the file at, and the
+    count so the report does not imply that fixing the first one is the whole
+    job.
+    """
+    if not feed.problems:  # pragma: no cover -- guarded by the caller
+        raise AssertionError(f"{feed.name}: not fully read but no problem recorded")
+    first = feed.problems[0].message
+    rest = len(feed.problems) - 1
+    if rest:
+        return f"{first} And {rest} further problem(s) in the same file."
+    return first
+
+
 def _resolve_base(
     gtfs: Package | None, base_name: str, companion: CompanionGTFS
 ) -> FeedFile | None:
-    """The base FeedFile to read for ``base_name``, or None if absent or unreadable.
+    """The base FeedFile to read for ``base_name``, or None if it cannot be trusted.
 
-    A file present in the package but that failed to parse outright (no
-    headers, no rows) is folded into the "absent" case here, so every other
-    caller keeps the already-correct missing-file behavior; the reason is
-    recorded in ``companion.unreadable`` for TODS-W302 to report (#125).
+    Three cases collapse to None here, and they collapse for one reason: in
+    each, the rows this reader holds for ``base_name`` are not the rows the
+    file contains, so resolving a reference against them would answer a
+    question the reader cannot answer.
+
+    - Absent from the package. Already handled correctly everywhere.
+    - Present but unparseable (no headers, no rows). Folded into the absent
+      case with the reason recorded in ``companion.unreadable`` (#125).
+    - Present and parsed, but not read in full: a ragged row or a duplicated
+      column means some values were dropped. Folded in the same way, with the
+      reason recorded in ``companion.degraded``.
+
+    The third case is the one that used to fail open. A dropped ``trip_id`` is
+    not reported anywhere -- TODS-E103/E104/E105 scan the TODS package, never
+    the companion feed -- so the reader silently held a short list of trips,
+    every rule that reads trips still recorded ``ran`` in the coverage
+    manifest, and a run event naming a real trip was reported as TODS-E307,
+    an ERROR against the producer's TODS file for a defect in their GTFS file.
+    See ADR 0007.
     """
     base = gtfs.get(base_name) if gtfs is not None else None
-    if base is not None and not base.readable:
+    if base is None:
+        return None
+    if not base.readable:
         companion.unreadable[base_name] = _blocking_reason(base)
+        return None
+    if not base.fully_read:
+        companion.degraded[base_name] = _degraded_reason(base)
         return None
     return base
 

@@ -43,7 +43,7 @@ verify:
 # with pyproject.toml, so a bumped version (or an added dependency) shipped a
 # stale environment and every CI job stayed green -- measured, not assumed:
 # with pyproject at 0.9.0 and uv.lock still at 0.8.0, `uv sync --frozen
-# --extra dev` exits 0 and installs 0.8.0, while `uv lock --check` exits 1.
+# --group dev` exits 0 and installs 0.8.0, while `uv lock --check` exits 1.
 # ADR 0005 claimed --frozen "fails on any lockfile drift"; it does not, and the
 # ADR now records the correction. Runs first in VERIFY_GATES and as its own
 # step before every `uv sync` in CI, because a check after the install is a
@@ -81,7 +81,7 @@ i18n-check:
 # dependency is still audited.
 audit:
 	req="$$(mktemp)" && \
-	uv export --frozen --extra dev --no-emit-project --no-hashes --quiet \
+	uv export --frozen --group dev --no-emit-project --no-hashes --quiet \
 		--format requirements-txt -o "$$req" && \
 	pip-audit --strict --no-deps -r "$$req"; \
 	rc=$$?; rm -f "$$req"; exit $$rc

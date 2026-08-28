@@ -28,7 +28,7 @@ jobs:
       - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
         with:
           python-version: "3.12"
-      - run: python -m pip install -e ".[dev]"
+      - run: python -m pip install -e . --group dev
       # Two conditions get an issue, not one. "Spec drift detected" is news
       # about the spec; "Spec watch could not compare" is news about this
       # script, and it used to reach nobody: a document the parser did not
