@@ -4,7 +4,7 @@
 # (REL-14/15). CI additionally runs what needs GitHub itself -- the composite
 # action's self-test, CodeQL, Semgrep and zizmor -- so a green `make verify` is
 # a necessary condition for merge, not a sufficient one.
-.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation perf-check
+.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation perf-check memory-check
 
 # Every gate `make verify` runs, in reporting order. Each one is independent:
 # see the recipe below for why that matters.
@@ -124,3 +124,11 @@ citation:
 # job in .github/workflows/ci.yml.
 perf-check:
 	python scripts/check_perf_budget.py
+
+# The other half of the scale budget (FIX-04). Kept out of VERIFY_GATES for the
+# same reason perf-check is: it measures rather than inspects, so it belongs in
+# the `perf` CI job next to the throughput gate, not in the pre-commit loop.
+# tests/test_memory_budget.py runs the comparison logic and one real
+# measurement inside `make test`, so the budget is not only checked in CI.
+memory-check:
+	python scripts/check_memory_budget.py

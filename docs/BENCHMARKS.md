@@ -93,3 +93,64 @@ optimization.
 Numbers will vary by machine; re-run and update this table when the
 validation path changes materially (new rules, changed data structures) so
 regressions show up as a diff against a real baseline instead of folklore.
+
+## Memory
+
+Throughput was the only axis measured until 2026-08-27, which left the other
+one running on an estimate: FIX-04 in `docs/ideation/02-large-scale-fixes.md`
+guessed "roughly an order of magnitude over the raw bytes" and nobody had
+checked. `scripts/check_memory_budget.py` measures it.
+
+| Measure | Value |
+| --- | --- |
+| Peak traced memory, full `run()` | **30.9x the input bytes** |
+| Feed | 10,000-trip synthetic, 1,043,431 bytes |
+| Interpreters | 30.90x on CPython 3.13.9, 30.53x on 3.12.14 |
+| Budget | 1.03x growth against the committed ratio |
+
+It measures `tracemalloc` peak rather than resident set size. RSS depends on
+the allocator and the platform; traced peak counts the bytes the code asked
+Python for, which is why this baseline, unlike `rowsPerCpuSecond`, is not tied
+to a machine class. It is tied to an interpreter version, which
+`perf/baseline.json` records.
+
+The number was 36.6x before a per-file value pool landed in `loader.py`: equal
+cells in one file now share one string, which on repetitive transit data is
+most of them. Throughput was unchanged (65.9k against 65.0k rows/CPU-s, inside
+the noise). The remaining gap to FIX-04's 3x goal is the per-row
+`dict[str, str]`, which is open work.
+
+What that means for the documented limits is in `SECURITY.md`: the loader's
+512 MiB per-member and 2 GiB total ceilings bound extraction, not memory, and
+at 31x they describe packages no ordinary machine can hold.
+
+## Bundle size
+
+`scripts/check_bundle_budget.py` holds the shipped HTML to committed byte
+ceilings, recorded in `perf/bundle-baseline.json`.
+
+| Surface | Measured | Budget |
+| --- | --- | --- |
+| `web/index.html` | 7,465 | 12,288 |
+| Whole published `web/` tree | 112,626 | 262,144 |
+| Published page count | 45 | 60 |
+| HTML report at 10,000 findings | 2,348,762 | 3,145,728 |
+
+The last row is the one that can grow without anyone noticing: about 235 bytes
+per finding, so a template change adding 80 bytes to a row is invisible on a
+fixture and adds 800 KB to a report at the scale FIX-15 promises to survive.
+
+## Reproducing any of this
+
+`scripts/generate_feed.py` writes the feeds these numbers are measured on. Each
+archive carries a `SYNTHETIC.md` label and a `synthetic_manifest.json` naming
+its seed and parameters, and is byte-reproducible from that seed, so a
+checksum identifies the exact bytes a published number came from. Since
+EXP-13, `.github/workflows/release-corpus.yml` builds one archive per profile
+(`clean-100k`, `drifted-gtfs`, `messy-export`) on every release, prints their
+checksums into the job summary, and attaches them to the release. Before that
+every number here cited a feed a reader could not obtain.
+
+**These feeds are synthetic.** They are shaped like transit operations data
+and are not evidence about how real feeds look; #76 is the open work to get a
+real one.

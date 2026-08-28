@@ -6,6 +6,7 @@ import pytest
 
 from conftest import FIXTURES, rule_ids, run_invalid_fixture
 from tods_validate.findings import Finding, Severity
+from tods_validate.loader import Package
 from tods_validate.runner import run
 
 RULES = (
@@ -279,3 +280,89 @@ def test_a_complete_companion_trips_still_reports_a_real_e307(tmp_path: Path) ->
     )
     _, findings = run(tmp_path)
     assert "TODS-E307" in rule_ids(findings)
+
+
+def _gap_message(unreadable: dict[str, str], degraded: dict[str, str], target: str) -> str:
+    """TODS-W302's companion-feed sentence, called directly.
+
+    Going through `run()` exercises this helper only along whichever branch the
+    fixture happens to take, and only for a single-file target. Mutation
+    testing showed the cost: 16 mutants inside it survived the whole suite,
+    including ones that replaced the " or " separator, the "; " reason joiner,
+    and the " and " file joiner with other strings. Those separators are the
+    difference between a warning a producer can act on and a mangled sentence.
+    """
+    from tods_validate.gtfs_companion import CompanionGTFS
+    from tods_validate.rules import ValidationContext
+    from tods_validate.rules.references import _companion_gap_message
+
+    context = ValidationContext(
+        package=Package(source="test"),
+        gtfs=CompanionGTFS(source="test", unreadable=dict(unreadable), degraded=dict(degraded)),
+    )
+    return _companion_gap_message(context, "run_events.txt", target)
+
+
+def test_companion_gap_message_reports_a_missing_file() -> None:
+    assert _gap_message({}, {}, "trips.txt") == (
+        "The companion GTFS feed has no trips.txt, so run_events.txt "
+        "references into it could not be checked."
+    )
+    # An alternatives target is quoted whole, not split and half-reported.
+    assert _gap_message({}, {}, "calendar.txt or calendar_dates.txt") == (
+        "The companion GTFS feed has no calendar.txt or calendar_dates.txt, so "
+        "run_events.txt references into it could not be checked."
+    )
+
+
+def test_companion_gap_message_reports_an_unreadable_file() -> None:
+    assert _gap_message({"trips.txt": "trips.txt is empty."}, {}, "trips.txt") == (
+        "The companion GTFS feed's trips.txt could not be read (trips.txt is empty.), "
+        "so run_events.txt references into it could not be checked."
+    )
+
+
+def test_companion_gap_message_names_every_unreadable_alternative() -> None:
+    # Both halves of an alternatives group can fail at once. The message has to
+    # name both files and both reasons, joined by " and " and "; " respectively.
+    message = _gap_message(
+        {"calendar.txt": "calendar.txt is empty.", "calendar_dates.txt": "bad encoding."},
+        {},
+        "calendar.txt or calendar_dates.txt",
+    )
+    assert message == (
+        "The companion GTFS feed's calendar.txt and calendar_dates.txt could not be "
+        "read (calendar.txt is empty.; bad encoding.), so run_events.txt references "
+        "into it could not be checked."
+    )
+
+
+def test_companion_gap_message_reports_a_short_read() -> None:
+    assert _gap_message({}, {"trips.txt": "trips.txt row 4 is ragged."}, "trips.txt") == (
+        "The companion GTFS feed's trips.txt could not be read in full (trips.txt row 4 "
+        "is ragged.), so run_events.txt references into it could not be checked: an ID "
+        "the reader could not place would read as an ID the feed does not have."
+    )
+
+
+def test_companion_gap_message_prefers_unreadable_over_short_read() -> None:
+    # A file that could not be parsed at all and a sibling that was short-read
+    # are different remedies. Unreadable is the more serious of the two and is
+    # what the sentence leads with; without this the branch order is unpinned.
+    message = _gap_message(
+        {"calendar.txt": "calendar.txt is empty."},
+        {"calendar_dates.txt": "calendar_dates.txt row 2 is ragged."},
+        "calendar.txt or calendar_dates.txt",
+    )
+    assert "calendar.txt could not be read (" in message
+    assert "in full" not in message
+
+
+def test_companion_gap_message_only_names_files_in_the_target() -> None:
+    # Positive control for the branch selection: an unreadable file that is not
+    # one of this target's alternatives must not pull the message off the
+    # missing-file branch.
+    assert _gap_message({"stops.txt": "stops.txt is empty."}, {}, "trips.txt") == (
+        "The companion GTFS feed has no trips.txt, so run_events.txt "
+        "references into it could not be checked."
+    )

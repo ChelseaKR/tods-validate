@@ -16,8 +16,14 @@ permissions:
 jobs:
   mutmut:
     runs-on: ubuntu-latest
-    # Belt and suspenders: even a non-zero exit must not fail the workflow.
-    continue-on-error: true
+    # `continue-on-error: true` used to sit here, on top of a `|| true` on every
+    # step, so this job could not fail under any circumstance: a kill rate that
+    # halved rendered identically to one that did not move. It is gone. The run
+    # itself still cannot fail the job (`mutmut run || true` below, because a
+    # surviving mutant is information, not a defect), and this workflow is
+    # weekly and manual, never a pull-request gate, so "advisory" still holds
+    # in the sense that matters. What is no longer advisory is a drop below the
+    # floor in perf/mutation-baseline.json (CQ-47).
     steps:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
         with:
@@ -41,6 +47,10 @@ jobs:
               echo '```'
             } >> "$GITHUB_STEP_SUMMARY"
           fi
+      - name: Kill rate is at or above the committed floor (CQ-47)
+        if: always()
+        run: python scripts/check_mutation_ratchet.py
+
       - name: Upload stats
         if: always()
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1

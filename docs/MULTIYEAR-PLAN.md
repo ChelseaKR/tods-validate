@@ -137,27 +137,68 @@ snapshot went one full release cycle unchanged before the tag;
 `v1-contract-audit.md` no longer says "candidate"; and the branch ruleset is
 enabled live, with `docs/rulesets/main.json` replaced by its export.
 
-## Phase 3: scale readiness and triage quality (2027 Q2 to Q3)
+## Phase 3: scale readiness and triage quality (2027 Q2 to Q3) [PARTLY EXECUTED]
 
 **Delivers.** The answer to "what happens on a real agency's feed", to the
 extent it can be answered without one.
 
-- Published synthetic benchmark feeds, loudly labeled as synthetic
-  (EXP-13). This is infrastructure for the rest of the phase as much as an
-  expansion: it feeds the caching, memory, and HTML acceptance tests.
-- Derived-state caching and the memory model (FIX-03, FIX-04), in that order,
-  with the property and differential tests as the safety net.
-- An HTML report that survives a feed with ten thousand findings (FIX-15).
-- The Lighthouse and bundle baseline the performance section of
-  `CONFORMANCE-GAPS.md` still lists as open, and a dated
-  `docs/a11y/STATEMENT.md` with a named WCAG conformance target.
-- Mutation kill-rate on the rules engine ratcheted from roughly 65% toward
-  the 70% target (CQ-47). Ratchet, do not jump.
+Two of this phase's items turned out to be already built, and saying so is
+part of the work: **FIX-03** (derived-state caching) is done, as
+`ValidationContext.events` / `.events_by_run` / `.run_pairs` cached properties
+that `semantics.py` and `coverage.py` read; **FIX-15** (an HTML report that
+survives ten thousand findings) is done and tested at exactly that scale,
+grouping, filtering, dark scheme and no-JavaScript fallback included. Neither
+needed doing again.
+
+Executed:
+
+- **EXP-13, published.** The generator existed; nothing published its output,
+  so every performance number in this repository cited a feed a reader could
+  not obtain. `release-corpus.yml` now builds one archive per profile on every
+  release, prints their checksums, and attaches them. Publishing them first
+  required making them worth publishing: zip entries carried build-time
+  mtimes, so two runs of one seed produced identical contents inside archives
+  with different checksums, against a docstring promising bit-for-bit
+  reproduction.
+- **FIX-04, measured and half closed.** Peak memory was an estimate ("roughly
+  an order of magnitude") nobody had checked. Measured, it was **36.6x the
+  input bytes**, which makes the loader's 512 MiB and 2 GiB limits describe
+  packages needing 18 and 72 GiB. A per-file value pool took it to **30.9x**
+  at no throughput cost; `scripts/check_memory_budget.py` gates it at 1.03x
+  growth, and `SECURITY.md` now states the real ceiling next to the limits it
+  contradicts. The per-row `dict[str, str]` that accounts for the rest is
+  still open, now with a number and a gate attached.
+- **The bundle baseline**, `perf/bundle-baseline.json`, over the playground
+  page, the whole published tree, the page count, and a report at ten thousand
+  findings, which is the one that can grow silently at 235 bytes a finding.
+- **A dated `docs/a11y/STATEMENT.md`** naming WCAG 2.1 AA as the target and
+  deliberately making no conformance *claim*, since the only evaluation run is
+  automated. Writing its surface table found an unaudited surface: the 44
+  rule-catalog pages `pages.yml` publishes had never had a runner pointed at
+  them. Entering the gate they failed with 141 contrast errors and 43
+  link-distinguishability errors, from one stylesheet that declared
+  `color-scheme: light dark` and painted neither scheme. Fixed.
+- **CQ-47, re-measured and ratcheted.** The documented ~65% was recorded
+  against 280 mutants and the engine has grown to 330; re-run, it was 57.6%.
+  Sixteen survivors sat in a helper added the same week, and killing twelve of
+  them took the rate to **62.2%**. The weekly workflow also carried
+  `continue-on-error: true` on the job plus `|| true` on every step, so a rate
+  that halved rendered identically to one that did not move; it now fails
+  below the floor in `perf/mutation-baseline.json`.
+
+Not executed, and why:
+
+| Item | Blocked on |
+| --- | --- |
+| FIX-04's compact row representation (`Row.values` as a view over a tuple) | Nothing external, but it is L-to-XL work touching every rule's data access, and it wants the differential corpus as a safety net. Deferred deliberately rather than started; the budget gate means it can be attempted later against a number. |
+| A Lighthouse baseline | A judgement the maintainer should make, not an agent. It means a new npm toolchain on top of the one already carrying an unpatchable high-severity advisory (`extract-zip` via puppeteer via `pa11y-ci`), for a metric that overlaps what axe and HTML_CodeSniffer already gate. The bundle half of that gap is closed; this half is stated rather than quietly ticked. |
+| Final calibration of any of these against real data | #76. Every number in `docs/BENCHMARKS.md` says synthetic, because it is. |
 
 **Depends on.** Phase 2's contract freeze, so that performance work cannot
-quietly change behavior. Final calibration depends on real feeds and will not
-get it; the honest output is a documented ceiling labeled synthetic-verified
-only.
+quietly change behavior. That freeze is blocked on a release cycle, so this
+phase honoured the constraint instead of the schedule: the one behavioural
+change here (the value pool) is byte-for-byte identical in output, and the
+whole suite plus the conformance corpus pass unchanged.
 
 **Done when.** A published, seeded benchmark corpus exists; the throughput
 and memory ceilings are documented with the machine class they were measured

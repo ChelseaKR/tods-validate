@@ -134,6 +134,11 @@ jobs:
       - run: uv sync --frozen
       - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - run: make perf-check
+      # Peak memory per input byte, the other axis of the same budget (FIX-04).
+      # Runs after perf-check rather than instead of it: a change can trade one
+      # for the other, and a budget that only watches one axis rewards exactly
+      # that trade.
+      - run: make memory-check
 
   # WCAG 2.1 AA automation, and nothing else. `make a11y` used to begin with
   # `npm audit --audit-level=high`, so an unfixable advisory in the npm

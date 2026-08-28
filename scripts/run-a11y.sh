@@ -29,6 +29,11 @@ cleanup() {
 trap cleanup EXIT
 
 cp web/index.html "$a11y_tmp/index.html"
+# The rule catalog is published by pages.yml (`path: web`) and was never
+# audited: 44 pages deployed to the same site as index.html, behind the same
+# accessibility claim, with no runner ever pointed at them.
+mkdir -p "$a11y_tmp/rules"
+cp web/rules/*.html "$a11y_tmp/rules/"
 "$a11y_validator" tests/fixtures/invalid/TODS-E201 --format html \
   > "$a11y_tmp/report.html" || [[ "$?" -eq 1 ]]
 

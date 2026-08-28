@@ -215,6 +215,23 @@ def _parse_csv(name: str, data: bytes, encoding: str | None = None) -> FeedFile:
         seen.add(h)
 
     width = len(header)
+    # One shared instance per distinct cell value in this file. Transit data is
+    # overwhelmingly repetitive in the columns that matter -- service_id,
+    # route_id, event_type, dates, times -- so most cells are a value the file
+    # has already used, and holding one string instead of thousands of equal
+    # ones is where the memory goes. Measured on the 10,000-trip synthetic
+    # benchmark: peak traced memory falls from 36.6x the input bytes to 30.5x,
+    # with throughput unchanged (65.9k vs 65.0k rows/CPU-s, inside the noise).
+    #
+    # The trade is real and bounded: on a file whose every cell is distinct the
+    # pool shares nothing and costs its own entries, measured at 6% more peak
+    # (10.9x to 11.5x). That is the shape of data this tool does not validate.
+    #
+    # A per-file dict, not sys.intern: interned strings live until the
+    # interpreter exits, which in the long-running LSP server would turn every
+    # feed a user opens into a permanent leak. This pool is dropped when the
+    # file is parsed, and only the values the rows actually hold survive.
+    pool: dict[str, str] = {}
     for i, raw in enumerate(raw_rows[1:], start=2):
         # Skip genuinely empty lines (a bare newline). An all-blank ",,," data
         # row is kept so TODS-E201 reports its missing required values instead
@@ -242,7 +259,8 @@ def _parse_csv(name: str, data: bytes, encoding: str | None = None) -> FeedFile:
         for j, h in enumerate(header):
             if h in values:
                 continue
-            values[h] = raw[j] if j < len(raw) else ""
+            cell = raw[j] if j < len(raw) else ""
+            values[h] = pool.setdefault(cell, cell)
         extra = tuple(raw[width:])
         feed.rows.append(Row(line=i, values=values, extra_cells=extra))
 

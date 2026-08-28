@@ -3,7 +3,8 @@
 
 DOCUMENTATION-STANDARD §6.5: a document whose correctness depends on something
 outside itself carries a ``Last verified: YYYY-MM-DD`` line and a
-``Recheck cadence:`` line. ``docs/getting-started.md`` and ``docs/api.md``
+``Recheck cadence:`` line. ``docs/getting-started.md``, ``docs/api.md``, and
+``docs/a11y/STATEMENT.md``
 document commands and API members that the code can move out from under, and
 had neither.
 
@@ -26,7 +27,7 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-STAMPED = ("docs/getting-started.md", "docs/api.md")
+STAMPED = ("docs/getting-started.md", "docs/api.md", "docs/a11y/STATEMENT.md")
 
 VERIFIED_RE = re.compile(r"^Last verified: (\d{4}-\d{2}-\d{2})\b", re.MULTILINE)
 CADENCE_RE = re.compile(r"^Recheck cadence: \S", re.MULTILINE)

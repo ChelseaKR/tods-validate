@@ -673,12 +673,24 @@ def _write_labels(directory: Path, stats: FeedStats, cli_args: list[str]) -> Non
     )
 
 
+# Zip entries carry the source file's mtime, so two runs of the same seed
+# produced identical *contents* inside archives with different bytes. This
+# module's docstring promises a package that "can be regenerated bit-for-bit",
+# and a published benchmark artifact whose checksum changes every build cannot
+# be checked against the number it was used to measure. Every entry is stamped
+# with this instead: 1980-01-01, the earliest a zip timestamp can express.
+_ZIP_EPOCH = (1980, 1, 1, 0, 0, 0)
+
+
 def _finalize(src: Path, out: Path) -> None:
     if out.suffix.lower() == ".zip":
         out.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(out, "w", compression=zipfile.ZIP_DEFLATED) as zf:
             for file in sorted(src.iterdir()):
-                zf.write(file, file.name)
+                info = zipfile.ZipInfo(file.name, date_time=_ZIP_EPOCH)
+                info.compress_type = zipfile.ZIP_DEFLATED
+                info.external_attr = 0o644 << 16
+                zf.writestr(info, file.read_bytes())
     else:
         out.mkdir(parents=True, exist_ok=True)
         for file in sorted(src.iterdir()):

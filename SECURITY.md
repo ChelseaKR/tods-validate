@@ -41,6 +41,29 @@ Hardening in place:
   decompress above `MAX_FILE_BYTES` (512 MiB), when the total decompressed size
   would exceed `MAX_TOTAL_BYTES` (2 GiB), or when the compression ratio exceeds
   `MAX_COMPRESSION_RATIO` (200:1). See `src/tods_validate/loader.py`.
+- **Memory ceiling, and why it is lower than those limits.** A full `run()`
+  peaks at about **31x the input bytes** of Python heap. That is measured, not
+  estimated: `scripts/check_memory_budget.py` records it into
+  `perf/baseline.json` and fails on a regression past 1.03x, and
+  `tests/test_memory_budget.py` fails if this paragraph and that file disagree.
+
+  The consequence is that the two limits above bound extraction, not memory. A
+  package at the 512 MiB per-member limit needs roughly **16 GiB**, and one at
+  the 2 GiB total limit roughly **62 GiB**; on an ordinary machine the process
+  is killed by the OS rather than returning a finding. So the practical ceiling
+  is **a few hundred MiB of input on an 8 GiB machine**, and a feed larger than
+  that should be split or validated per file.
+
+  The gap is the row representation, not the limits: `loader.Row` holds a
+  `dict[str, str]` per row, which costs an order of magnitude over the raw
+  bytes before any rule runs. A per-file value pool now shares one string per
+  distinct cell value, which took the ratio from 37x to 31x at no measurable
+  throughput cost; the remaining work, replacing the per-row dict with a view
+  over a tuple, is FIX-04 in `docs/ideation/02-large-scale-fixes.md` and is
+  open with this number attached in phase 3 of `docs/MULTIYEAR-PLAN.md`.
+  Lowering `MAX_FILE_BYTES` instead would be the wrong fix: the limits exist to
+  refuse a zip bomb, and moving them would refuse feeds a compact
+  representation could validate.
 - **Path-traversal defense.** Zip members with absolute paths or `..` segments
   are rejected rather than extracted; only top-level files are read.
 - **No code execution.** Inputs are parsed as CSV; nothing in a feed is

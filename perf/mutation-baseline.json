@@ -1,0 +1,13 @@
+{
+  "measuredAt": "2026-08-27",
+  "measuredOn": "CPython 3.12.14, mutmut 3.x, `mutmut run` over the [tool.mutmut] scope in pyproject.toml (src/tods_validate/rules/* plus run_events.py)",
+  "stats": {
+    "killed": 163,
+    "survived": 99,
+    "no_tests": 68,
+    "total": 330
+  },
+  "killRateFloor": 0.6,
+  "target": 0.7,
+  "note": "CQ-47. The floor ratchets up and never down: raising it is a decision recorded in this file, lowering it is a regression the gate is here to refuse. killRate is killed / (killed + survived), the same denominator docs/mutation-testing.md's earlier 280-mutant measurement used, so the two numbers are comparable. 163/262 = 62.2% today. The floor sits at 60% rather than at the measurement, so ordinary noise (mutmut's per-mutant test selection is not perfectly stable) does not turn a weekly advisory run red for no reason; a real drop of more than two points does. `no_tests` is reported but excluded from the rate, because a mutant no test touches says something about coverage rather than about test strength, and folding it in would let a coverage change move a number that is meant to track assertion quality."
+}

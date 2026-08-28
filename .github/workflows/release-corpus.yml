@@ -1,7 +1,8 @@
-name: Conformance corpus
+name: Release artifacts
 
-# Builds the downloadable conformance corpus (fixtures + expectations.json) and
-# attaches it to each GitHub release. workflow_dispatch builds it without
+# Builds the two downloadable artifacts and attaches them to each GitHub
+# release: the conformance corpus (fixtures + expectations.json), and the
+# synthetic benchmark feeds (EXP-13). workflow_dispatch builds both without
 # uploading, for a quick check.
 
 on:
@@ -52,3 +53,55 @@ jobs:
           # text before the shell ever sees it.
           TAG: ${{ github.event.release.tag_name }}
         run: gh release upload "$TAG" dist/tods-conformance-corpus.zip --clobber
+
+  # EXP-13. scripts/generate_feed.py could always produce these; nothing
+  # published them, so every performance and memory number in this repository
+  # cited a feed a reader could not obtain. One archive per profile, each
+  # carrying its own SYNTHETIC.md and synthetic_manifest.json, each byte-
+  # reproducible from its seed (tests/test_generate_feed.py pins that), and the
+  # checksums printed into the job summary so a published number can be tied to
+  # the exact bytes it was measured on.
+  benchmark-feeds:
+    needs: [verify]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # upload the assets to the release
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.13"
+      - run: python -m pip install -e .
+      - name: Build one archive per profile
+        run: |
+          set -eu
+          mkdir -p dist
+          for profile in clean-100k drifted-gtfs messy-export; do
+            python scripts/generate_feed.py \
+              --profile "$profile" --seed 1 \
+              --out "dist/tods-benchmark-$profile.zip"
+          done
+      - name: Record the checksums
+        run: |
+          set -eu
+          {
+            echo '### Synthetic benchmark feeds (EXP-13)'
+            echo
+            echo 'Generated with `--seed 1`. Every archive is byte-reproducible'
+            echo 'from its seed, so these checksums identify the exact bytes any'
+            echo 'published benchmark number was measured on.'
+            echo
+            echo '```'
+            sha256sum dist/tods-benchmark-*.zip
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+      - name: Upload to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          # Routed through env: for the same reason as the corpus job above
+          # (CICD-21 / zizmor template-injection).
+          TAG: ${{ github.event.release.tag_name }}
+        run: gh release upload "$TAG" dist/tods-benchmark-*.zip --clobber

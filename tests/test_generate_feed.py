@@ -127,3 +127,68 @@ def test_profile_presets_trips_and_deadhead_pct_but_flags_override(tmp_path: Pat
     manifest = json.loads((out / "synthetic_manifest.json").read_text())
     assert manifest["trips"] == 60  # explicit --trips wins over the profile's preset
     assert manifest["profile"] == "clean-100k"
+
+
+def test_archive_entries_carry_a_fixed_timestamp(tmp_path: Path) -> None:
+    generator = _load_generator()
+    # The real guard behind the byte-identity test below. Zip stores mtimes at
+    # two-second resolution, so two archives built back to back are usually
+    # identical by luck whatever the code does; only a run that straddles a
+    # two-second boundary shows the bug. Asserting the stamp itself is the
+    # version of that test that fails when it should.
+    out = tmp_path / "stamped.zip"
+    generator.main(["--profile", "messy-export", "--seed", "7", "--out", str(out)])
+    with zipfile.ZipFile(out) as archive:
+        stamps = {info.date_time for info in archive.infolist()}
+    assert stamps == {generator._ZIP_EPOCH}, (
+        f"archive entries carry build-time mtimes ({sorted(stamps)}), so the "
+        "published artifact's checksum changes on every build"
+    )
+
+
+def test_the_same_seed_produces_a_byte_identical_archive(tmp_path: Path) -> None:
+    generator = _load_generator()
+    # EXP-13 publishes these as release artifacts, and the module docstring
+    # promises a package that can be regenerated bit-for-bit. Zip entries carry
+    # the source file's mtime, so before `_ZIP_EPOCH` two runs of one seed
+    # produced identical contents inside archives whose checksums differed --
+    # which makes a published artifact impossible to check against the number
+    # it was used to measure.
+    first = tmp_path / "first.zip"
+    second = tmp_path / "second.zip"
+    generator.main(["--profile", "messy-export", "--seed", "7", "--out", str(first)])
+    generator.main(["--profile", "messy-export", "--seed", "7", "--out", str(second)])
+    assert first.read_bytes() == second.read_bytes()
+
+
+def test_a_different_seed_produces_a_different_archive(tmp_path: Path) -> None:
+    generator = _load_generator()
+    # Positive control: an archive that was byte-identical because the
+    # generator ignored its seed would satisfy the test above.
+    first = tmp_path / "first.zip"
+    other = tmp_path / "other.zip"
+    generator.main(["--profile", "messy-export", "--seed", "7", "--out", str(first)])
+    generator.main(["--profile", "messy-export", "--seed", "8", "--out", str(other)])
+    assert first.read_bytes() != other.read_bytes()
+
+
+def test_every_published_profile_builds_and_is_labelled(tmp_path: Path) -> None:
+    generator = _load_generator()
+    # The release job builds one archive per profile. A profile that stopped
+    # building, or stopped carrying its synthetic label, would be published as
+    # a silently unlabelled artifact.
+    for profile in generator.PROFILES:
+        out = tmp_path / f"{profile}.zip"
+        # --trips overrides the profile's preset. The labelling and manifest
+        # paths do not depend on size, and clean-100k at full size is a 4.5 MB
+        # archive this test does not need to build to answer its question.
+        generator.main(["--profile", profile, "--seed", "1", "--trips", "200", "--out", str(out)])
+        with zipfile.ZipFile(out) as archive:
+            names = set(archive.namelist())
+            assert "SYNTHETIC.md" in names, f"{profile} is published without its label"
+            assert "synthetic_manifest.json" in names
+            label = archive.read("SYNTHETIC.md").decode("utf-8")
+            assert "SYNTHETIC DATA" in label
+            manifest = json.loads(archive.read("synthetic_manifest.json"))
+            assert manifest["profile"] == profile
+            assert manifest["seed"] == 1
