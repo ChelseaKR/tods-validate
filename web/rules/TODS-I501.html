@@ -5,16 +5,34 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TODS-I501: GTFS trips have no run event — tods-validate rule catalog</title>
     <style>
-      :root { color-scheme: light dark; }
+      :root {
+        color-scheme: light dark;
+        --fg: #1a1a1a;
+        --bg: #ffffff;
+        --muted: #595959;
+        --link: #0b4fa8;
+        --line: #6b6b6b;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #e8e8e8;
+          --bg: #121212;
+          --muted: #a8a8a8;
+          --link: #8ab4f8;
+          --line: #9a9a9a;
+        }
+      }
       body {
         font: 16px/1.5 system-ui, sans-serif;
         max-width: 40rem;
         margin: 2rem auto;
         padding: 0 1rem;
+        color: var(--fg);
+        background: var(--bg);
       }
       h1 { margin-bottom: 0.25rem; font-size: 1.5rem; }
       h2 { margin-top: 2rem; font-size: 1.1rem; }
-      .lede, .meta, .id { color: #666; }
+      .lede, .meta, .id { color: var(--muted); }
       .id { font-family: ui-monospace, monospace; margin: 0; }
       .meta { margin: 0.5rem 0 1rem; }
       .badge {
@@ -23,12 +41,10 @@
         font-weight: 600;
         padding: 0.1rem 0.5rem;
         border-radius: 999px;
-        border: 1px solid #888;
+        border: 1px solid var(--line);
         margin-right: 0.4rem;
       }
-      nav a, .rule-list a { text-decoration: none; }
-      nav a:hover, .rule-list a:hover { text-decoration: underline; }
-      a { color: inherit; }
+      a { color: var(--link); text-decoration: underline; }
       code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
       ul.rule-list { list-style: none; padding-left: 0; }
       ul.rule-list li { padding: 0.25rem 0; }

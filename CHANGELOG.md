@@ -7,6 +7,33 @@ new checks may be added in minor releases.
 
 Fixed:
 
+- The 44 rule-catalog pages published at `web/rules/` had never been audited
+  for accessibility. `pages.yml` deploys the whole `web/` tree; `make a11y`
+  pointed axe and HTML_CodeSniffer at `index.html` and a generated report and
+  at nothing else. Added to the gate, they failed it: **141 colour-contrast
+  errors and 43 "links must be distinguishable without relying on colour"
+  errors**, from two defects in one shared stylesheet. It declared
+  `color-scheme: light dark` and then set no `color` or `background` on
+  `body`, so a user agent in dark mode painted light text on an unpainted
+  canvas and every text element failed, `<h1>` and body copy included; and
+  links were `color: inherit` with `text-decoration: none`, leaving them
+  indistinguishable from body text by any means at all. Both fixed, every
+  colour stated for both schemes with its computed ratio recorded, all four
+  audited URLs passing.
+- `scripts/generate_feed.py` promised packages that "can be regenerated
+  bit-for-bit", but wrote zip entries with build-time mtimes, so two runs of
+  one seed produced identical contents inside archives with different
+  checksums. Entries now carry a fixed timestamp. This matters now that the
+  archives are published: a benchmark number is only checkable against the
+  bytes it was measured on.
+- The weekly mutation workflow could not fail. `continue-on-error: true` on
+  the job, `|| true` on every step: a kill rate that halved rendered
+  identically to one that did not move. It now fails below the floor committed
+  in `perf/mutation-baseline.json` (CQ-47). Re-measuring also found the
+  documented ~65% stale, recorded against 280 mutants when the engine now
+  generates 330; the real figure was 57.6%, and killing twelve survivors in
+  one under-tested helper moved it to 62.2%.
+
 - The v1 public-contract gate verified `pythonExports` against each module's
   `__all__`, which is a declaration of the export list rather than the export
   list. A rename that left the list behind removed `tods_validate.suggest_fixes`
@@ -88,6 +115,21 @@ Fixed:
 
 Changed:
 
+- `loader.py` now pools cell values per file: equal cells in one file share one
+  string, which on repetitive transit data is most of them. Peak memory over a
+  full `run()` falls from **36.6x the input bytes to 30.9x** with throughput
+  unchanged (65.9k against 65.0k rows/CPU-s, inside the noise). Values are
+  equal as before and only their identity changes, so no output moves.
+  A per-file dict rather than `sys.intern`, because interned strings live
+  until the interpreter exits and would make every feed opened in the LSP
+  server permanent.
+- `SECURITY.md` states the memory ceiling next to the zip-bomb limits it
+  contradicts. The 512 MiB per-member and 2 GiB total limits bound extraction,
+  not memory: at 31x they describe packages needing 16 and 62 GiB, so the
+  practical ceiling is a few hundred MiB of input on an 8 GiB machine.
+  `tests/test_memory_budget.py` fails if that prose and `perf/baseline.json`
+  disagree.
+
 - Development dependencies moved from the `dev` extra to a PEP 735
   `[dependency-groups]` table (CQ-27, #145), so no linter, type checker, or
   test runner is installable as an extra of the published distribution.
@@ -114,6 +156,24 @@ Changed:
   the file was there.
 
 Added:
+
+- [`docs/a11y/STATEMENT.md`](docs/a11y/STATEMENT.md): the dated accessibility
+  statement, carried by the `docs-check` currency gate, naming **WCAG 2.1
+  Level AA** as the target and deliberately making no conformance *claim*,
+  because the only evaluation run is automated. It tables every surface
+  against what has actually been checked and by what.
+- Two new budget gates beside the existing throughput one.
+  `scripts/check_memory_budget.py` holds peak traced memory per input byte to
+  1.03x the committed ratio (FIX-04), and `scripts/check_bundle_budget.py`
+  holds the shipped HTML to byte ceilings in `perf/bundle-baseline.json`,
+  including a report at ten thousand findings, which grows at 235 bytes a
+  finding and so can grow silently. Both refuse to pass when they cannot
+  compare, like the throughput gate they copy.
+- Synthetic benchmark feeds are published (EXP-13).
+  `.github/workflows/release-corpus.yml` builds one byte-reproducible archive
+  per profile on every release, prints their checksums into the job summary,
+  and attaches them. Every number in `docs/BENCHMARKS.md` previously cited a
+  feed a reader could not obtain.
 
 - [`docs/rulesets/main.json`](docs/rulesets/main.json), the branch ruleset for
   `main` as a reviewable artifact rather than a paragraph of prose in

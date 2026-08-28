@@ -99,8 +99,17 @@ row asks for: it fails if development tooling reappears under
   force-push, no admin bypass). ⛔ **Needs a live GitHub Settings change**
   this remediation pass intentionally did not make (see ci-cd below for the
   exact ruleset and the reasoning).
-- **CQ-47** — mutation kill-rate on the rules engine is ~65% (advisory,
-  weekly), below the 70% target. Unchanged this pass; ratchet, don't jump.
+- **CQ-47** — mutation kill-rate on the rules engine is **62.2%** as of
+  2026-08-27, below the 70% target. Two things changed this pass. The rate was
+  re-measured, because the ~65% figure in `docs/mutation-testing.md` was
+  recorded against 280 mutants and the engine has since grown to 330: it was
+  really 57.6%, and killing twelve survivors in one under-tested helper took it
+  to 62.2%. And the weekly workflow can now fail. It carried
+  `continue-on-error: true` on the job plus `|| true` on every step, so a rate
+  that halved rendered identically to one that did not move;
+  `scripts/check_mutation_ratchet.py` now fails it below the floor committed in
+  `perf/mutation-baseline.json`. Still open against the target; ratchet, don't
+  jump.
 
 ## security-and-supply-chain
 
@@ -270,13 +279,23 @@ reason. The two are independent gates now, each reporting its own result, and
 The Pyodide CDN script in `web/index.html` also retains its SRI hash, closing
 the supply-chain-flavored A11Y-17 note from the original audit.
 
+**Updated 2026-08-27:** [`docs/a11y/STATEMENT.md`](a11y/STATEMENT.md) now
+exists: dated, carried by the `docs-check` currency gate, naming **WCAG 2.1
+Level AA** as the target and deliberately making no conformance *claim*,
+because the only evaluation run is automated. It tables every surface against
+what has actually been checked. Writing that table found an unaudited surface:
+the 44 rule-catalog pages `pages.yml` publishes had never had a runner pointed
+at them. They are in the blocking gate now, and entering it they failed with
+141 colour-contrast errors and 43 link-distinguishability errors, both from one
+shared stylesheet that declared `color-scheme: light dark` and then painted
+neither scheme. Fixed; all four audited URLs pass.
+
 **Still open:** no Lighthouse pass; no committed screen-reader/keyboard
-walkthrough artifact; no ACR/VPAT; the README `## Accessibility` section is a
-genuine, specific statement but is not yet promoted to a dated
-`docs/a11y/STATEMENT.md` with a named WCAG conformance target. Automated checks
-are a floor, not evidence of screen-reader usability. The next accessibility
-artifact should therefore be the manual keyboard and assistive-technology
-walkthrough, not another scanner.
+walkthrough artifact; no ACR/VPAT; the *booted* playground state is still
+unaudited, because the gate loads `?a11y-static=1`. Automated checks are a
+floor, not evidence of screen-reader usability. The next accessibility artifact
+should therefore be the manual keyboard and assistive-technology walkthrough,
+not another scanner.
 
 **2026-08-21:** an attempt at that walkthrough (#74) could not proceed --
 no browser tool was available in that session, so it recorded a static

@@ -458,6 +458,16 @@ non-color users.
   that is accessible in the repository is not evidence about the page you open,
   so both are checked.
 
+- The rule catalog published at `web/rules/` is audited by the same runners.
+  It was not until 2026-08-27, and entering the gate it failed with 184 errors
+  in one shared stylesheet; see the statement below for what and why.
+
+[`docs/a11y/STATEMENT.md`](docs/a11y/STATEMENT.md) is the dated statement: the
+WCAG 2.1 AA target, a surface-by-surface table of what has actually been
+checked and by what, and the gaps automation cannot close. It deliberately
+makes no conformance *claim*, because no assistive-technology evaluation has
+been done.
+
 If you hit an output that is hard to read with assistive technology, that is a
 bug — please report it.
 

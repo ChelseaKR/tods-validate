@@ -126,3 +126,32 @@ def test_a_clean_file_is_both_readable_and_fully_read(tmp_path: Path) -> None:
     assert feed.readable
     assert feed.fully_read
     assert feed.problems == []
+
+
+def test_repeated_cell_values_share_one_string(tmp_path: Path) -> None:
+    # The per-file value pool (FIX-04): equal cells in the same file are the
+    # same object, so a column like service_id costs one string rather than one
+    # per row. Identity is the only way to observe this, since every version of
+    # the code produces equal values.
+    (tmp_path / "run_events.txt").write_text(
+        "service_id,run_id,event_type\nweekday,1,operator\nweekday,2,operator\nweekday,3,operator\n"
+    )
+    rows = load_package(tmp_path).files["run_events.txt"].rows
+    assert [r.values["service_id"] for r in rows] == ["weekday"] * 3
+    assert len({id(r.values["service_id"]) for r in rows}) == 1
+    assert len({id(r.values["event_type"]) for r in rows}) == 1
+    # Distinct values stay distinct objects; pooling shares, it does not merge.
+    assert len({id(r.values["run_id"]) for r in rows}) == 3
+
+
+def test_the_value_pool_does_not_leak_across_files(tmp_path: Path) -> None:
+    # Positive control, and the reason this is a per-file dict rather than
+    # sys.intern: interned strings live until the interpreter exits, which in
+    # the long-running LSP server would make every feed a user opens permanent.
+    (tmp_path / "run_events.txt").write_text("service_id,run_id\nweekday,1\n")
+    (tmp_path / "vehicles.txt").write_text("vehicle_id,vehicle_label\nweekday,1\n")
+    package = load_package(tmp_path)
+    first = package.files["run_events.txt"].rows[0].values["service_id"]
+    second = package.files["vehicles.txt"].rows[0].values["vehicle_id"]
+    assert first == second == "weekday"
+    assert first is not second

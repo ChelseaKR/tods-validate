@@ -15,19 +15,43 @@ the CI gate and never blocks a pull request. The gate stays
 
 ## Baseline
 
-Measured on the rules engine (`src/tods_validate/rules/*`):
+Measured on the rules engine (`src/tods_validate/rules/*` plus
+`run_events.py`), re-measured 2026-08-27 on CPython 3.12.14:
 
-| Metric | Value |
-| --- | --- |
-| Mutants generated | 280 |
-| Killed | 181 |
-| Survived | 99 |
-| Mutation score | ~65% |
+| Metric | 2026-07 | 2026-08-27, before | 2026-08-27, after |
+| --- | --- | --- | --- |
+| Mutants generated | 280 | 330 | 330 |
+| Killed | 181 | 151 | 163 |
+| Survived | 99 | 111 | 99 |
+| No covering test | not recorded | 68 | 68 |
+| Kill rate | ~65% | 57.6% | **62.2%** |
+
+Kill rate is `killed / (killed + survived)`, the denominator the 2026-07 figure
+used, so the columns are comparable. The re-measurement is the point of the
+table: the earlier 65% was recorded against 280 mutants, the engine has grown
+by fifty mutants since, and nobody had re-run it, so the number in this
+document had quietly stopped describing the code. It was 57.6%, not 65%.
+
+The "after" column is one round of the ratchet. Sixteen of the 111 survivors
+were in `_companion_gap_message`, a helper added the same week: the
+integration tests reached it along one branch with one filename, so mutants
+that replaced its `" or "`, `"; "` and `" and "` separators with other strings
+all survived. `tests/test_references.py` now calls it directly across all
+three branches with single- and multi-file targets, which killed twelve of the
+sixteen and moved the rate to 62.2%.
 
 The score is a signal to read, not a target to chase. Many survivors are
 effectively equivalent mutants (see below), so 100% is neither reachable nor
-the goal. The number to watch is a sudden drop, which means a test stopped
-pinning down behaviour it used to pin down.
+the goal. What is now enforced is a floor: `perf/mutation-baseline.json`
+records 60%, and `scripts/check_mutation_ratchet.py` fails the weekly run
+below it. The floor ratchets up and never down. The 70% target from CQ-47
+stays where it is, as something to move toward.
+
+Fifty-three of the remaining survivors are in `rule()`, the registration
+decorator, and nine in `validate()`. Those are next, and they are a different
+kind of gap from the rest: the registry's own argument validation is exercised
+by every rule that registers successfully and by few tests that register a bad
+one.
 
 ## What gets mutated, and what does not
 

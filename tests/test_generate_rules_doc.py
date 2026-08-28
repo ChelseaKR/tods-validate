@@ -87,3 +87,40 @@ def test_check_mode_detects_drift(tmp_path: Path, monkeypatch) -> None:
     stale_page = tmp_path / "rules" / f"{stale_rule_id}.html"
     stale_page.write_text("stale", encoding="utf-8")
     assert gen.main() == 1
+
+
+def test_every_published_page_carries_the_audited_stylesheet() -> None:
+    # scripts/pa11y-ci.cjs audits the catalog index plus one rule page, on the
+    # reasoning that all 44 pages share one template. That reasoning is only
+    # sound while it is true, so this is where it is checked: an audit of one
+    # page is an audit of every page's *shape* precisely because the shape is
+    # one string. Without this, a per-band or per-rule style override could
+    # reintroduce the contrast failures the widened audit just removed.
+    gen = _load_generator()
+    pages = gen.generate_rule_pages()  # includes index.html
+    assert "index.html" in pages
+    assert len(pages) == len(all_rules()) + 1
+    for name, html in pages.items():
+        assert gen._PAGE_STYLE in html, f"{name} does not use the shared stylesheet"
+
+
+def test_the_catalog_stylesheet_paints_both_schemes() -> None:
+    # The defect the widened audit found: `color-scheme: light dark` with no
+    # colour or background on `body`, so the user agent painted dark-mode text
+    # on an unpainted canvas and every text element failed contrast. A page
+    # that declares the scheme must define the palette for both halves of it.
+    gen = _load_generator()
+    style = gen._PAGE_STYLE
+    assert "color-scheme: light dark" in style
+    assert "prefers-color-scheme: dark" in style, "dark half of the scheme is undefined"
+    assert "color: var(--fg)" in style
+    assert "background: var(--bg)" in style
+
+
+def test_catalog_links_do_not_rely_on_colour_alone() -> None:
+    # WCAG 1.4.1, flagged 43 times on the index by HTML_CodeSniffer: links were
+    # `color: inherit` with `text-decoration: none`, so they were not
+    # distinguishable from body text by colour *or* anything else.
+    style = _load_generator()._PAGE_STYLE
+    assert "text-decoration: underline" in style
+    assert "text-decoration: none" not in style
