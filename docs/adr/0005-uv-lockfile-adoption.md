@@ -1,6 +1,11 @@
 # 0005 — uv with a committed lockfile for dependency management
 
 - Status: accepted (backfilled 2026-07-09; adopted 2026-07-05 in the conformance remediation)
+- Amended 2026-08-27: development dependencies moved out of the `dev` extra
+  into a PEP 735 `[dependency-groups]` table (CQ-27, #145), so the install
+  command quoted below is now `uv sync --frozen --group dev`. The decision
+  recorded here, uv with a committed lockfile, is unchanged; only the table
+  the dev dependencies are declared in has moved.
 - Date: 2026-07-09
 
 ## Context

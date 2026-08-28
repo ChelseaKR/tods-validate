@@ -500,7 +500,7 @@ create` away; see that file's header).
 git clone https://github.com/ChelseaKR/tods-validate
 cd tods-validate
 python -m venv .venv && . .venv/bin/activate
-pip install -e ".[dev]"
+pip install -e . --group dev
 pytest
 ```
 

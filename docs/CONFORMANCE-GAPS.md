@@ -86,10 +86,14 @@ declared deviation. `docs/adr/0006-python-312-floor.md` supersedes 0001;
 0001 stays in the log as the record of why the deviation existed from
 2026-07-09 to 2026-08-21.
 
+**Updated 2026-08-27:** **CQ-27** closed. Development dependencies moved from
+the `dev` extra to a PEP 735 `[dependency-groups]` table (#145), so no linter,
+type checker, or test runner is installable as an extra of the published
+distribution. `tests/test_packaging.py` is the AUTO-GATE the standard's CQ-27
+row asks for: it fails if development tooling reappears under
+`[project.optional-dependencies]`.
+
 **Still open:**
-- **CQ-27** — dev deps still live in `[project.optional-dependencies].dev`,
-  not PEP 735 `[dependency-groups]`. `uv` (adopted 2026-07-05) reads
-  `dependency-groups` natively, so this is a clean follow-up, not urgent.
 - **CQ-37–43** — no committed branch-ruleset artifact (PR-required, stale-
   review dismissal, required status checks, linear history, no
   force-push, no admin bypass). ⛔ **Needs a live GitHub Settings change**
@@ -163,22 +167,28 @@ audit`), so CI-vs-local drift is structural, not a copy-paste discipline.
 `CONTRIBUTING.md` now says `make verify` and links `docs/standards/`.
 
 **Still open:**
-- **CICD-03/11-18** — ⛔ **the branch-ruleset gap.** No committed ruleset
-  artifact exists, and this pass did not enable one live. This needs an
-  interactive decision on GitHub (Settings → Rules → Rulesets, or `gh api
-  repos/ChelseaKR/tods-validate/rulesets` with a write payload), which the
-  ground rules for this remediation pass explicitly excluded (branch
-  protection is a listed no-write-API item). **What to do:** create a
-  ruleset targeting `main` with: require a pull request (≥1 approval),
-  dismiss stale reviews, require status checks in strict mode (name every
-  `ci.yml` job plus `zizmor`, `Semgrep`, `CodeQL`/`analyze`), require
-  CODEOWNERS review, require linear history, block force-pushes, no admin
-  bypass. Export the resulting ruleset JSON
-  (`gh api repos/ChelseaKR/tods-validate/rulesets/<id>`) and commit it to
-  `docs/rulesets/main.json` so it's an artifact, not tribal knowledge. Note
-  honestly once done: solo-maintainer self-review remains a structural
-  limitation no ruleset fixes by itself (`CODEOWNERS`, added this pass, is
-  ready for when a second maintainer joins).
+- **CICD-03/11-18** — ⛔ **the branch-ruleset gap**, now half closed. The
+  artifact exists: [`docs/rulesets/main.json`](rulesets/main.json) is the
+  ruleset payload, in the shape `POST /repos/{owner}/{repo}/rulesets` accepts,
+  and `tests/test_branch_ruleset.py` keeps its required-status-check list in
+  step with the checks the workflows actually report. **No ruleset is enabled
+  live.** That still needs an interactive decision on GitHub (Settings → Rules
+  → Rulesets, or `gh api repos/ChelseaKR/tods-validate/rulesets --input
+  docs/rulesets/main.json`), which no automated pass makes. Once applied,
+  replace the file with the export so the artifact records what is enforced
+  rather than what was intended; see
+  [`docs/rulesets/README.md`](rulesets/README.md).
+
+  Writing the prose down as a file found a defect in the prose. This entry
+  previously said to require `zizmor` among the status checks. `zizmor.yml` is
+  path-filtered on `pull_request`, so on a pull request touching no workflow
+  file the check never reports and the merge could never happen. It is
+  excluded, with a test that keeps it excluded until the filter goes away.
+
+  Solo-maintainer self-review remains a structural limitation no ruleset fixes
+  by itself (`CODEOWNERS` is ready for when a second maintainer joins), and
+  with `bypass_actors` empty, expect to need a recorded bypass to merge until
+  there is a second person.
 - **CICD-06** — the PyPI trusted-publisher scoping leaves the GitHub
   Environment blank (`pypi-publish.yml` comment already notes this). ⛔
   Fixing it requires creating a `pypi` GitHub Environment (Settings →
