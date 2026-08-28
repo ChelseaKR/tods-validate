@@ -19,12 +19,12 @@
 # This paragraph is checked against the workflows by
 # tests/test_ci_gate_parity.py, so a job added later cannot reject a tree that
 # `make verify` has just called green without saying so here.
-.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation-cff perf-check memory-check
+.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff perf-check memory-check
 
 # Every gate `make verify` runs, in reporting order. Each one is independent:
 # see the recipe below for why that matters.
 VERIFY_GATES := lockfile action-lock lint format typecheck test docs-check contract-check \
-	i18n-check audit npm-audit secrets a11y citation-cff
+	i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff
 
 # The gates run one after another and every one of them runs, whatever the ones
 # before it did. This is deliberate. When `verify` was a prerequisite list, make
@@ -228,6 +228,16 @@ citation-cff:
 # runner's machine class, so a laptop's number is not comparable to it. Run it
 # to see the measurement locally; the merge-blocking comparison is the `perf`
 # job in .github/workflows/ci.yml.
+# The incident-response contract as a gate rather than a document (IR-05/07/
+# 15/16/17), and the data-card presence check DG-01 marks AUTO-GATE. Both are
+# in VERIFY_GATES rather than in a workflow of their own because the
+# portfolio's definition of AUTO-GATE is merge-blocking, with no `|| true`.
+incident-check:
+	python scripts/check_incident_contract.py
+
+data-cards-check:
+	python scripts/check_data_cards.py
+
 perf-check:
 	python scripts/check_perf_budget.py
 

@@ -35,6 +35,9 @@ STAMPED = (
     "docs/api.md",
     "docs/read-api.md",
     "docs/a11y/STATEMENT.md",
+    "docs/runbooks/publish-vscode-extension.md",
+    "docs/runbooks/secret-exposure.md",
+    "docs/DORA-2026-Q3.md",
 )
 
 VERIFIED_RE = re.compile(r"^Last verified: (\d{4}-\d{2}-\d{2})\b", re.MULTILINE)

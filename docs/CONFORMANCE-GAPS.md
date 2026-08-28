@@ -20,19 +20,42 @@ code-quality and documentation sections.
 
 ## ai-development-measurement
 
-**Still open:** the repository records delivery and quality metrics in
-`docs/roadmap.md`, but it has no dated AI-development diagnostic baseline or
-graduation decision. AI-product evaluation remains separately N/A because the
-validator itself has no model runtime.
+**Closed 2026-08-27.** `docs/roadmap.md`'s metrics ledger now carries the
+`AI-DEV-MEASUREMENT: APPLIES` declaration the standard's section 8 asks for,
+with the diagnostic share measured (32 of 160 commits on `main` carry a
+`Co-Authored-By: Claude` trailer) and stated as diagnostic-only, never gating.
+The two quality-debt counterweights the standard pairs with throughput, revert
+rate and unreviewed-merge rate, are BASELINE rows each carrying a dated
+graduation decision of **2026-11-30**, because a BASELINE row without one is a
+conformance failure in its own right. The quarterly review that reads them is
+[`docs/DORA-2026-Q3.md`](DORA-2026-Q3.md), run jointly with QM-11 per that
+standard's own cadence line.
+
+AI-product evaluation remains separately N/A because the validator itself has
+no model runtime.
 
 ## data-governance
 
 **Current boundary:** validation is local and process-lifetime only;
 `docs/RESPONSIBLE-TECH-AUDITS.md` records that feeds are not retained.
 
-**Still open:** classify bundled, fixture, and user-supplied feed data under the
-v2.0.0 tiers and add a mechanically checked data-card/source inventory without
-claiming ownership of users' input feeds.
+**Closed 2026-08-27.** Five sources are classified under the v2.0.0 tiers in
+[`docs/data/sources.json`](data/sources.json), each with a card in
+[`docs/data/`](data/): the spec transcription, the conformance corpus, the
+example feed, and the generated benchmark packages at **L1**; a user's own feed
+at **L3**. `scripts/check_data_cards.py` is the AUTO-GATE DG-01 asks for and
+fails in either direction, on a declared source with no card and on a card with
+no declared source, and additionally when a card and the list disagree about a
+tier or when a source's paths no longer exist.
+
+The user-feed card is the one that needed care, and it is written to *decline*
+ownership rather than assert it: a feed is the input to a local validator that
+holds it for one process lifetime and writes nothing back, so this project has
+no standing to state a licence, a refresh cadence, or a retention line over an
+agency's records. The card names the three L3 fields (`employee_id`,
+`license_plate`, `vehicle_label`), points at the existing DPIA-lite, and records
+that its "not retained" line stops being true by construction the day #76
+succeeds.
 
 ## observability
 
@@ -72,9 +95,28 @@ claiming it.
 
 ## incident-response
 
-**Still open:** security reporting and release recovery exist, but the v2.0.0
-`incident`/`sevN` label convention, committed postmortem template, and
-secret-exposure response runbook have not been adopted as one checked contract.
+**Closed 2026-08-27** as a checked contract.
+[`.github/labels.yml`](../.github/labels.yml) declares the `incident`, `sev1`
+to `sev4`, and `deploy-caused` convention (IR-02/IR-04/IR-17);
+[`docs/incidents/TEMPLATE.md`](incidents/TEMPLATE.md) carries every section
+IR-07 names; and [`docs/runbooks/secret-exposure.md`](runbooks/secret-exposure.md)
+works IR-10 to IR-14 in order, rotate before revoke before scope before the
+history decision before closing the entry point, with the per-credential
+revocation table this repository would actually need.
+
+`scripts/check_incident_contract.py` is the gate, in `make verify` and in the
+`stewardship` CI job. Two of its four checks (IR-15, no wildcard `git add` in
+unattended automation; IR-16, no scripted commit without a secret scan) were
+already clean when they landed, so each prints what it scanned rather than only
+whether it found anything: a guard with nothing to catch and a guard that is
+not looking otherwise render identically, and this repository has shipped the
+second kind before.
+
+**Still open:** the labels are declared, not created. `gh label list` on
+2026-08-27 showed none of the six exist on the repository; the create command
+is in the header of `.github/labels.yml`. IR-02's live check (every open
+`incident` issue carries exactly one `sevN`) needs those labels and a scheduled
+run against the API, so it is not wired yet.
 
 ## performance
 
@@ -357,7 +399,22 @@ clock, so a busy shared runner does not read as a regression; the baseline is
 recorded from the CI runner's machine class, and the check fails rather than
 passes when it has no baseline to compare against.
 
-**Still open:** QM-11 (DORA quarterly review — no cadence established yet).
+**Updated 2026-08-27:** QM-11 closed for this quarter.
+[`docs/DORA-2026-Q3.md`](DORA-2026-Q3.md) is the first review, with
+[`DORA-2026-Q3.json`](DORA-2026-Q3.json) as the machine-readable snapshot and
+`scripts/delivery_metrics.py` as the collector. Cadence: quarterly, next due
+**2026-11-30**, carried by the `docs-check` currency gate so the document
+cannot drift without saying so.
+
+Three of the five DORA metrics come back breached and one comes back N/A, which
+is the point of measuring rather than a reason not to publish: deployment
+frequency 1 per 7.9 days against a weekly floor, lead-time p90 131h against a
+1-day floor, change fail rate 20% against 15%, and rework rate N/A because zero
+reverts in 160 commits leaves no ratio to compute. The collector writes `null`
+with a reason rather than `0` for anything it cannot measure, and
+`tests/test_delivery_metrics.py` pins that, because the standard says the
+collector "never fabricates a zero" and a 0% change fail rate that means "we
+counted nothing" reads exactly like a good one.
 
 ## documentation
 

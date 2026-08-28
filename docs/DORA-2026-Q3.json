@@ -1,0 +1,43 @@
+{
+  "quarter": "2026-Q3",
+  "collectedAt": "2026-08-28",
+  "repositoryShape": "library/CLI: reports deployment frequency and lead time only",
+  "metrics": {
+    "deploymentFrequencyDays": {
+      "value": 7.9,
+      "releases": 10,
+      "spanDays": 71,
+      "first": "2026-06-12",
+      "last": "2026-08-22"
+    },
+    "changeLeadTimeHours": {
+      "p50": 2.8,
+      "p90": 131.0,
+      "sample": 118
+    },
+    "unreviewedMergeRate": {
+      "value": 0.958,
+      "unreviewed": 113,
+      "sample": 118
+    },
+    "revertRate": {
+      "value": 0.0,
+      "reverts": 0,
+      "commits": 160
+    },
+    "aiAuthoredShare": {
+      "value": 0.2,
+      "aiAuthored": 32,
+      "commits": 160,
+      "note": "diagnostic only; never gates (AI-DEVELOPMENT-MEASUREMENT-STANDARD section 2)"
+    },
+    "failedDeploymentRecoveryTime": {
+      "value": null,
+      "reason": "no incident-labelled issue exists yet; becomes measurable from issue open and close timestamps at the first one (IR-03)"
+    },
+    "deploymentReworkRate": {
+      "value": null,
+      "reason": "no revert commits exist, so there is no ratio to compute; the first revert retires this"
+    }
+  }
+}

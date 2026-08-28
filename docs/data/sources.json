@@ -1,0 +1,35 @@
+{
+  "note": "The declared source list DG-01 checks data cards against. Every entry needs docs/data/<id>.md; every card in that directory needs an entry here. scripts/check_data_cards.py fails on either mismatch. `paths` are checked to exist, so a source that moves or is deleted cannot leave a card describing nothing.",
+  "sources": [
+    {
+      "id": "tods-spec",
+      "title": "The TODS specification itself",
+      "tier": "L1",
+      "paths": ["src/tods_validate/schema.py", "docs/spec-versions.md"]
+    },
+    {
+      "id": "conformance-fixtures",
+      "title": "The rule conformance corpus",
+      "tier": "L1",
+      "paths": ["tests/fixtures", "tests/fixtures/expectations.json"]
+    },
+    {
+      "id": "example-feed",
+      "title": "The shipped example feed",
+      "tier": "L1",
+      "paths": ["examples/sample-feed"]
+    },
+    {
+      "id": "synthetic-benchmark-feeds",
+      "title": "Generated benchmark packages",
+      "tier": "L1",
+      "paths": ["scripts/generate_feed.py", "perf/baseline.json"]
+    },
+    {
+      "id": "user-supplied-feeds",
+      "title": "A user's own TODS feed (not a source of this repository)",
+      "tier": "L3",
+      "paths": ["src/tods_validate/loader.py", "src/tods_validate/anonymize.py"]
+    }
+  ]
+}

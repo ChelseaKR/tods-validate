@@ -71,6 +71,25 @@ jobs:
       - name: Check the public contract matches the implementation
         run: make contract-check
 
+  # The two stewardship contracts that are AUTO-GATE in their standards, which
+  # the portfolio defines as merge-blocking in CI rather than advisory: the
+  # incident-response label/postmortem/wildcard-staging contract (IR-05/07/15/
+  # 16/17) and the data-card presence check (DG-01). Both also run in `make
+  # verify`; this is the half that blocks a merge.
+  stewardship:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+      - name: Incident-response contract (IR-05/07/15/16/17)
+        run: make incident-check
+      - name: Data cards match the declared source list (DG-01)
+        run: make data-cards-check
+
   i18n:
     # Enforce the i18n N/A declaration (INTERNATIONALIZATION-STANDARD §1): fail
     # if docs/I18N.md is missing its status marker or its Reason line.
