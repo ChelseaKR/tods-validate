@@ -4,6 +4,12 @@ Planned direction for tods-validate. Dates are intentions, not promises;
 items move earlier when users ask for them. Feedback and feature requests
 are welcome as GitHub issues.
 
+This file is version-keyed and stays the product roadmap.
+[`MULTIYEAR-PLAN.md`](MULTIYEAR-PLAN.md) sequences what is left of it into
+phases across roughly 2026 to 2029, alongside the standards and stewardship
+work that has no version number attached, and is honest about which parts are
+gated on other people rather than on engineering.
+
 ## v0.2.0 — Suppression and reporting (shipped 2026-06-12)
 
 - `--ignore TODS-Wxxx` (repeatable) and a `tods-validate.toml` config file so

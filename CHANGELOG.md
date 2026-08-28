@@ -20,6 +20,12 @@ Fixed:
 
 Added:
 
+- [`docs/MULTIYEAR-PLAN.md`](docs/MULTIYEAR-PLAN.md), which sequences the
+  remaining work in `docs/roadmap.md`, `docs/CONFORMANCE-GAPS.md`, and
+  `docs/ideation/` into six phases across roughly 2026 to 2029, and separates
+  the work that is gated on engineering from the work that is gated on other
+  people. The three fixes above are its first phase.
+
 - `scripts/check-playground-boots.cjs`, the first check that shows the
   deployed playground actually works. It drives the live page in a real
   browser, waits for Pyodide to load and micropip to install the pinned wheel
