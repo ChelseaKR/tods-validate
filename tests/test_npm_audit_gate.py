@@ -190,3 +190,96 @@ def test_the_committed_registry_is_well_formed() -> None:
     # The record has to carry the facts the acceptance rests on, not just an id.
     for claim in ("2.0.1", "pa11y-ci", "2026-08-15"):
         assert claim in waiver["reason"] + waiver["version"] + waiver["dependency_path"]
+
+
+# ---------------------------------------------------------------------------
+# A report this gate cannot read is a failure, not a zero.
+#
+# The gate's own docstring promises it fails on "an `npm audit` report this
+# gate cannot parse, or a count of HIGH/CRITICAL findings that the parsed
+# advisories do not account for". The cross-check that keeps that promise is
+# guarded by `blocking_total(report) > 0`, and `blocking_total` used to answer
+# 0 for a report whose counts it could not read -- so a report that degraded
+# in both halves at once disarmed the guard and passed.
+# ---------------------------------------------------------------------------
+
+
+def _clean_report() -> dict[str, Any]:
+    """A report with nothing wrong in it, so only the damage under test differs."""
+    return _report()
+
+
+def test_a_clean_report_still_passes(tmp_path: Path) -> None:
+    """The positive control for everything below."""
+    assert _run(tmp_path, _clean_report()) == 0
+
+
+@pytest.mark.parametrize(
+    ("damage", "expected"),
+    [
+        pytest.param({}, "metadata.vulnerabilities", id="metadata-missing"),
+        pytest.param({"metadata": []}, "metadata.vulnerabilities", id="metadata-not-an-object"),
+        pytest.param(
+            {"metadata": {"vulnerabilities": []}},
+            "metadata.vulnerabilities",
+            id="counts-not-an-object",
+        ),
+        pytest.param(
+            {"metadata": {"vulnerabilities": {"high": None, "critical": 0}}},
+            "metadata.vulnerabilities",
+            id="count-is-null",
+        ),
+        pytest.param(
+            {"metadata": {"vulnerabilities": {"high": "0", "critical": 0}}},
+            "metadata.vulnerabilities",
+            id="count-is-a-string",
+        ),
+        pytest.param(
+            {"metadata": {"vulnerabilities": {"critical": 0}}},
+            "metadata.vulnerabilities",
+            id="a-blocking-severity-is-absent",
+        ),
+        pytest.param(
+            {"vulnerabilities": []},
+            "no readable 'vulnerabilities' object",
+            id="vulnerabilities-not-an-object",
+        ),
+    ],
+)
+def test_a_report_whose_counts_cannot_be_read_fails_closed(
+    damage: dict[str, Any],
+    expected: str,
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture,
+) -> None:
+    report = _clean_report()
+    if damage:
+        report.update(damage)
+    else:  # the metadata key removed entirely
+        report.pop("metadata")
+
+    assert _run(tmp_path, report) == 1
+    assert expected in capsys.readouterr().err
+
+
+def test_both_halves_degrading_at_once_still_fails(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    """The shape that used to slip through.
+
+    `vulnerabilities` as a list makes the advisory parse empty; no `metadata`
+    made the reported count read as 0. Neither half could see the other was
+    broken, so the gate reported a clean audit.
+    """
+    report = {"auditReportVersion": 2, "vulnerabilities": []}
+    assert _run(tmp_path, report) == 1
+    err = capsys.readouterr().err
+    assert "refusing to pass a report it does not understand" in err
+
+
+def test_blocking_total_separates_unreadable_from_zero() -> None:
+    gate = _gate()
+    assert gate.blocking_total(_clean_report()) == 0
+    assert gate.blocking_total(_report(_advisory(WAIVED_ADVISORY, WAIVED_PACKAGE))) == 2
+    assert gate.blocking_total({"metadata": {"vulnerabilities": {"high": 1}}}) is None
+    assert gate.blocking_total({}) is None

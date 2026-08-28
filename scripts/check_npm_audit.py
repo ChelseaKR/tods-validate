@@ -200,19 +200,33 @@ def report_advisories(report: dict[str, Any]) -> list[dict[str, Any]]:
     ]
 
 
-def blocking_total(report: dict[str, Any]) -> int:
-    """Return the HIGH + CRITICAL count npm itself reports."""
+def blocking_total(report: dict[str, Any]) -> int | None:
+    """The HIGH + CRITICAL count npm itself reports, or None if it is unreadable.
 
-    counts = report.get("metadata", {})
-    counts = counts.get("vulnerabilities", {}) if isinstance(counts, dict) else {}
+    None is not zero, and the distinction is the whole point. This used to
+    return 0 for a report whose `metadata.vulnerabilities` was missing, was
+    not an object, or held a count that was not a number. Zero disarms the
+    cross-check in `adjudicate` that exists to catch a report this gate has
+    stopped understanding -- `blocking_total(report) > 0` is false, so the
+    check never fires -- and the gate then prints "no unwaived HIGH/CRITICAL
+    advisories" and exits 0. That is the exact failure the docstring at the
+    top of this file promises against, so the unreadable case is reported as
+    unreadable and the caller fails on it.
+    """
+
+    metadata = report.get("metadata")
+    if not isinstance(metadata, dict):
+        return None
+    counts = metadata.get("vulnerabilities")
     if not isinstance(counts, dict):
-        return 0
+        return None
     total = 0
     for severity in sorted(BLOCKING):
-        try:
-            total += int(counts.get(severity, 0))
-        except (TypeError, ValueError):
-            return 0
+        value = counts.get(severity)
+        # bool is an int subclass; `"high": true` is not a count.
+        if isinstance(value, bool) or not isinstance(value, int):
+            return None
+        total += value
     return total
 
 
@@ -228,7 +242,23 @@ def adjudicate(
     advisories = report_advisories(report)
     blocking = [item for item in advisories if item["severity"] in BLOCKING]
 
-    if blocking_total(report) > 0 and not blocking:
+    vulnerabilities = report.get("vulnerabilities")
+    if not isinstance(vulnerabilities, dict):
+        # `report_advisories` returns [] for this, which is indistinguishable
+        # from a clean tree. The --audit-json path never checked the shape at
+        # all, and run_npm_audit only checked that the key was present.
+        failures.append(
+            "npm audit's report has no readable 'vulnerabilities' object; refusing to "
+            "pass a report it does not understand"
+        )
+
+    reported_blocking = blocking_total(report)
+    if reported_blocking is None:
+        failures.append(
+            "this gate could not read the HIGH/CRITICAL counts npm reported in "
+            "metadata.vulnerabilities; refusing to pass a report it does not understand"
+        )
+    elif reported_blocking > 0 and not blocking:
         failures.append(
             "npm reports HIGH/CRITICAL findings but this gate parsed no advisory objects "
             "from the report; refusing to pass a report it does not understand"

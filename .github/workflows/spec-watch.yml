@@ -29,11 +29,19 @@ jobs:
         with:
           python-version: "3.12"
       - run: python -m pip install -e ".[dev]"
+      # Two conditions get an issue, not one. "Spec drift detected" is news
+      # about the spec; "Spec watch could not compare" is news about this
+      # script, and it used to reach nobody: a document the parser did not
+      # understand printed "schema.py is in sync with the upstream spec" and
+      # exited 0, so this grep found nothing and the tripwire stayed silent
+      # about having stopped working. A fetch failure still writes nothing to
+      # stdout and still opens nothing, so a flaky network does not file
+      # issues.
       - name: Diff the upstream spec against schema.py
         id: diff
         run: |
           python scripts/spec_watch.py --format markdown > drift.md || true
-          if [ -s drift.md ] && grep -q "Spec drift detected" drift.md; then
+          if [ -s drift.md ] && grep -qE "Spec drift detected|Spec watch could not compare" drift.md; then
             echo "drift=true" >> "$GITHUB_OUTPUT"
           else
             echo "drift=false" >> "$GITHUB_OUTPUT"

@@ -279,9 +279,12 @@ feed, stats — as one command with a single combined report. gtfs-validator is
 never downloaded automatically: without java or a jar (`--gtfs-validator-jar`
 or `GTFS_VALIDATOR_JAR`) already available, that stage is labeled SKIPPED
 with the reason ("merged-feed GTFS validity NOT checked"), never silently
-treated as a pass. `doctor` exits non-zero on validate findings at
-`--fail-on` severity or a gtfs-validator stage that actually failed to run,
-not on one that was honestly skipped.
+treated as a pass. A `report.json` gtfs-validator wrote but this version
+cannot read is labeled FAILED, naming what it could not read, rather than
+counted as zero notices; zero notices out of an unreadable document would
+render exactly like a clean merged feed. `doctor` exits non-zero on validate
+findings at `--fail-on` severity or a gtfs-validator stage that actually
+failed to run, not on one that was honestly skipped.
 
 ## Other subcommands
 
