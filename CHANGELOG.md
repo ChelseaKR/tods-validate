@@ -7,6 +7,40 @@ new checks may be added in minor releases.
 
 Fixed:
 
+- Three checks that read a document produced outside this repository could
+  report success without having read it. Each now fails closed and says what
+  it did not read.
+  - `doctor`'s gtfs-validator stage counted notices out of a `report.json`
+    whose shape it did not understand. A report that parsed as JSON but was
+    not an object, or had no top-level `notices` array, or held a notice with
+    a non-integer `totalNotices` or a severity this version does not count,
+    yielded zero notices and `status="ran"` -- rendering as "0 error
+    notice(s), 0 warning notice(s), 0 info notice(s)", exactly what a
+    genuinely clean gtfs-validator run renders as, and exiting 0. The stage is
+    now FAILED with a reason naming what could not be read, which the existing
+    exit-code rule already treats as a failure, so a merged feed nobody
+    checked no longer exits 0 (#147).
+  - `scripts/spec_watch.py`, the tripwire for `schema.py` drifting from the
+    upstream spec, printed `spec-watch: schema.py is in sync with the upstream
+    spec.` and exited 0 for any document it could not parse. Upstream
+    restructuring its headings, renaming the Type or Required columns, or the
+    raw URL serving any other 200 all landed there, and the weekly workflow
+    greps stdout for drift, so nothing would have reported that the tripwire
+    had stopped working. A run that recognises no field table now raises and
+    prints a report under a heading the workflow opens an issue for; a run
+    that reads some of the four in-scope tables but not all of them names the
+    ones it did not read and exits 2 rather than 0. Every report, clean ones
+    included, now ends with the tables it compared. A fetch failure still
+    writes nothing to stdout, so a flaky network still files no issues.
+  - `scripts/check_npm_audit.py`, the merge-blocking Node advisory gate, has
+    a cross-check for reports it cannot parse, guarded by `blocking_total`,
+    which returned 0 for a report whose `metadata.vulnerabilities` counts it
+    could not read. A report that degraded in both halves at once -- no
+    readable counts and no parseable advisories -- disarmed its own guard and
+    passed. Unreadable counts are now distinct from zero, and a
+    `vulnerabilities` value that is not an object fails instead of parsing as
+    an empty advisory list.
+
 - The weekly **Playground deployment check** failed on `main` from 2026-08-24
   against a deployment that was correct. Its drift job compared the live page
   with `web/index.html` at the most recent release tag, and `v0.10.0` tags a

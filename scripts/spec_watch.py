@@ -18,9 +18,17 @@ plus a handful of `TODS_`-prefixed additions listed in a separate flat table
 keyed by filename, not a per-table field list — `schema.py` synthesizes their
 `TableSpec.fields` from the GTFS field inventory, so a line-by-line diff
 against a spec table isn't meaningful for them. This script only diffs
-tables it actually finds a `### `filename.txt`` field table for; anything
-else in `TABLES` is silently out of scope, and a spec table found for a name
-not in `TABLES` is reported as a newly-introduced table (drift).
+tables it actually finds a `### `filename.txt`` field table for; supplement
+tables are out of scope by design, and a spec table found for a name not in
+`TABLES` is reported as a newly-introduced table (drift).
+
+Every report names what it compared. A tripwire that cannot say what it
+looked at cannot be trusted when it says nothing is wrong: an unparseable
+document used to yield zero tables, zero diffs, and "schema.py is in sync
+with the upstream spec" at exit 0. A run that recognises no field table now
+raises `SpecParseError`, and a run that reads some of the in-scope tables but
+not all of them reports the gap and exits advisory rather than reporting
+sync it did not establish.
 
 Usage:
     python scripts/spec_watch.py
@@ -28,9 +36,10 @@ Usage:
     python scripts/spec_watch.py --format markdown
 
 Exit codes:
-    0  in sync
+    0  in sync, and every in-scope table was compared
     1  drift found (advisory signal for CI; never used to block a merge gate)
-    2  the spec could not be fetched or parsed (advisory: comparison skipped)
+    2  the spec could not be fetched or parsed, or only some of the in-scope
+       tables could be read (advisory: the comparison was skipped or partial)
 """
 
 from __future__ import annotations
@@ -93,6 +102,41 @@ class FieldDiff:
     table: str
     field: str
     detail: str
+
+
+@dataclass(frozen=True)
+class ComparisonScope:
+    """Which in-scope tables this run actually compared, and which it did not.
+
+    A diff that found nothing means "in sync" only if everything in scope was
+    read. Parsing three of four tables and matching all three is not the same
+    result as matching all four, and until this existed the script printed the
+    same sentence for both.
+    """
+
+    compared: tuple[str, ...]
+    not_found: tuple[str, ...]
+
+
+def in_scope_tables() -> tuple[str, ...]:
+    """The `TABLES` entries the spec publishes a per-table field list for.
+
+    Supplement tables are excluded because `schema.py` synthesizes their
+    fields from the GTFS inventory rather than transcribing a spec table, so
+    there is nothing to diff them against. That exclusion is the module
+    docstring's, restated here as code so the scope report can name what was
+    expected instead of only what happened to turn up.
+    """
+    return tuple(sorted(name for name in TABLES if not name.endswith("_supplement.txt")))
+
+
+def comparison_scope(spec_tables: dict[str, SpecTable]) -> ComparisonScope:
+    """Split the in-scope tables into the ones parsed and the ones missing."""
+    expected = in_scope_tables()
+    return ComparisonScope(
+        compared=tuple(name for name in expected if name in spec_tables),
+        not_found=tuple(name for name in expected if name not in spec_tables),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -288,6 +332,18 @@ def parse_spec_tables(text: str) -> dict[str, SpecTable]:
                     i = j
                     continue
         i += 1
+    if not tables:
+        # Nothing was recognised, so nothing can be compared. Returning {} here
+        # used to flow through diff_tables (zero iterations) into "schema.py is
+        # in sync with the upstream spec" and exit 0 -- a green tripwire for a
+        # document this script did not understand at all. Upstream restructuring
+        # its headings, renaming the Type/Required columns, or the fetch URL
+        # serving any other 200 all landed there.
+        raise SpecParseError(
+            "no `### `filename.txt`` field tables were found in the spec markdown. "
+            "Either this is not the spec document, or its headings or column names "
+            "changed; either way nothing was compared."
+        )
     return tables
 
 
@@ -355,13 +411,74 @@ def diff_tables(spec_tables: dict[str, SpecTable]) -> list[FieldDiff]:
 # ---------------------------------------------------------------------------
 
 
-def render_diff(diffs: list[FieldDiff], fmt: str) -> str:
-    if not diffs:
+# The heading the weekly workflow greps for when the comparison itself could
+# not be completed. Kept distinct from "Spec drift detected" because the two
+# say different things: one is news about the spec, the other is news about
+# this script.
+INCOMPLETE_HEADING = "Spec watch could not compare"
+
+
+def _scope_sentence(scope: ComparisonScope) -> str:
+    total = len(scope.compared) + len(scope.not_found)
+    compared = ", ".join(scope.compared) or "nothing"
+    return f"Compared {len(scope.compared)} of {total} in-scope table(s): {compared}."
+
+
+def _not_found_sentence(scope: ComparisonScope) -> str:
+    one = len(scope.not_found) == 1
+    were = "it was" if one else "they were"
+    those = "that file" if one else "those files"
+    return (
+        f"The spec markdown had no field table for {', '.join(scope.not_found)}, "
+        f"so {were} not compared at all. Either the spec dropped {those}, or "
+        "this script's parser no longer recognises its heading or columns."
+    )
+
+
+def render_incomplete(reason: str, fmt: str) -> str:
+    """A report for a run that could not compare anything, in the chosen format.
+
+    Written to stdout, not just stderr, so the weekly workflow has a body to
+    put in an issue. A tripwire that fails silently is the failure it exists
+    to catch.
+    """
+    if fmt == "markdown":
         return (
-            "spec-watch: schema.py is in sync with the upstream spec.\n"
-            if fmt == "text"
-            else "# Spec drift check\n\nNo drift: `schema.py` matches the upstream spec.\n"
+            f"# {INCOMPLETE_HEADING}\n\n"
+            f"{reason}\n\n"
+            "`schema.py` was **not** checked against the upstream spec on this run. "
+            "This is news about `scripts/spec_watch.py`, not about the spec.\n"
         )
+    return f"spec-watch: {INCOMPLETE_HEADING.lower()}.\n\n{reason}\n"
+
+
+def _render_no_drift(fmt: str, scope: ComparisonScope) -> str:
+    """What to print when the diff found nothing.
+
+    "Nothing differed" is only "in sync" when everything in scope was read.
+    When it was not, this says so instead, because the two results are not
+    the same and used to print the same sentence.
+    """
+    if scope.not_found:
+        return render_incomplete(
+            f"{_scope_sentence(scope)} {_not_found_sentence(scope)} "
+            "No difference was found among the tables that were compared, which is "
+            "not the same as the transcription agreeing with the spec.",
+            fmt,
+        )
+    if fmt == "text":
+        return (
+            f"spec-watch: schema.py is in sync with the upstream spec.\n{_scope_sentence(scope)}\n"
+        )
+    return (
+        "# Spec drift check\n\nNo drift: `schema.py` matches the upstream spec.\n\n"
+        f"{_scope_sentence(scope)}\n"
+    )
+
+
+def render_diff(diffs: list[FieldDiff], fmt: str, scope: ComparisonScope) -> str:
+    if not diffs:
+        return _render_no_drift(fmt, scope)
 
     by_table: dict[str, list[FieldDiff]] = {}
     for d in diffs:
@@ -378,6 +495,11 @@ def render_diff(diffs: list[FieldDiff], fmt: str) -> str:
             "`scripts/spec_watch.py`)."
         )
         lines.append("")
+        lines.append(_scope_sentence(scope))
+        if scope.not_found:
+            lines.append("")
+            lines.append(_not_found_sentence(scope))
+        lines.append("")
         for table in sorted(by_table):
             lines.append(f"## `{table}`")
             lines.append("")
@@ -386,6 +508,10 @@ def render_diff(diffs: list[FieldDiff], fmt: str) -> str:
             lines.append("")
     else:
         lines.append("Spec drift detected:")
+        lines.append("")
+        lines.append(_scope_sentence(scope))
+        if scope.not_found:
+            lines.append(_not_found_sentence(scope))
         lines.append("")
         for table in sorted(by_table):
             lines.append(f"{table}:")
@@ -434,11 +560,24 @@ def main(argv: list[str] | None = None) -> int:
     try:
         spec_tables = parse_spec_tables(text)
     except SpecParseError as exc:
+        print(render_incomplete(str(exc), args.format))
         print(f"spec-watch: could not parse the spec markdown: {exc}", file=sys.stderr)
         return EXIT_ADVISORY
 
+    scope = comparison_scope(spec_tables)
     diffs = diff_tables(spec_tables)
-    print(render_diff(diffs, args.format))
+    print(render_diff(diffs, args.format, scope))
+    if scope.not_found:
+        # Exit 2, "comparison was skipped", rather than 0 or 1: whatever the
+        # tables that parsed had to say, the run did not read everything it is
+        # supposed to read, and "in sync" would be a claim about files nobody
+        # looked at.
+        print(
+            "spec-watch: the comparison was incomplete; no field table was found for "
+            f"{', '.join(scope.not_found)}.",
+            file=sys.stderr,
+        )
+        return EXIT_ADVISORY
     return EXIT_DRIFT if diffs else EXIT_OK
 
 

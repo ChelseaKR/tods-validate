@@ -30,6 +30,11 @@ def spec_watch():
     return _load_spec_watch()
 
 
+def _full_scope(spec_watch):
+    """A scope in which every in-scope table was read, i.e. a complete run."""
+    return spec_watch.ComparisonScope(compared=spec_watch.in_scope_tables(), not_found=())
+
+
 def test_in_sync_fixture_parses_to_the_four_tods_specific_tables(spec_watch) -> None:
     text = (_FIXTURES / "in_sync.md").read_text(encoding="utf-8")
     tables = spec_watch.parse_spec_tables(text)
@@ -85,19 +90,22 @@ def test_drifted_fixture_is_detected_as_a_single_presence_change(spec_watch) -> 
 
 def test_drifted_fixture_renders_as_a_human_readable_diff(spec_watch) -> None:
     text = (_FIXTURES / "drifted.md").read_text(encoding="utf-8")
-    diffs = spec_watch.diff_tables(spec_watch.parse_spec_tables(text))
-    rendered = spec_watch.render_diff(diffs, "markdown")
+    tables = spec_watch.parse_spec_tables(text)
+    diffs = spec_watch.diff_tables(tables)
+    scope = spec_watch.comparison_scope(tables)
+    rendered = spec_watch.render_diff(diffs, "markdown", scope)
     assert "vehicles.txt" in rendered
     assert "vehicle_label" in rendered
     assert "changed" in rendered
 
-    text_rendered = spec_watch.render_diff(diffs, "text")
+    text_rendered = spec_watch.render_diff(diffs, "text", scope)
     assert "vehicle_label" in text_rendered
 
 
 def test_render_diff_reports_in_sync_when_empty(spec_watch) -> None:
-    assert "in sync" in spec_watch.render_diff([], "text")
-    assert "No drift" in spec_watch.render_diff([], "markdown")
+    everything = _full_scope(spec_watch)
+    assert "in sync" in spec_watch.render_diff([], "text", everything)
+    assert "No drift" in spec_watch.render_diff([], "markdown", everything)
 
 
 def test_added_and_removed_fields_are_both_reported(spec_watch) -> None:
@@ -184,3 +192,126 @@ def test_normalize_presence(spec_watch) -> None:
     assert spec_watch._normalize_presence("Conditionally required") is Presence.CONDITIONAL
     with pytest.raises(spec_watch.SpecParseError):
         spec_watch._normalize_presence("Sometimes")
+
+
+# ---------------------------------------------------------------------------
+# The tripwire has to be able to say what it compared.
+#
+# Until these existed, a document this script did not understand produced zero
+# tables, zero diffs, and "schema.py is in sync with the upstream spec." at
+# exit 0 -- byte-identical to a real clean run. Upstream restructuring its
+# headings, renaming the Type/Required columns, or the raw URL serving any
+# other 200 all landed there, and the weekly workflow greps stdout for drift,
+# so nothing anywhere would have said the check had stopped working.
+# ---------------------------------------------------------------------------
+
+
+def test_a_document_with_no_field_tables_is_a_parse_error_not_a_clean_run(spec_watch) -> None:
+    with pytest.raises(spec_watch.SpecParseError) as raised:
+        spec_watch.parse_spec_tables("# Some other document\n\nNo field tables here.\n")
+    assert "no `### `filename.txt`` field tables" in str(raised.value)
+
+
+def test_main_refuses_to_report_sync_for_a_document_it_did_not_understand(
+    spec_watch, capsys, tmp_path
+) -> None:
+    not_the_spec = tmp_path / "not-the-spec.md"
+    not_the_spec.write_text("# Release notes\n\nNothing to see.\n", encoding="utf-8")
+
+    code = spec_watch.main(["--spec-file", str(not_the_spec)])
+
+    assert code == spec_watch.EXIT_ADVISORY
+    captured = capsys.readouterr()
+    assert "in sync" not in captured.out
+    assert spec_watch.INCOMPLETE_HEADING.lower() in captured.out.lower()
+
+
+def test_the_workflow_has_an_issue_body_to_post_when_the_comparison_fails(
+    spec_watch, capsys, tmp_path
+) -> None:
+    """spec-watch.yml greps stdout for a heading; an empty stdout opens nothing."""
+    not_the_spec = tmp_path / "not-the-spec.md"
+    not_the_spec.write_text("# Release notes\n\nNothing to see.\n", encoding="utf-8")
+
+    spec_watch.main(["--spec-file", str(not_the_spec), "--format", "markdown"])
+
+    out = capsys.readouterr().out
+    assert f"# {spec_watch.INCOMPLETE_HEADING}" in out
+    assert "was **not** checked" in out
+
+
+def _in_sync_missing_one_table(tmp_path: Path) -> Path:
+    """The in-sync fixture with `vehicles.txt`'s heading renamed.
+
+    Stands in for the realistic partial-parse failure: upstream reorganises one
+    section, or the parser stops recognising it, and the other three tables
+    still match.
+    """
+    text = (_FIXTURES / "in_sync.md").read_text(encoding="utf-8")
+    assert "### `vehicles.txt`" in text
+    partial = tmp_path / "partial.md"
+    partial.write_text(text.replace("### `vehicles.txt`", "### Vehicles"), encoding="utf-8")
+    return partial
+
+
+def test_a_table_the_parser_missed_is_named_rather_than_counted_as_matching(
+    spec_watch, tmp_path
+) -> None:
+    tables = spec_watch.parse_spec_tables(
+        _in_sync_missing_one_table(tmp_path).read_text(encoding="utf-8")
+    )
+    scope = spec_watch.comparison_scope(tables)
+    assert scope.not_found == ("vehicles.txt",)
+    assert "vehicles.txt" not in scope.compared
+    assert set(scope.compared) == {
+        "employee_run_dates.txt",
+        "run_events.txt",
+        "vehicle_assignments.txt",
+    }
+
+
+def test_a_partial_comparison_never_renders_as_in_sync(spec_watch, tmp_path) -> None:
+    tables = spec_watch.parse_spec_tables(
+        _in_sync_missing_one_table(tmp_path).read_text(encoding="utf-8")
+    )
+    scope = spec_watch.comparison_scope(tables)
+    diffs = spec_watch.diff_tables(tables)
+    assert diffs == []  # everything that WAS compared matched
+
+    for fmt in ("text", "markdown"):
+        rendered = spec_watch.render_diff(diffs, fmt, scope)
+        assert "in sync" not in rendered
+        assert "No drift" not in rendered
+        assert "vehicles.txt" in rendered
+
+
+def test_a_partial_comparison_exits_advisory_not_ok(spec_watch, capsys, tmp_path) -> None:
+    code = spec_watch.main(["--spec-file", str(_in_sync_missing_one_table(tmp_path))])
+    assert code == spec_watch.EXIT_ADVISORY
+    captured = capsys.readouterr()
+    assert "in sync" not in captured.out
+    assert "vehicles.txt" in captured.err
+
+
+def test_a_complete_in_sync_run_still_says_so_and_names_its_scope(spec_watch, capsys) -> None:
+    """The positive control: a real, complete comparison is unchanged, and now
+    says which tables it read."""
+    code = spec_watch.main(["--spec-file", str(_FIXTURES / "in_sync.md")])
+    assert code == spec_watch.EXIT_OK
+    out = capsys.readouterr().out
+    assert "in sync" in out
+    assert "Compared 4 of 4 in-scope table(s)" in out
+    for name in spec_watch.in_scope_tables():
+        assert name in out
+
+
+def test_in_scope_tables_excludes_the_supplement_files(spec_watch) -> None:
+    scoped = spec_watch.in_scope_tables()
+    assert scoped == (
+        "employee_run_dates.txt",
+        "run_events.txt",
+        "vehicle_assignments.txt",
+        "vehicles.txt",
+    )
+    assert set(scoped) <= set(TABLES)
+    assert not any(name.endswith("_supplement.txt") for name in scoped)

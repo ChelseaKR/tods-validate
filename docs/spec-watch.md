@@ -33,14 +33,28 @@ Exit codes:
 
 | Code | Meaning |
 | --- | --- |
-| 0 | in sync — no drift found |
+| 0 | in sync, and every in-scope table was compared |
 | 1 | drift found (the advisory signal the CI workflow acts on) |
-| 2 | the spec could not be fetched or parsed; comparison was skipped |
+| 2 | the spec could not be fetched or parsed, or only some of the in-scope tables could be read; the comparison was skipped or partial |
 
 Network access is optional by design: a fetch failure prints a clear message
 and exits 2, distinct from the "drift found" exit 1, so CI logs and any
 scripting around this command can tell "no signal" apart from "signal:
 drift."
+
+Exit 0 is a claim about all four in-scope tables, not about whichever ones
+happened to parse. Until 2026-08-27 it was the latter: a document with no
+recognisable field tables produced zero tables, zero diffs, and `spec-watch:
+schema.py is in sync with the upstream spec.` at exit 0, which is what this
+command prints for a genuinely clean run. Upstream restructuring its
+headings, renaming the Type or Required columns, or the raw URL serving any
+other 200 all landed there, and the weekly workflow greps stdout for drift,
+so nothing would have said the tripwire had stopped working. A run that
+recognises no field table now raises `SpecParseError` and prints a report
+under the heading `Spec watch could not compare`, which the workflow opens an
+issue for; a run that reads some in-scope tables but not all of them names
+the ones it did not read and exits 2. Every report, including a clean one,
+ends with the tables it compared.
 
 ## Scope
 
