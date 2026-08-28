@@ -273,7 +273,7 @@ readiness for one either way.
 records why it is not; and each of the four standards rows above is either
 closed or has a dated decision saying it will not be.
 
-## Phase 5: upstream standing (2028)
+## Phase 5: upstream standing (2028) [NOT STARTED, GATE VERIFIED 2026-08-27]
 
 **Delivers.** The position `CLAUDE.md`'s "adoption, not ownership" framing
 has always pointed at, and which `ideation/03-expansions.md` calls the
@@ -287,17 +287,34 @@ endgame.
   paired with a rule ID and an interpretation note, with the eight open
   ambiguities in `docs/spec-questions.md` decided as part of adoption.
 
+**Gate state, re-read 2026-08-27.** MobilityData issue #153, "Would the TODS
+Board like to adopt a shared conformance corpus?", is **open with no comments,
+last updated 2026-07-12**. Nothing has been declined and nothing has been
+adopted; the question has not been answered.
+
+Nothing in this phase has been started, and starting it would be the overclaim
+the plan already warns against. Attestations that nobody upstream recognises
+are a certificate this project issues to itself, and an annex proposed to a
+board that has not answered the smaller question first is a worse version of
+asking it. The fallback, a well-maintained third-party catalog, is what exists
+today and is already useful; every rule already has a permanent URL, a spec
+citation, and a fixture.
+
+What *is* new is that the gate is now watched rather than remembered.
+[`docs/phase-gates.json`](phase-gates.json) records the state, and
+`scripts/check_phase_gates.py` re-reads it monthly, because "a phase is not
+scheduled until it can be worked" is only honest if somebody would notice when
+it can be.
+
 **Depends on.** Entirely on the TODS Board and MobilityData. This is the
 phase this repository cannot execute alone, and saying otherwise would be the
-same kind of overclaim the validator is built to refuse. The fallback, a
-well-maintained third-party catalog, is what exists today and is already
-useful.
+same kind of overclaim the validator is built to refuse.
 
 **Done when.** At least one spec release cites rule IDs from this catalog,
 whatever repository they live in by then; or the Board declines, and that is
 recorded so nobody re-litigates it from scratch.
 
-## Phase 6: only on a trigger (2028 H2 to 2029)
+## Phase 6: only on a trigger (2028 H2 to 2029) [NEITHER TRIGGER FIRED, CHECKED 2026-08-27]
 
 Two large bets, neither scheduled, each with a written trigger. A phase with
 no trigger met is a phase that does not start.
@@ -307,23 +324,45 @@ no trigger met is a phase that does not start.
   MobilityData-family spec would be a schema module rather than a new
   project. **Trigger:** a concrete second spec with a committed user. Not
   speculation, and not before v1.0's stability promise can absorb the split.
+
+  **Not fired.** There is no second spec and no committed user; no issue in
+  this repository asks for one. The second half of the trigger is also unmet
+  by construction: v1.0 is not released, so there is no stability promise for
+  a split to be absorbed by. Two independent reasons, either sufficient.
+
 - **Planned versus actual, TODS against TIDES (EXP-16).** Explicitly parked.
   It crosses the spirit of the current out-of-scope line, and needs a
   documented scope decision, real TIDES data, and real operational partners.
   **Trigger:** real-feed adoption (#76) succeeding first, then an explicit
   decision to renegotiate the scope line.
 
+  **Not fired.** #76 is open, last updated 2026-08-21, with one comment and no
+  feed. The trigger is explicitly two-stage and the first stage has not
+  happened, so the second is not a question anyone has to answer yet.
+
+Both remain unbuilt, which is the correct state and not a shortfall. A trigger
+manufactured to justify starting is worse than a phase that has not started,
+because it spends the one thing this repository trades on. `docs/phase-gates.json`
+watches #76 for the second; the first has nothing to watch, which is itself the
+honest answer.
+
 ## Standing work that no phase owns
 
 These run across every phase and are gated on people. They are listed here
 rather than scheduled because a date on them would be fiction.
 
+Every row's gate is recorded in [`phase-gates.json`](phase-gates.json) and
+re-read monthly by `scripts/check_phase_gates.py`, which opens an issue when a
+state moves **or when it could not read one**. The states below were verified
+live on **2026-08-27**; all eight gates were still open.
+
 | Work | Gate | What is honest meanwhile |
 | --- | --- | --- |
-| Real production feeds (#76) | An agency or vendor sharing a feed, privately is fine | Synthetic corpora, clearly labeled; `anonymize` exists to lower the sharing barrier, and its docs say it pseudonymizes rather than anonymizes |
-| Screen-reader and keyboard walkthrough (#74) | A human with assistive technology, ideally a real AT user | The blocking axe and HTML_CodeSniffer gates are a floor; `docs/a11y/2026-08-21-automated-only-not-a-substitute.md` already records that automated checks are not evidence of usability |
-| Confirming the deployed playground end to end (#146) | Recording browser, OS and date against the live page | `scripts/check-playground-boots.cjs` now boots the live page in a real browser and asserts a finding renders, which answers most of it; the dated record is the remainder |
-| Spec additions upstream (rosters, runtimes, chargers) | Upstream adopting any of the three | `docs/research/E1-upstream-spec-state.md` records that all three are open and unmerged, one dormant since 2023; `spec_watch` is the tripwire for when that changes |
+| Real production feeds (#76) | An agency or vendor sharing a feed, privately is fine. Open, updated 2026-08-21 | Synthetic corpora, clearly labeled; `anonymize` exists to lower the sharing barrier, and its docs say it pseudonymizes rather than anonymizes. Every number in `BENCHMARKS.md` says synthetic |
+| Screen-reader and keyboard walkthrough (#74) | A human with assistive technology, ideally a real AT user. Open, updated 2026-08-21 | The blocking axe and HTML_CodeSniffer gates are a floor; `docs/a11y/STATEMENT.md` names WCAG 2.1 AA as the target and deliberately makes no conformance claim, because automated checks are not evidence of usability |
+| Confirming the deployed playground end to end (#146) | Recording browser, OS and date against the live page. Open, updated 2026-08-23 | `scripts/check-playground-boots.cjs` now boots the live page in a real browser and asserts a finding renders, which answers most of it; the dated record is the remainder |
+| Spec additions upstream: rosters (#45), runtimes (#42, #43), chargers (#46) | Upstream adopting any of the four. All open; #45 last touched 2024-08-26, #42 and #43 2024-08-28, #46 2023-12-29 | `docs/research/E1-upstream-spec-state.md` records that none is merged and one has been dormant for over two and a half years; `spec_watch` is the tripwire for the spec text, `check_phase_gates.py` for the proposals themselves |
+| Two good first rules (#143, #144) | A contributor, or a maintainer deciding to absorb them. Open, updated 2026-08-23 | Both are labelled `good first issue` on purpose and neither blocks the v1.0.0 release; `docs/authoring-rules.md` carries the contract, fixture requirement, and doc-regeneration step for each |
 
 ## What would tell us this plan is wrong
 
