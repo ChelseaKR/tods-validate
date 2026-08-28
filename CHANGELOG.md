@@ -7,6 +7,28 @@ new checks may be added in minor releases.
 
 Fixed:
 
+- A companion GTFS file that parsed but did not read in full counted as a
+  clean read. `loader.py` splits CSV defects into ones that stop parsing
+  (`encoding`, `empty`, `csv_error`) and ones that leave the file parsed but
+  drop values (`ragged`, `duplicate_header`). #125 fixed the first kind for
+  companion files; the second kind still counted the file as `present`, so
+  every rule reading it recorded `ran` in the coverage manifest. Nothing
+  reported the defect either way, because TODS-E103/E104/E105 scan the TODS
+  package and never the companion feed. One short row in a companion
+  `trips.txt` therefore did one of two things: dropped a `block_id`, leaving
+  the run to report "No problems found", "Every applicable check ran" and
+  exit 0; or dropped a `trip_id`, and reported `TODS-E307` against the
+  producer's `run_events.txt`, an ERROR asserting that a trip "does not exist
+  in the companion GTFS trips.txt" when it did. Such a file is now not
+  available to resolve references against, exactly as an unreadable one
+  already was not: dependent rules are recorded `skipped:needs_gtfs_table`,
+  the skip counts as unrequested so `--require-complete-run` fails on it, and
+  `TODS-W302` discloses it with the loader's own message so the producer gets
+  the row or column number. `loader.PROBLEM_CODES` now closes the code space,
+  with a test that reads the parser's own source, so a defect code added later
+  cannot default to harmless. See
+  [ADR 0007](docs/adr/0007-companion-gtfs-partial-read-is-not-a-read.md).
+
 - Three checks that read a document produced outside this repository could
   report success without having read it. Each now fails closed and says what
   it did not read.
@@ -51,6 +73,18 @@ Fixed:
   on the default branch, which is both what `workflow_dispatch` deploys and
   the honest answer to "the page this repository publishes", and which goes
   green again on the deploy that resolves any real drift.
+
+Changed:
+
+- **TODS-W302**'s title becomes "Referenced file is missing or was not read in
+  full, references not checked" (from "missing or unreadable"), and its
+  description covers the third case. Its ID, severity and category are
+  unchanged, so `docs/v1-contract-candidate.json` is unaffected.
+- The `skipped:needs_gtfs_table` reason in the coverage manifest widens from
+  "the companion GTFS feed has none of the files the check reads" to the same
+  wording plus ", or could not read one of them in full". The old wording was
+  already inaccurate for the unreadable companion files v0.10.0 introduced:
+  the file was there.
 
 Added:
 

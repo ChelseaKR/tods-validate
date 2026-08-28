@@ -805,7 +805,8 @@ STATUS_SKIPPED_SPEC_VERSION = "skipped:spec_version"
 _STATUS_REASON = {
     STATUS_SKIPPED_NEEDS_GTFS: "no companion GTFS feed was provided",
     STATUS_SKIPPED_NEEDS_GTFS_TABLE: (
-        "the companion GTFS feed has none of the files the check reads"
+        "the companion GTFS feed has none of the files the check reads, or could "
+        "not read one of them in full"
     ),
     STATUS_SKIPPED_DISABLED: "opt-in rule not enabled (use --enable)",
     STATUS_SKIPPED_IGNORED: "suppressed by local policy (--ignore)",
@@ -1034,12 +1035,18 @@ def _is_enabled(r: Rule, enabled: frozenset[str]) -> bool:
 
 
 def missing_gtfs_tables(r: Rule, gtfs: CompanionGTFS) -> tuple[str, ...]:
-    """Which of ``r``'s required GTFS files the companion feed does not have.
+    """Which of ``r``'s required GTFS files the companion feed cannot supply.
 
     A requirement group is met when any one of its alternatives is a *base*
     file of the companion feed. A TODS supplement file does not meet it: a
     supplement modifies a GTFS table, so without that table there is nothing to
     resolve a reference against, and every ID would look missing.
+
+    "Does not have" is broader than "is not in the package": a base file the
+    reader could not parse, or parsed but could not read in full, is also not
+    in ``present``, for the same reason. Resolving against a partial row set
+    answers with IDs the reader failed to read, not IDs the feed lacks. Which
+    of the three it was is disclosed by TODS-W302; see gtfs_companion.
     """
     return tuple(" or ".join(group) for group in r.gtfs_tables if not set(group) & gtfs.present)
 

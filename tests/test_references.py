@@ -230,3 +230,52 @@ def test_time_check_treats_2400_as_midnight(tmp_path: Path) -> None:
     )
     _, findings = run(tmp_path)
     assert not any(f.rule_id == "TODS-W316" for f in findings)
+
+
+def test_ragged_companion_trips_does_not_invent_e307(tmp_path: Path) -> None:
+    # The companion-GTFS half of #125's defect class. trips.txt parses, so it
+    # counted as present; the ragged row dropped trip T1's trip_id; and the
+    # run event that names T1 was reported as TODS-E307 -- an ERROR against
+    # the producer's TODS file for a defect in their GTFS file, with a message
+    # asserting T1 "does not exist in the companion GTFS trips.txt" when it
+    # does. Nothing anywhere reported the ragged row itself.
+    (tmp_path / "trips.txt").write_text(
+        "route_id,service_id,trip_id,block_id\nR1,weekday,T1,B1\nR1,weekday\n"
+    )
+    (tmp_path / "calendar.txt").write_text(
+        "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,"
+        "start_date,end_date\nweekday,1,1,1,1,1,0,0,20260101,20261231\n"
+    )
+    (tmp_path / "stops.txt").write_text("stop_id\nS1\n")
+    (tmp_path / "run_events.txt").write_text(
+        "service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,"
+        "end_location,end_time\nweekday,1,10,operator,T1,S1,09:00:00,S1,10:00:00\n"
+    )
+    _, findings = run(tmp_path)
+    assert "TODS-E307" not in rule_ids(findings)
+    w302 = [f for f in findings if f.rule_id == "TODS-W302" and "trips.txt" in f.message]
+    assert w302, "expected TODS-W302 to disclose that the companion trips.txt was not read in full"
+    assert "could not be read in full" in w302[0].message
+    # Distinct from both of the other two wordings, so a reader can tell which
+    # of the three remedies applies.
+    assert "has no trips.txt" not in w302[0].message
+    assert "trips.txt could not be read (" not in w302[0].message
+
+
+def test_a_complete_companion_trips_still_reports_a_real_e307(tmp_path: Path) -> None:
+    # Positive control for the test above: same feed, same run event, but a
+    # trips.txt that reads in full and genuinely does not contain T1. TODS-E307
+    # must still fire, or the test above could be green because E307 stopped
+    # working rather than because it stopped being invented.
+    (tmp_path / "trips.txt").write_text("route_id,service_id,trip_id,block_id\nR1,weekday,T2,B1\n")
+    (tmp_path / "calendar.txt").write_text(
+        "service_id,monday,tuesday,wednesday,thursday,friday,saturday,sunday,"
+        "start_date,end_date\nweekday,1,1,1,1,1,0,0,20260101,20261231\n"
+    )
+    (tmp_path / "stops.txt").write_text("stop_id\nS1\n")
+    (tmp_path / "run_events.txt").write_text(
+        "service_id,run_id,event_sequence,event_type,trip_id,start_location,start_time,"
+        "end_location,end_time\nweekday,1,10,operator,T1,S1,09:00:00,S1,10:00:00\n"
+    )
+    _, findings = run(tmp_path)
+    assert "TODS-E307" in rule_ids(findings)

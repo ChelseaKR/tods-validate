@@ -147,11 +147,13 @@ def employee_run_missing(context: ValidationContext) -> Iterator[Finding]:
     spec_versions=_V2_ONLY,
     id="TODS-W302",
     severity=Severity.WARNING,
-    title="Referenced file is missing or unreadable, references not checked",
+    title="Referenced file is missing or was not read in full, references not checked",
     description=(
         "A file references another file that is not in the package (or, for GTFS "
-        "targets, not in the companion feed) or that could not be read (TODS-E103), "
-        "so those references could not be validated."
+        "targets, not in the companion feed), that could not be read at all "
+        "(TODS-E103), or that parsed but did not read in full because a row was "
+        "ragged or a column was declared twice. In each case those references "
+        "could not be validated, and are reported as unchecked rather than clean."
     ),
     spec_section=SPEC_URL,
 )
@@ -214,26 +216,44 @@ def referenced_file_missing(context: ValidationContext) -> Iterator[Finding]:
         ]
         for source, available, target in gtfs_needs:
             if package.get(source) is not None and not available:
-                unreadable = [
-                    name for name in target.split(" or ") if name in context.gtfs.unreadable
-                ]
-                if unreadable:
-                    reasons = "; ".join(context.gtfs.unreadable[name] for name in unreadable)
-                    message = (
-                        f"The companion GTFS feed's {' and '.join(unreadable)} could not be "
-                        f"read ({reasons}), so {source} references into it could not be checked."
-                    )
-                else:
-                    message = (
-                        f"The companion GTFS feed has no {target}, so {source} "
-                        "references into it could not be checked."
-                    )
                 yield Finding(
                     rule_id="TODS-W302",
                     severity=Severity.WARNING,
                     file=source,
-                    message=message,
+                    message=_companion_gap_message(context, source, target),
                 )
+
+
+def _companion_gap_message(context: ValidationContext, source: str, target: str) -> str:
+    """Why ``source``'s references into companion file ``target`` went unchecked.
+
+    ``target`` may name alternatives ("calendar.txt or calendar_dates.txt").
+    The three reasons are kept apart because they ask the producer for three
+    different things: ship the file, re-export it so it parses, or fix the row
+    or column whose values the reader could not place.
+    """
+    gtfs = context.gtfs
+    assert gtfs is not None
+    names = target.split(" or ")
+    unreadable = [name for name in names if name in gtfs.unreadable]
+    degraded = [name for name in names if name in gtfs.degraded]
+    if unreadable:
+        reasons = "; ".join(gtfs.unreadable[name] for name in unreadable)
+        return (
+            f"The companion GTFS feed's {' and '.join(unreadable)} could not be "
+            f"read ({reasons}), so {source} references into it could not be checked."
+        )
+    if degraded:
+        reasons = "; ".join(gtfs.degraded[name] for name in degraded)
+        return (
+            f"The companion GTFS feed's {' and '.join(degraded)} could not be read in "
+            f"full ({reasons}), so {source} references into it could not be checked: "
+            "an ID the reader could not place would read as an ID the feed does not have."
+        )
+    return (
+        f"The companion GTFS feed has no {target}, so {source} "
+        "references into it could not be checked."
+    )
 
 
 def _uses_column(package: Package, filename: str, column: str) -> bool:
