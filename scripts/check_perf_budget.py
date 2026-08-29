@@ -18,6 +18,23 @@ mean less than it says:
   the honest estimate of what the code can do. Noise then makes a regression
   under-reported rather than invented, and the budget absorbs the difference.
 
+And one thing it now does that it did not. A throughput gate can only fire on
+slowness, which means *doing less work makes it greener*. The timed call's
+result was discarded and the row count was an assumed constant, so a validator
+that had quietly stopped reading the feed would have burned almost no CPU,
+reported an enormous rate, and passed more comfortably than a correct one --
+the failure the gate exists to catch was unreachable from below. Every
+repetition now counts the rows the loader actually parsed, refuses to report a
+rate when that count falls short of what the generated feed contains, and
+refuses when two repetitions disagree about it.
+
+The rate's denominator stays the fixed ``trips * ROWS_PER_TRIP`` unit of work
+rather than becoming the measured count. The two differ (the generated feed
+also carries stops, vehicles and assignments), and switching would silently
+raise every number by that margin, making the committed baseline look like a
+speedup nobody made. The measured count is printed and checked; it is not the
+divisor.
+
 The baseline has to be recorded on the machine class the gate runs on: a number
 from a laptop compared against a shared CI runner is a comparison between two
 different things, which is how a perf gate ends up either permanently red or
@@ -42,12 +59,29 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from benchmark import build_feed  # noqa: E402
 
-from tods_validate.runner import run  # noqa: E402
+from tods_validate.runner import run_with_coverage  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
 BASELINE = ROOT / "perf" / "baseline.json"
 DEFAULT_TRIPS = 50000
 DEFAULT_REPEAT = 3
+# `benchmark.build_feed` writes one trips.txt row and one run_events.txt row per
+# trip, so a run that parsed fewer than this did not read the feed it was given.
+# The generated package also holds calendar, stops, vehicles and
+# vehicle_assignments rows, so the real count is comfortably above the floor;
+# the floor is the "did any work happen" question, not a row-exact assertion.
+ROWS_PER_TRIP = 2
+# A budget this large is not a loose budget, it is a retired one, and it would
+# be retired in a data file rather than in a reviewed change to this script.
+MAX_SANE_BUDGET = 10.0
+
+
+class NoWorkMeasured(RuntimeError):
+    """A timed repetition did not do the work the measurement assumes.
+
+    Raised rather than returned so there is no path on which the caller can
+    treat "the validator read nothing" as a very fast run.
+    """
 
 
 def measure(trips: int, repeat: int) -> float:
@@ -63,20 +97,40 @@ def measure(trips: int, repeat: int) -> float:
     with tempfile.TemporaryDirectory() as tmp:
         feed = Path(tmp) / "feed"
         build_feed(feed, trips)
-        rows = trips * 2  # trips + run events dominate
+        rows = trips * ROWS_PER_TRIP
+        floor = trips * ROWS_PER_TRIP
         best = 0.0
+        parsed_counts: set[int] = set()
         for attempt in range(1, repeat + 1):
             wall_start = time.perf_counter()
             cpu_start = time.process_time()
-            run(feed)
+            package, _findings, _coverage = run_with_coverage(feed)
             cpu = time.process_time() - cpu_start
             wall = time.perf_counter() - wall_start
+
+            parsed = sum(len(f.rows) for f in package.files.values())
+            parsed_counts.add(parsed)
+            if parsed < floor:
+                raise NoWorkMeasured(
+                    f"repetition {attempt} parsed {parsed:,} rows from a {trips:,}-trip "
+                    f"feed, below the {floor:,} this generator writes. The measurement "
+                    "timed a run that did not read the feed, and a rate computed from "
+                    "it would report a speedup rather than the defect."
+                )
+
             throughput = rows / cpu
             print(
                 f"  run {attempt}/{repeat}: {cpu:.2f}s CPU ({wall:.2f}s wall), "
-                f"{throughput:,.0f} rows/CPU-s"
+                f"{parsed:,} rows parsed, {throughput:,.0f} rows/CPU-s"
             )
             best = max(best, throughput)
+
+        if len(parsed_counts) != 1:
+            raise NoWorkMeasured(
+                "repetitions of the same feed parsed different row counts "
+                f"({sorted(parsed_counts)}). The runs are not comparable, so the best "
+                "of them is not a measurement of anything."
+            )
         return best
 
 
@@ -98,7 +152,11 @@ def main() -> int:
     repeat = args.repeat or int(baseline.get("repeat", DEFAULT_REPEAT))
 
     print(f"measuring {trips} trips, best of {repeat}")
-    measured = measure(trips, repeat)
+    try:
+        measured = measure(trips, repeat)
+    except NoWorkMeasured as exc:
+        print(f"::error::{exc}")
+        return 1
     print(f"\nmeasured: {measured:,.0f} rows/CPU-s")
 
     expected = baseline.get("rowsPerCpuSecond")
@@ -114,7 +172,21 @@ def main() -> int:
         )
         return 1
 
-    budget = float(baseline.get("maxRegressionFactor", 2.0))
+    declared_budget = baseline.get("maxRegressionFactor", 2.0)
+    if (
+        not isinstance(declared_budget, int | float)
+        or isinstance(declared_budget, bool)
+        or not 1.0 <= float(declared_budget) <= MAX_SANE_BUDGET
+    ):
+        print(
+            f"::error::{BASELINE.relative_to(ROOT)} declares maxRegressionFactor "
+            f"{declared_budget!r}, which is not a number between 1.0 and "
+            f"{MAX_SANE_BUDGET}. A budget outside that range does not loosen this "
+            "gate, it retires it, and retiring a gate belongs in a reviewed change "
+            "rather than in a data file."
+        )
+        return 1
+    budget = float(declared_budget)
     ratio = float(expected) / measured if measured else float("inf")
     print(
         f"baseline: {float(expected):,.0f} rows/CPU-s "
