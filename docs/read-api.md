@@ -34,8 +34,20 @@ Loads all top-level files from a directory or `.zip` file and returns a
 | `name` | The file name. |
 | `headers` | Column names, in declaration order. |
 | `rows` | `list[Row]`. |
-| `problems` | Structural defects found while reading (bad encoding, ragged rows, and so on). |
+| `problems` | `list[LoadProblem]`: structural defects found while reading (bad encoding, ragged rows, and so on). |
 | `column(name)` | `True` when `name` is a declared header. |
+| `readable` | `False` when the file could not be parsed at all. Check it before reading anything into an empty `rows`: nothing could be read is a different fact from the file was empty. |
+
+## `LoadProblem`
+
+One entry in `FeedFile.problems`, reached through that field rather than
+exported from this namespace. A dataclass: `code` (`"encoding"`, `"empty"`,
+`"ragged"`, `"duplicate_header"` or `"csv_error"`), `message`, `line`,
+`column` (set for `"duplicate_header"`), and `expected` / `actual` (declared
+and actual value counts, set for `"ragged"`). The first three codes are the
+ones that make `readable` false. This page previously documented the
+`problems` field without naming its element type, which left the field
+unusable from the page alone.
 
 ## `Row`
 
@@ -78,3 +90,16 @@ namespace is intentionally curated and kept separate from the top-level
 package namespace (`from tods_validate import validate_feed`, documented in
 [api.md](api.md)) so the stability commitment stays bounded to what is
 re-exported here.
+
+---
+
+Last verified: 2026-08-28, against tods-validate 0.10.0. Every member and
+signature on this page was checked against `loader.py`, `gtfs_companion.py`
+and `read.py`, and against `tods_validate.read.__all__`, which is the list the
+v1 contract freezes. This page documents ten of the nineteen names in
+`docs/v1-contract-candidate.json` and until now carried no currency stamp at
+all, so `make docs-check` had nothing to fail on when it drifted.
+Recheck cadence: every release, and whenever this page changes;
+`make docs-check` fails if the page is edited without a fresh verification.
+
+<!-- doc-currency: sha256=4fbafd6913ab -->

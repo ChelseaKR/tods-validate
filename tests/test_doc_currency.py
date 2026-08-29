@@ -27,11 +27,22 @@ def _checker() -> ModuleType:
     return module
 
 
+# Derived from the checker rather than restated. The list was written out by
+# hand here, so adding docs/read-api.md to STAMPED would have left the new page
+# with a gate in `make docs-check` and no test proving that gate can fail.
+_STAMPED = tuple(_checker().STAMPED)
+
+
+def test_the_stamped_set_is_not_empty() -> None:
+    """A parametrize over an empty list reports success without running."""
+    assert len(_STAMPED) >= 3, f"only {_STAMPED} are stamped; the parser or the list moved"
+
+
 def test_the_committed_stamps_are_current() -> None:
     assert _checker().main() == 0
 
 
-@pytest.mark.parametrize("relative", ["docs/getting-started.md", "docs/api.md"])
+@pytest.mark.parametrize("relative", _STAMPED)
 def test_editing_a_stamped_page_fails_until_it_is_re_verified(
     relative: str, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
