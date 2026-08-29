@@ -144,8 +144,36 @@ audit:
 # Secret scan over the working tree + history (SEC-17/18). Requires the
 # gitleaks binary (see https://github.com/gitleaks/gitleaks#installing); the
 # CI job installs it explicitly rather than via the license-gated Action.
+#
+# Two scans, because one of them cannot see what the other is for. `gitleaks
+# detect --source .` walks commits: it answers "was a secret ever committed",
+# and it is blind to a file that exists on disk and has not been committed
+# yet. That is the state every working tree is in while a gate runs against
+# it. Measured on this repository at v0.10.0: a file at the repository root
+# holding an AWS key pair, a GitHub PAT and a Slack bot token, saved and never
+# added to the index, gave "283 commits scanned / no leaks found" and exit 0
+# from the history scan, and "leaks found: 1" and exit 1 from --no-git. The
+# comment above this recipe had said "working tree + history" since the gate
+# was written; only the history half existed.
+#
+# Both run, whatever the other one did, and each reports its own result -- the
+# same reason `verify` does not stop at its first failure. `.gitleaks.toml`
+# scopes the working-tree scan away from installed dependencies; see that file.
 secrets:
-	gitleaks detect --source . --redact --exit-code 1
+	@status=0; \
+	printf '%s\n' '' 'gitleaks scan 1 of 2: committed history'; \
+	if gitleaks detect --source . --redact --exit-code 1; then \
+		printf '%s\n' 'gitleaks history: PASS'; \
+	else \
+		status=1; printf '%s\n' 'gitleaks history: FAIL'; \
+	fi; \
+	printf '%s\n' '' 'gitleaks scan 2 of 2: working tree, uncommitted files included'; \
+	if gitleaks detect --no-git --source . --redact --exit-code 1; then \
+		printf '%s\n' 'gitleaks working tree: PASS'; \
+	else \
+		status=1; printf '%s\n' 'gitleaks working tree: FAIL'; \
+	fi; \
+	exit $$status
 
 # Node dependency vulnerability audit (SEC-11). This used to be the first line
 # of the `a11y` recipe, which meant a HIGH advisory anywhere in the npm
