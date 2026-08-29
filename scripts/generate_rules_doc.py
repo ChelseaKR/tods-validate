@@ -41,6 +41,42 @@ WEB_RULES_DIR = Path(__file__).parent.parent / "web" / "rules"
 # nothing. Neither is visible in a browser.
 _CATALOG_URL = RULE_PAGE_BASE + "index.html"
 
+# Semgrep's html.security.audit.missing-integrity rule fires on the canonical
+# link of every page this script writes, and the finding is a false positive.
+#
+# The rule is about Subresource Integrity: a script or a stylesheet the browser
+# fetches and executes from a host that could serve different bytes than the
+# ones anyone reviewed, where the `integrity` hash is what makes a substitution
+# fail closed rather than run. Its pattern is `<script $...A >...</script>` or
+# `<link $...A >` where the href or src carries a scheme, with no condition on
+# the rel at all, so it matches every absolute-href link whatever that link is
+# for. It already excludes rel=preconnect, which opens a connection and fetches
+# no subresource; a canonical link is the same case and was never enumerated.
+#
+# A canonical link is metadata. It states which URL a page is, for a crawler to
+# read. The browser fetches nothing from it, and `integrity` is not defined on
+# it, so there is no hash SRI would accept. Measured rather than argued: a
+# probe page carrying four link tags at four distinct paths on a local server,
+# loaded in Chrome with every request recorded, was asked for the stylesheet
+# and preload hrefs and never for the canonical or alternate ones.
+#
+# So it is suppressed at the tag, on the line above it, and nowhere else: not
+# by an --exclude-rule in .github/workflows/semgrep.yml and not by a path in a
+# .semgrepignore, either of which would also silence the real finding this rule
+# exists for. web/index.html carries the Pyodide runtime as an external
+# `<script src>` with an SRI hash on it, added when this same rule caught its
+# absence; dropping the rule repository-wide would let that hash be deleted
+# without a word. tests/test_generate_rules_doc.py holds the suppression to
+# exactly the canonical line.
+_CANONICAL_SRI_SUPPRESSION = (
+    "    <!-- The rule below asks for a Subresource Integrity hash on a\n"
+    "         subresource the browser fetches and executes. A canonical link is\n"
+    "         not one: it is metadata, it starts no fetch, and integrity is not\n"
+    "         defined on it. Suppressed at this tag only, never repository-wide;\n"
+    "         the reasoning is in scripts/generate_rules_doc.py.\n"
+    "         nosemgrep: html.security.audit.missing-integrity.missing-integrity -->\n"
+)
+
 
 def _head_metadata(*, title: str, description: str, canonical: str) -> str:
     """The description, canonical and share card shared by every page here.
@@ -55,6 +91,7 @@ def _head_metadata(*, title: str, description: str, canonical: str) -> str:
     esc = html.escape
     return (
         f'    <meta name="description" content="{esc(description, quote=True)}" />\n'
+        f"{_CANONICAL_SRI_SUPPRESSION}"
         f'    <link rel="canonical" href="{esc(canonical, quote=True)}" />\n'
         f'    <meta property="og:type" content="article" />\n'
         f'    <meta property="og:site_name" content="tods-validate" />\n'

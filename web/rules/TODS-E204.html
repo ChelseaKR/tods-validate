@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TODS-E204: Duplicate primary key — tods-validate rule catalog</title>
     <meta name="description" content="Two rows in a TODS-specific file share the same primary key (run_events: service_id + run_id + event_sequence; vehicles: vehicle_id; employee_run_dates: date + service_id + run_id + employee_id; vehicle_assignments: date + block_id + service_id). Consumers cannot tell the rows apart." />
+    <!-- The rule below asks for a Subresource Integrity hash on a
+         subresource the browser fetches and executes. A canonical link is
+         not one: it is metadata, it starts no fetch, and integrity is not
+         defined on it. Suppressed at this tag only, never repository-wide;
+         the reasoning is in scripts/generate_rules_doc.py.
+         nosemgrep: html.security.audit.missing-integrity.missing-integrity -->
     <link rel="canonical" href="https://chelseakr.github.io/tods-validate/rules/TODS-E204.html" />
     <meta property="og:type" content="article" />
     <meta property="og:site_name" content="tods-validate" />

@@ -5,6 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>TODS-E203: Value has the wrong format — tods-validate rule catalog</title>
     <meta name="description" content="A value does not match its field type: times must be HH:MM:SS (hours may exceed 24 for service after midnight), dates must be YYYYMMDD, event_sequence must be a non-negative whole number, latitudes must be a decimal degree in -90..90, longitudes a decimal degree in -180..180, and shape_dist_traveled a non-negative decimal number." />
+    <!-- The rule below asks for a Subresource Integrity hash on a
+         subresource the browser fetches and executes. A canonical link is
+         not one: it is metadata, it starts no fetch, and integrity is not
+         defined on it. Suppressed at this tag only, never repository-wide;
+         the reasoning is in scripts/generate_rules_doc.py.
+         nosemgrep: html.security.audit.missing-integrity.missing-integrity -->
     <link rel="canonical" href="https://chelseakr.github.io/tods-validate/rules/TODS-E203.html" />
     <meta property="og:type" content="article" />
     <meta property="og:site_name" content="tods-validate" />

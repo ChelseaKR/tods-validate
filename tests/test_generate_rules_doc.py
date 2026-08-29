@@ -251,3 +251,34 @@ def test_no_page_states_a_rule_count_in_its_head() -> None:
         assert re.search(r"\b[0-9]+\b", without_spec_version) is None, (
             f"the catalog description states a figure nothing derives: {described!r}"
         )
+
+
+# ---------------------------------------------------------------------------
+# The one scanner suppression these pages carry
+#
+# Semgrep's html.security.audit.missing-integrity rule matches every link whose
+# href carries a scheme, whatever its rel, so it fires on each page's canonical
+# link. That finding is a false positive (see scripts/generate_rules_doc.py for
+# why), and the marker suppressing it is the only one on the page. A `nosemgrep`
+# suppresses the line it sits on and the line below it, so where it sits is the
+# whole of how narrow it is: one line higher and it would also cover the
+# description, one line lower and it would cover og:type, and a third copy
+# anywhere on the page would cover something nobody decided about.
+# ---------------------------------------------------------------------------
+
+_SUPPRESSION_MARKER = "nosemgrep: html.security.audit.missing-integrity.missing-integrity"
+
+
+def test_the_only_suppression_on_a_page_sits_directly_above_its_canonical() -> None:
+    gen = _load_generator()
+    for name, page in gen.generate_rule_pages().items():
+        lines = page.splitlines()
+        marked = [i for i, line in enumerate(lines) if "nosemgrep" in line]
+        assert len(marked) == 1, f"{name} carries {len(marked)} nosemgrep markers, expected 1"
+        index = marked[0]
+        assert _SUPPRESSION_MARKER in lines[index], (
+            f"{name} suppresses something other than the missing-integrity rule: {lines[index]!r}"
+        )
+        assert lines[index + 1].strip().startswith('<link rel="canonical" '), (
+            f"{name} suppresses the wrong line: the marker covers {lines[index + 1]!r}"
+        )

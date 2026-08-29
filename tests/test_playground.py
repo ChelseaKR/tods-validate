@@ -267,3 +267,36 @@ def test_the_playground_makes_no_root_relative_reference() -> None:
     page = _HTML.read_text(encoding="utf-8")
     rooted = re.findall(r'(?:href|src)="(/(?!/)[^"]*)"', page)
     assert rooted == [], f"root-relative references escape /tods-validate/: {rooted}"
+
+
+# The page carries exactly one scanner suppression. Semgrep's
+# html.security.audit.missing-integrity rule matches every link whose href
+# carries a scheme, whatever its rel, so it fires on the canonical link; that
+# finding is a false positive, and the comment above the tag says why. A
+# `nosemgrep` marker covers the line it sits on and the line below it, so where
+# it sits is the whole of how narrow it is. It must not reach the Pyodide
+# `<script src>` further down, whose integrity hash this same rule is the
+# reason for: that one is the finding the rule exists for, and it has to stay
+# catchable.
+_SUPPRESSION_MARKER = "nosemgrep: html.security.audit.missing-integrity.missing-integrity"
+
+
+def test_the_only_suppression_sits_directly_above_the_canonical() -> None:
+    lines = _HTML.read_text(encoding="utf-8").splitlines()
+    marked = [i for i, line in enumerate(lines) if "nosemgrep" in line]
+    assert len(marked) == 1, f"the page carries {len(marked)} nosemgrep markers, expected 1"
+    index = marked[0]
+    assert _SUPPRESSION_MARKER in lines[index], (
+        f"the page suppresses something other than the missing-integrity rule: {lines[index]!r}"
+    )
+    assert lines[index + 1].strip().startswith('<link rel="canonical" '), (
+        f"the marker covers the wrong line: {lines[index + 1]!r}"
+    )
+
+
+def test_the_external_runtime_script_still_carries_an_integrity_hash() -> None:
+    # The other half of the same decision: the suppression above is defensible
+    # only while the real subresource on this page is still hashed.
+    page = _HTML.read_text(encoding="utf-8")
+    for tag in re.findall(r"<script\b[^>]*\bsrc=[^>]*>", page, re.S):
+        assert "integrity=" in tag, f"an external script ships without an SRI hash: {tag!r}"
