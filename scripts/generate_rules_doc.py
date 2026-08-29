@@ -19,11 +19,88 @@ import sys
 from pathlib import Path
 
 from tods_validate.findings import Severity
+from tods_validate.report import RULE_PAGE_BASE
 from tods_validate.rules import EXAMPLES, Rule, all_rules, render_example_markdown
 from tods_validate.schema import SPEC_VERSION
 
 DOC_PATH = Path(__file__).parent.parent / "docs" / "rules.md"
 WEB_RULES_DIR = Path(__file__).parent.parent / "web" / "rules"
+
+# Each page's canonical URL is the address SARIF already publishes for it.
+#
+# ``RULE_PAGE_BASE`` is what ``helpUri`` points at and what editor hovers open,
+# so reusing it here means a rule page's canonical and the URL the tool hands a
+# CI annotation cannot drift apart: there is one string, and
+# tests/test_generate_rules_doc.py holds the pages to it.
+#
+# It matters that the base carries ``/tods-validate/``. These pages are served
+# at a path under chelseakr.github.io, which five sibling projects also publish
+# under, and https://chelseakr.github.io/ is itself a 404. A canonical naming
+# the bare origin would tell a crawler that six unrelated projects are one
+# page, and a root-relative href would resolve to another project or to
+# nothing. Neither is visible in a browser.
+_CATALOG_URL = RULE_PAGE_BASE + "index.html"
+
+# Semgrep's html.security.audit.missing-integrity rule fires on the canonical
+# link of every page this script writes, and the finding is a false positive.
+#
+# The rule is about Subresource Integrity: a script or a stylesheet the browser
+# fetches and executes from a host that could serve different bytes than the
+# ones anyone reviewed, where the `integrity` hash is what makes a substitution
+# fail closed rather than run. Its pattern is `<script $...A >...</script>` or
+# `<link $...A >` where the href or src carries a scheme, with no condition on
+# the rel at all, so it matches every absolute-href link whatever that link is
+# for. It already excludes rel=preconnect, which opens a connection and fetches
+# no subresource; a canonical link is the same case and was never enumerated.
+#
+# A canonical link is metadata. It states which URL a page is, for a crawler to
+# read. The browser fetches nothing from it, and `integrity` is not defined on
+# it, so there is no hash SRI would accept. Measured rather than argued: a
+# probe page carrying four link tags at four distinct paths on a local server,
+# loaded in Chrome with every request recorded, was asked for the stylesheet
+# and preload hrefs and never for the canonical or alternate ones.
+#
+# So it is suppressed at the tag, on the line above it, and nowhere else: not
+# by an --exclude-rule in .github/workflows/semgrep.yml and not by a path in a
+# .semgrepignore, either of which would also silence the real finding this rule
+# exists for. web/index.html carries the Pyodide runtime as an external
+# `<script src>` with an SRI hash on it, added when this same rule caught its
+# absence; dropping the rule repository-wide would let that hash be deleted
+# without a word. tests/test_generate_rules_doc.py holds the suppression to
+# exactly the canonical line.
+_CANONICAL_SRI_SUPPRESSION = (
+    "    <!-- The rule below asks for a Subresource Integrity hash on a\n"
+    "         subresource the browser fetches and executes. A canonical link is\n"
+    "         not one: it is metadata, it starts no fetch, and integrity is not\n"
+    "         defined on it. Suppressed at this tag only, never repository-wide;\n"
+    "         the reasoning is in scripts/generate_rules_doc.py.\n"
+    "         nosemgrep: html.security.audit.missing-integrity.missing-integrity -->\n"
+)
+
+
+def _head_metadata(*, title: str, description: str, canonical: str) -> str:
+    """The description, canonical and share card shared by every page here.
+
+    Every description is the page's own text: a rule page describes itself with
+    the rule's registered description, and the catalog with its own lede. None
+    of them states a rule count. The count is derived from the registry at
+    build time, README claims about it are pinned by
+    tests/test_readme_claims.py, and a number copied into a meta tag would be a
+    third copy that nothing derives and nothing checks.
+    """
+    esc = html.escape
+    return (
+        f'    <meta name="description" content="{esc(description, quote=True)}" />\n'
+        f"{_CANONICAL_SRI_SUPPRESSION}"
+        f'    <link rel="canonical" href="{esc(canonical, quote=True)}" />\n'
+        f'    <meta property="og:type" content="article" />\n'
+        f'    <meta property="og:site_name" content="tods-validate" />\n'
+        f'    <meta property="og:url" content="{esc(canonical, quote=True)}" />\n'
+        f'    <meta property="og:title" content="{esc(title, quote=True)}" />\n'
+        f'    <meta property="og:description" content="{esc(description, quote=True)}" />\n'
+        f'    <meta name="twitter:card" content="summary" />\n'
+    )
+
 
 _BANDS = {
     "1": "Package and file structure",
@@ -177,13 +254,21 @@ def _rule_page_html(r: Rule) -> str:
     notes_html = f"<p class='meta'>{esc(notes)}</p>\n    " if notes else ""
     spec_href = esc(r.spec_section, quote=True)
     spec_text = esc(r.spec_section)
+    title = f"{r.id}: {r.title} — tods-validate rule catalog"
+    # The rule's registered description, which is the paragraph the page
+    # renders below. Two statements about one rule, from one string.
+    metadata = _head_metadata(
+        title=title,
+        description=r.description,
+        canonical=f"{RULE_PAGE_BASE}{r.id}.html",
+    )
     return f"""<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{esc(r.id)}: {esc(r.title)} — tods-validate rule catalog</title>
-    <style>
+    <title>{esc(title)}</title>
+{metadata}    <style>
 {_PAGE_STYLE}    </style>
   </head>
   <body>
@@ -220,13 +305,22 @@ def _index_page_html(rules: list[Rule]) -> str:
             '    <ul class="rule-list">\n' + "\n".join(items) + "\n    </ul>\n"
         )
     body = "\n".join(sections)
+    metadata = _head_metadata(
+        title="tods-validate rule catalog",
+        description=(
+            f"Every rule tods-validate checks against TODS v{SPEC_VERSION}, one permanent "
+            f"page per rule ID. These are the URLs SARIF helpUri, editor hovers and CI "
+            f"annotations link back to."
+        ),
+        canonical=_CATALOG_URL,
+    )
     return f"""<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>tods-validate rule catalog</title>
-    <style>
+{metadata}    <style>
 {_PAGE_STYLE}    </style>
   </head>
   <body>

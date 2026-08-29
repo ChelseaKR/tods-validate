@@ -166,3 +166,137 @@ def test_playground_api_symbols_exist() -> None:
     # The playground calls these exact signatures.
     assert callable(validate_feed)
     assert callable(render_html)
+
+
+# ---------------------------------------------------------------------------
+# The head, and the shared origin it has to survive
+#
+# The playground is served at a path under chelseakr.github.io, which five
+# sibling projects also publish under, and https://chelseakr.github.io/ is
+# itself a 404. Two mistakes follow, and neither shows up in a browser, because
+# the browser has already been handed the page: a canonical or og:url naming
+# the bare origin, which tells a crawler that six unrelated projects are one
+# page, and a root-relative href, which resolves against the origin rather than
+# /tods-validate/ and so lands on another project or on nothing.
+#
+# web/index.html is hand-written, with no generator behind it, so nothing here
+# is checked by the docs-drift gate. This module is where the page's other
+# hand-editable invariants already live, so the checks go here rather than in a
+# second file that would have to remember to exist.
+# ---------------------------------------------------------------------------
+
+# Written out rather than read from tods_validate.report.RULE_PAGE_BASE. An
+# expectation derived from the constant under test moves with the mistake and
+# stays green.
+_PUBLISHED_AT = "https://chelseakr.github.io/tods-validate/"
+
+# Words that would make the description claim something this project does not.
+# TODS is somebody else's specification: NOTICE says in full that this is not
+# affiliated with, endorsed by, or sponsored by Cal-ITP, MobilityData, the TODS
+# working group, or any agency or vendor. A description is read in places
+# NOTICE is not, so it may not contradict it. Nor may it state coverage: the
+# rule set moves with the spec, and tests/test_readme_claims.py is what holds
+# the README's figures to the registry.
+_FORBIDDEN_IN_DESCRIPTION = (
+    "official",
+    "endorsed",
+    "approved",
+    "certified",
+    "conformant",
+    "conformance",
+    "compliant",
+    "authoritative",
+    "complete coverage",
+    "full coverage",
+)
+
+
+def _head() -> str:
+    return _HTML.read_text(encoding="utf-8").split("</head>", 1)[0]
+
+
+def _meta(attribute: str, name: str) -> str | None:
+    found = re.search(
+        rf'<meta\s+{attribute}="{re.escape(name)}"\s+content="([^"]*)"\s*/?>',
+        _head(),
+        re.S,
+    )
+    if found is None:
+        found = re.search(
+            rf'<meta\s*\n\s*{attribute}="{re.escape(name)}"\s*\n\s*content="([^"]*)"\s*\n\s*/>',
+            _head(),
+            re.S,
+        )
+    return found.group(1) if found else None
+
+
+def test_the_playground_canonical_is_itself_and_keeps_the_project_path() -> None:
+    assert f'<link rel="canonical" href="{_PUBLISHED_AT}" />' in _head()
+    assert _meta("property", "og:url") == _PUBLISHED_AT
+
+
+def test_the_playground_carries_a_share_card_that_agrees_with_the_page() -> None:
+    description = _meta("name", "description")
+    assert description is not None
+    assert description.strip()
+    assert _meta("property", "og:description") == description
+    title = re.search(r"<title>([^<]+)</title>", _head())
+    assert title is not None
+    assert _meta("property", "og:title") == title.group(1)
+    assert _meta("property", "og:type") == "website"
+    assert _meta("property", "og:site_name") == "tods-validate"
+    assert _meta("name", "twitter:card") == "summary"
+
+
+def test_the_playground_description_claims_nothing_the_page_does_not() -> None:
+    description = _meta("name", "description")
+    assert description is not None
+    lowered = description.lower()
+    for word in _FORBIDDEN_IN_DESCRIPTION:
+        assert word not in lowered, (
+            f"the description says {word!r}. This project validates a specification it "
+            f"does not speak for, and states no coverage it has not measured. See NOTICE."
+        )
+    assert re.search(r"\b[0-9]+\b", description) is None, (
+        f"the description states a figure nothing derives: {description!r}"
+    )
+
+
+def test_the_playground_makes_no_root_relative_reference() -> None:
+    # Protocol-relative //host/x is a different thing and is not this mistake.
+    page = _HTML.read_text(encoding="utf-8")
+    rooted = re.findall(r'(?:href|src)="(/(?!/)[^"]*)"', page)
+    assert rooted == [], f"root-relative references escape /tods-validate/: {rooted}"
+
+
+# The page carries exactly one scanner suppression. Semgrep's
+# html.security.audit.missing-integrity rule matches every link whose href
+# carries a scheme, whatever its rel, so it fires on the canonical link; that
+# finding is a false positive, and the comment above the tag says why. A
+# `nosemgrep` marker covers the line it sits on and the line below it, so where
+# it sits is the whole of how narrow it is. It must not reach the Pyodide
+# `<script src>` further down, whose integrity hash this same rule is the
+# reason for: that one is the finding the rule exists for, and it has to stay
+# catchable.
+_SUPPRESSION_MARKER = "nosemgrep: html.security.audit.missing-integrity.missing-integrity"
+
+
+def test_the_only_suppression_sits_directly_above_the_canonical() -> None:
+    lines = _HTML.read_text(encoding="utf-8").splitlines()
+    marked = [i for i, line in enumerate(lines) if "nosemgrep" in line]
+    assert len(marked) == 1, f"the page carries {len(marked)} nosemgrep markers, expected 1"
+    index = marked[0]
+    assert _SUPPRESSION_MARKER in lines[index], (
+        f"the page suppresses something other than the missing-integrity rule: {lines[index]!r}"
+    )
+    assert lines[index + 1].strip().startswith('<link rel="canonical" '), (
+        f"the marker covers the wrong line: {lines[index + 1]!r}"
+    )
+
+
+def test_the_external_runtime_script_still_carries_an_integrity_hash() -> None:
+    # The other half of the same decision: the suppression above is defensible
+    # only while the real subresource on this page is still hashed.
+    page = _HTML.read_text(encoding="utf-8")
+    for tag in re.findall(r"<script\b[^>]*\bsrc=[^>]*>", page, re.S):
+        assert "integrity=" in tag, f"an external script ships without an SRI hash: {tag!r}"

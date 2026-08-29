@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 import importlib.util
+import re
+from html import escape
 from pathlib import Path
 
 from tods_validate.findings import Severity
+from tods_validate.report import RULE_PAGE_BASE
 from tods_validate.rules import all_rules
+from tods_validate.schema import SPEC_VERSION
 
 _SCRIPT = Path(__file__).resolve().parent.parent / "scripts" / "generate_rules_doc.py"
 
@@ -42,7 +46,18 @@ def test_rule_page_carries_expected_fields_and_escapes_html() -> None:
     assert rule.severity.name in page
     assert rule.spec_section in page
     # No external assets: everything is inlined.
-    assert "<link " not in page
+    #
+    # This used to read `assert "<link " not in page`, which stated the rule
+    # more broadly than the rule is. What must not appear is a link that makes
+    # the browser fetch something: a stylesheet, an icon, a font, a preload.
+    # `rel="canonical"` fetches nothing at all; it is a statement about which
+    # URL this page is, and these pages need one, because they are served at a
+    # path on an origin five sibling projects share. So the assertion names the
+    # rels that load rather than the tag that sometimes does.
+    for loading_rel in ("stylesheet", "icon", "preload", "prefetch", "preconnect", "manifest"):
+        assert f'rel="{loading_rel}"' not in page, f"{loading_rel} would be an external fetch"
+    for link in re.findall(r"<link\b[^>]*>", page):
+        assert 'rel="canonical"' in link, f"unexpected <link>: {link}"
     assert "<script" not in page
 
 
@@ -124,3 +139,146 @@ def test_catalog_links_do_not_rely_on_colour_alone() -> None:
     style = _load_generator()._PAGE_STYLE
     assert "text-decoration: underline" in style
     assert "text-decoration: none" not in style
+
+
+# ---------------------------------------------------------------------------
+# The head, and the shared origin these 44 pages have to survive
+#
+# The catalog is served at a path under chelseakr.github.io, which five sibling
+# projects also publish under, and https://chelseakr.github.io/ is itself a
+# 404. A canonical naming the bare origin would tell a crawler that six
+# unrelated projects are one page, and a root-relative href would resolve to
+# another project or to nothing. Neither is visible in a browser.
+#
+# The permanence contract makes it sharper here than elsewhere: these URLs are
+# what SARIF helpUri, editor hovers and CI annotations link back to, and rule
+# IDs are never renumbered, so a link made today is meant to keep working.
+# ---------------------------------------------------------------------------
+
+# Written out rather than imported from tods_validate.report.RULE_PAGE_BASE.
+# The generator reads its canonical from that constant, so a test that also
+# read it would move with the constant and stay green through exactly the
+# mistake it is here to catch.
+_PUBLISHED_RULE_BASE = "https://chelseakr.github.io/tods-validate/rules/"
+
+
+def _head(page: str) -> str:
+    return page.split("</head>", 1)[0]
+
+
+def _attribute(head: str, pattern: str) -> str | None:
+    found = re.search(pattern, head)
+    return found.group(1) if found else None
+
+
+def test_the_generator_reads_its_canonical_from_the_url_sarif_publishes() -> None:
+    # One string, so a rule page's canonical and the helpUri a CI annotation
+    # hands a reader cannot come apart.
+    assert RULE_PAGE_BASE == _PUBLISHED_RULE_BASE
+
+
+def test_every_page_canonical_is_its_own_permanent_url() -> None:
+    gen = _load_generator()
+    pages = gen.generate_rule_pages()
+    for name, page in pages.items():
+        head = _head(page)
+        expected = _PUBLISHED_RULE_BASE + name
+        assert _attribute(head, r'<link rel="canonical" href="([^"]*)"') == expected, (
+            f"{name} canonical is not {expected}"
+        )
+        assert _attribute(head, r'<meta property="og:url" content="([^"]*)"') == expected
+
+
+def test_every_page_describes_itself_with_its_own_text() -> None:
+    gen = _load_generator()
+    pages = gen.generate_rule_pages()
+    for rule in all_rules():
+        head = _head(pages[f"{rule.id}.html"])
+        described = _attribute(head, r'<meta name="description" content="([^"]*)"')
+        assert described == escape(rule.description, quote=True), (
+            f"{rule.id}: the description is not the rule's registered description"
+        )
+    catalog = _head(pages["index.html"])
+    assert (_attribute(catalog, r'<meta name="description" content="([^"]*)"') or "").strip()
+
+
+def test_no_two_pages_share_a_description_or_a_title() -> None:
+    gen = _load_generator()
+    pages = gen.generate_rule_pages()
+    heads = [_head(page) for page in pages.values()]
+    descriptions = [_attribute(h, r'<meta name="description" content="([^"]*)"') for h in heads]
+    titles = [_attribute(h, r"<title>([^<]*)</title>") for h in heads]
+    assert None not in descriptions
+    assert len(set(descriptions)) == len(pages), "two rule pages describe themselves identically"
+    assert len(set(titles)) == len(pages), "two rule pages carry the same title"
+
+
+def test_every_page_carries_a_share_card_that_agrees_with_the_page() -> None:
+    gen = _load_generator()
+    pages = gen.generate_rule_pages()
+    for name, page in pages.items():
+        head = _head(page)
+        assert '<meta property="og:type" content="article" />' in head, name
+        assert '<meta property="og:site_name" content="tods-validate" />' in head, name
+        assert '<meta name="twitter:card" content="summary" />' in head, name
+        title = _attribute(head, r"<title>([^<]*)</title>")
+        assert _attribute(head, r'<meta property="og:title" content="([^"]*)"') == title, name
+        described = _attribute(head, r'<meta name="description" content="([^"]*)"')
+        assert (
+            _attribute(head, r'<meta property="og:description" content="([^"]*)"') == described
+        ), name
+
+
+def test_no_page_makes_a_root_relative_reference() -> None:
+    gen = _load_generator()
+    for name, page in gen.generate_rule_pages().items():
+        rooted = re.findall(r'(?:href|src)="(/(?!/)[^"]*)"', page)
+        assert rooted == [], f"{name} escapes /tods-validate/ via {rooted}"
+
+
+def test_no_page_states_a_rule_count_in_its_head() -> None:
+    # The rule count is derived from the registry. A number in a meta tag would
+    # be a copy nothing derives, wrong the first release a rule is added. Rule
+    # IDs are digits too, so this looks only at the description.
+    gen = _load_generator()
+    for name, page in gen.generate_rule_pages().items():
+        if name != "index.html":
+            continue
+        described = _attribute(_head(page), r'<meta name="description" content="([^"]*)"') or ""
+        # The spec version is a figure the description is allowed to carry: it
+        # is read from tods_validate.schema.SPEC_VERSION, not typed here.
+        without_spec_version = described.replace(f"TODS v{SPEC_VERSION}", "")
+        assert re.search(r"\b[0-9]+\b", without_spec_version) is None, (
+            f"the catalog description states a figure nothing derives: {described!r}"
+        )
+
+
+# ---------------------------------------------------------------------------
+# The one scanner suppression these pages carry
+#
+# Semgrep's html.security.audit.missing-integrity rule matches every link whose
+# href carries a scheme, whatever its rel, so it fires on each page's canonical
+# link. That finding is a false positive (see scripts/generate_rules_doc.py for
+# why), and the marker suppressing it is the only one on the page. A `nosemgrep`
+# suppresses the line it sits on and the line below it, so where it sits is the
+# whole of how narrow it is: one line higher and it would also cover the
+# description, one line lower and it would cover og:type, and a third copy
+# anywhere on the page would cover something nobody decided about.
+# ---------------------------------------------------------------------------
+
+_SUPPRESSION_MARKER = "nosemgrep: html.security.audit.missing-integrity.missing-integrity"
+
+
+def test_the_only_suppression_on_a_page_sits_directly_above_its_canonical() -> None:
+    gen = _load_generator()
+    for name, page in gen.generate_rule_pages().items():
+        lines = page.splitlines()
+        marked = [i for i, line in enumerate(lines) if "nosemgrep" in line]
+        assert len(marked) == 1, f"{name} carries {len(marked)} nosemgrep markers, expected 1"
+        index = marked[0]
+        assert _SUPPRESSION_MARKER in lines[index], (
+            f"{name} suppresses something other than the missing-integrity rule: {lines[index]!r}"
+        )
+        assert lines[index + 1].strip().startswith('<link rel="canonical" '), (
+            f"{name} suppresses the wrong line: the marker covers {lines[index + 1]!r}"
+        )
