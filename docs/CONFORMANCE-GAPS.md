@@ -34,6 +34,42 @@ validator itself has no model runtime.
 v2.0.0 tiers and add a mechanically checked data-card/source inventory without
 claiming ownership of users' input feeds.
 
+## observability
+
+**Current boundary:** Tier C, per `OBSERVABILITY-STANDARD.md` §0. OTel tracing
+is out of scope and the README's `## Observability` section declares it: there
+is no network surface to trace, and the tool is offline by design.
+
+**Still open (found 2026-08-28):** Tier C also asks for "an opt-in
+`--log-format json` flag backed by `structlog`" (`OBSERVABILITY-STANDARD.md`
+§3, and `QUALITY-AND-METRICS-STANDARD.md` line 190 restates it as a must). The
+flag does not exist anywhere in `src/`. Until today the README reproduced the
+standard's own declaration sentence verbatim, ending "Opt-in `--log-format
+json` only", which reads as a statement that the flag is there; nothing in
+this ledger recorded otherwise, and no gate compared the sentence to the CLI.
+`tests/test_readme_claims.py` now does, so the claim cannot return without the
+flag returning with it.
+
+Two ways to close it, and the choice is a product decision rather than a
+remediation:
+
+1. **Restate the tier.** Nothing under `src/` imports `logging`; the package
+   emits no log records at all, so there is no stream for a format flag to
+   select. The machine-readable surface here is the *report* (`--format json`,
+   `--format sarif`, `docs/report.schema.json`), which is a different artifact
+   from a log. If the standard's intent is "a machine can consume this tool's
+   output", that is already met, and the row should say so in those words
+   rather than by naming a flag.
+2. **Implement it.** `structlog` would be a second runtime dependency for a
+   tool that deliberately has one (`click`), added to satisfy a sentence
+   rather than a user. Weaker unless an operator asks for parseable progress
+   logs on large feeds.
+
+Not on the v1.0.0 critical path either way: `--log-format` does not appear in
+`docs/v1-contract-candidate.json`, so adding it later is an additive minor
+release. What was on the critical path was shipping v1.0.0 with the README
+claiming it.
+
 ## incident-response
 
 **Still open:** security reporting and release recovery exist, but the v2.0.0

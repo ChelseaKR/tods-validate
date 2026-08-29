@@ -207,7 +207,10 @@ be passed with `--config path/to/file.toml`. A config may also `extends =
 A third preset, `ingest-ready`, is for a downstream CAD/AVL system deciding
 whether to import a feed at all: it is at least as strict as `strict` (fails
 on warnings, enables `coverage` and `advisory`) and adds no ignores, so it
-doubles as a go/no-go gate rather than an authoring-time policy.
+doubles as a go/no-go gate rather than an authoring-time policy. Today it
+resolves to exactly the same settings as `strict`; it is a separate name
+because the two answer different questions, and a later change to one should
+not silently move the other.
 
 Some checks are off by default because they surface judgement calls rather than
 spec violations. Turn them on with `--enable coverage` (which GTFS trips have no
@@ -388,8 +391,8 @@ jobs:
 The action runs `--format github`, so the annotations it leaves on the pull
 request include the checks that did not run and why (see
 [Rule-set coverage](#rule-set-coverage)). Leaving `gtfs`
-out is the case worth knowing about: 16 reference checks cannot run, 9 of them
-ERROR-severity, and the job still passes. Add
+out is the case worth knowing about: the 16 checks that read GTFS files cannot
+run, 9 of them ERROR-severity, and the job still passes. Add
 `require-complete-run: "true"` to fail it instead.
 
 The action installs `tods-validate` from a hash-verified
@@ -473,8 +476,18 @@ bug — please report it.
 
 ## Observability
 
-Observability: Tier C — OTel tracing out-of-scope (no network surface). Opt-in
---log-format json only.
+Observability: Tier C. OpenTelemetry tracing is out of scope, because there is
+no network surface to trace.
+
+The tier also asks for an opt-in `--log-format json` flag, and that flag does
+not exist. It is not an oversight that a release would quietly carry: the
+package emits no log records at all (nothing under `src/` imports `logging`),
+so a flag to choose their format would be a claim rather than a capability.
+What is machine-readable here is the report, through `--format json`, `--format
+sarif`, and the schema at [docs/report.schema.json](docs/report.schema.json).
+That is a different thing from a log stream, and this section previously
+conflated them. Tracked in
+[docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#observability).
 
 ## Standards Conformance
 
@@ -488,7 +501,7 @@ Applicability and current state:
 | CI-CD | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#ci-cd) |
 | RELEASE-AND-VERSIONING | Applies (PyPI + GHCR + GitHub Releases + Action) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#release-and-versioning) |
 | ACCESSIBILITY | Applies (scoped to the `--format html` report and the `web/` playground) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#accessibility) |
-| OBSERVABILITY | Applies at Tier C (see `## Observability` above) | Applies — Tier C; N/A — tracing has no network surface, as declared above |
+| OBSERVABILITY | Applies at Tier C (see `## Observability` above) | Applies — Tier C; tracing N/A (no network surface); the tier's `--log-format json` is a gap, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#observability) |
 | INTERNATIONALIZATION | N/A — no user-facing strings requiring translation | N/A — see [docs/I18N.md](docs/I18N.md) |
 | AI Development Measurement | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#ai-development-measurement) |
 | AI Evaluation | N/A — no LLM/AI runtime | N/A — no LLM SDK or generative/agentic component anywhere in `src/` or `scripts/`; deterministic rule engine only |
