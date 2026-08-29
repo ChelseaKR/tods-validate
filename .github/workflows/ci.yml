@@ -27,6 +27,12 @@ jobs:
       # CQ-09 drift half of the gate; see the note in the Makefile's `lockfile`
       # target for why `uv sync --frozen` alone cannot fail on a stale lock.
       - run: uv lock --check
+      # The other lockfile: the hash-pinned runtime set action.yml installs.
+      # It is generated from uv.lock and had drifted two minor versions of
+      # click behind it, unnoticed, because nothing compared them. Runs here
+      # rather than in a job of its own because this is the job that already
+      # has uv, and the check needs no index.
+      - run: make action-lock
       - run: uv sync --frozen --group dev
       - run: echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - run: make lint

@@ -92,3 +92,76 @@ def test_the_real_surfaces_are_within_the_committed_budget() -> None:
         if value > limits[name]
     }
     assert not over, f"over the committed bundle budget: {over}"
+
+
+# ---------------------------------------------------------------------------
+# The committed measurement, and the prose that quotes it.
+#
+# `limits` was gated from the day the file landed; `measured` never was. On
+# 2026-08-29 the recorded playgroundPageBytes was 39% under the real page and
+# publishedSiteBytes 57% under the real tree, both stale since the meta and
+# canonical tags landed on the 45 published pages, and both still inside their
+# ceilings, so nothing went red. docs/BENCHMARKS.md carried the same two stale
+# numbers, and the rationale strings carried them a third time in KiB.
+#
+# The measurement is bytes, and bytes are exact, so the comparison below is
+# exact. Nothing here writes: `scripts/check_bundle_budget.py --update` is how
+# the file is regenerated, and it runs only when a person asks.
+
+BENCHMARKS = ROOT / "docs" / "BENCHMARKS.md"
+
+# How each rationale string is expected to quote its own measurement. Precision
+# differs per surface because the surfaces differ in size, so the renderings are
+# named rather than guessed.
+_RATIONALE_FIGURE = {
+    "playgroundPageBytes": lambda value: f"{value / 1024:.1f} KiB",
+    "publishedSiteBytes": lambda value: f"{value / 1024:.0f} KiB",
+    "publishedPageCount": lambda value: f"{value:d}",
+    "reportBytesAt10kFindings": lambda value: f"{value / 1024 / 1024:.2f} MiB",
+}
+
+
+def test_the_committed_measurement_is_what_the_surfaces_measure_now() -> None:
+    gate = _gate()
+    committed = json.loads(BUDGET.read_text(encoding="utf-8"))["measured"]
+    assert gate.measure() == committed, (
+        "perf/bundle-baseline.json's measured block does not describe the surfaces this "
+        "commit ships. Regenerate it: python scripts/check_bundle_budget.py --update"
+    )
+
+
+def test_every_measured_surface_has_a_rationale_that_quotes_its_own_number() -> None:
+    document = json.loads(BUDGET.read_text(encoding="utf-8"))
+    measured = document["measured"]
+    rationale = document["rationale"]
+    assert set(rationale) == set(measured), sorted(set(rationale) ^ set(measured))
+    assert set(_RATIONALE_FIGURE) == set(measured), sorted(set(_RATIONALE_FIGURE) ^ set(measured))
+    for name, value in measured.items():
+        figure = _RATIONALE_FIGURE[name](value)
+        assert figure in rationale[name], (
+            f"the rationale for {name} does not quote its measured value ({figure}); "
+            "the prose and the measurement have drifted apart"
+        )
+
+
+def test_the_rationale_counts_the_rules_the_registry_holds() -> None:
+    # "One page per rule plus two indexes; 43 rules today" is a count, and a
+    # count typed once is a count that stops being true.
+    from tods_validate.rules import all_rules
+
+    rationale = json.loads(BUDGET.read_text(encoding="utf-8"))["rationale"]
+    assert f"{len(all_rules())} rules today" in rationale["publishedPageCount"]
+
+
+def test_the_benchmarks_doc_quotes_the_committed_bundle_numbers() -> None:
+    # docs/BENCHMARKS.md restates the whole table. It is the third copy of these
+    # numbers and was the second to go stale.
+    document = json.loads(BUDGET.read_text(encoding="utf-8"))
+    text = BENCHMARKS.read_text(encoding="utf-8")
+    for name, value in document["measured"].items():
+        limit = document["limits"][name]
+        row = f"| {value:,} | {limit:,} |"
+        assert row in text, (
+            f"docs/BENCHMARKS.md has no bundle row reading {row!r} for {name}; "
+            "the doc and perf/bundle-baseline.json have drifted apart"
+        )

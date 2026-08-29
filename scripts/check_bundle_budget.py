@@ -22,15 +22,29 @@ unrecorded budget is a failure, not a pass, and the failure prints the number
 just measured. Unlike throughput, bytes are exact, so the budgets are absolute
 ceilings with headroom rather than ratios against a noisy measurement.
 
+The file also records what the surfaces measured when it was last written, and
+that half is checked too. A committed measurement nothing re-derives is a
+number that describes whatever the code used to do: on 2026-08-29 the recorded
+``playgroundPageBytes`` was 39% under the real page and ``publishedSiteBytes``
+57% under the real tree, both of them stale since the meta and canonical tags
+landed on the 45 published pages, and both still inside their ceilings, so no
+gate went red. ``tests/test_bundle_budget.py`` now compares the recorded
+measurement against a live one, exactly, and ``--update`` is how it is
+regenerated.
+
 Usage:
 
     python scripts/check_bundle_budget.py
+    python scripts/check_bundle_budget.py --update    # rewrite the measurement
 """
 
 from __future__ import annotations
 
+import argparse
+import datetime as dt
 import json
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -82,7 +96,39 @@ def load_budget() -> dict[str, Any]:
     return loaded
 
 
-def main() -> int:
+def update(today: str | None = None) -> dict[str, int]:
+    """Rewrite the ``measured`` block from a live measurement.
+
+    The one place that writes into the working tree, and it writes only when
+    asked. The gate itself never repairs what it is meant to report.
+    """
+    document = load_budget()
+    measured = measure()
+    document["measured"] = measured
+    document["measuredAt"] = today or dt.date.today().isoformat()
+    BUDGET.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
+    return measured
+
+
+def main(argv: Sequence[str] | None = None) -> int:
+    """Run the gate. ``argv`` defaults to no flags, not to ``sys.argv``.
+
+    ``tests/test_bundle_budget.py`` calls this in-process, where ``sys.argv``
+    holds pytest's own arguments; the entry point below passes the real ones.
+    """
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--update",
+        action="store_true",
+        help="rewrite the measured block in perf/bundle-baseline.json and exit",
+    )
+    args = parser.parse_args(list(argv) if argv is not None else [])
+    if args.update:
+        for name, value in update().items():
+            print(f"{name:>26}: {value:>10,}")
+        print(f"rewrote the measurement in {BUDGET.relative_to(ROOT)}")
+        return 0
+
     budget = load_budget()
     measured = measure()
     limits = budget.get("limits")
@@ -117,4 +163,4 @@ def main() -> int:
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    raise SystemExit(main(sys.argv[1:]))
