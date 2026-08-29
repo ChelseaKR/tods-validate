@@ -4,12 +4,12 @@
 # (REL-14/15). CI additionally runs what needs GitHub itself -- the composite
 # action's self-test, CodeQL, Semgrep and zizmor -- so a green `make verify` is
 # a necessary condition for merge, not a sufficient one.
-.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation perf-check memory-check
+.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation-cff perf-check memory-check
 
 # Every gate `make verify` runs, in reporting order. Each one is independent:
 # see the recipe below for why that matters.
 VERIFY_GATES := lockfile lint format typecheck test docs-check contract-check i18n-check \
-	audit npm-audit secrets a11y citation
+	audit npm-audit secrets a11y citation-cff
 
 # The gates run one after another and every one of them runs, whatever the ones
 # before it did. This is deliberate. When `verify` was a prerequisite list, make
@@ -114,7 +114,15 @@ a11y:
 # (DOC-08). Catches malformed citation metadata before a release ships it.
 # Run via uvx so the check needs no addition to the dev dependency set;
 # cffconvert is fetched ephemerally into uv's tool cache.
-citation:
+#
+# Named for the file, not for the word. It was called `citation` until 2026-08-29,
+# which in a repository whose premise is cited findings read as a claim that the
+# spec citations findings carry had been checked. They had not, by this target or
+# any other under this name. Those citations are checked elsewhere:
+# tests/test_registry.py asserts every rule's spec_section is a URL under the TODS
+# specification, and `make docs-check` regenerates docs/rules.md from the registry
+# and fails on any drift.
+citation-cff:
 	uvx cffconvert --validate -i CITATION.cff
 
 # Perf budget (QM-02): validation throughput against perf/baseline.json.
