@@ -29,6 +29,7 @@ _README = Path(__file__).resolve().parent.parent / "README.md"
 # whose flag it is.
 _FOREIGN_FLAGS = {
     "--rm": "docker run",
+    "--group": "pip install",
     "--no-deps": "pip install",
     "--require-hashes": "pip install",
 }
