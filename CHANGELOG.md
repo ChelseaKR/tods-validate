@@ -31,6 +31,16 @@ Added:
   from `RULE_PAGE_BASE`, because a check that derives its expectation from the
   constant it is checking moves with the mistake.
 
+Changed:
+
+- The `make citation` gate is now `make citation-cff`, and the CI job that runs
+  it is renamed to match. It validates `CITATION.cff`, the file describing how
+  to cite the software; it has never had anything to do with the spec citations
+  findings carry. In a repository whose premise is cited findings, a green
+  `make citation` read as a claim about the wrong thing entirely. The recipe is
+  unchanged and `docs/rulesets/main.json` is updated so the intended ruleset
+  still names a check the workflows produce.
+
 Fixed:
 
 - `test_rule_page_carries_expected_fields_and_escapes_html` asserted
