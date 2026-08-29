@@ -139,3 +139,34 @@ def test_the_real_measurement_matches_the_committed_baseline() -> None:
     assert ratio / committed <= budget, (
         f"measured {ratio:.2f}x against a committed {committed:.2f}x, past the {budget:.2f}x budget"
     )
+
+
+BENCHMARKS = ROOT / "docs" / "BENCHMARKS.md"
+
+
+def test_benchmarks_md_quotes_the_committed_memory_numbers() -> None:
+    """The third copy of the ratio, held to the first.
+
+    `SECURITY.md` has been pinned to `perf/baseline.json` since the memory
+    budget landed; `docs/BENCHMARKS.md` restates the same measurement in a
+    table of its own and was pinned to nothing. Both copies are hand-typed, and
+    a copy nothing re-derives is the one that goes quietly wrong: the bundle
+    half of the same file was found 39% and 57% stale on 2026-08-29.
+
+    The interpreter-specific figures in the prose (30.90x on 3.13, 30.53x on
+    3.12) are deliberately not checked here. `perf/baseline.json` records them
+    only inside a free-text `memoryMeasuredOn` note, so there is nothing to
+    derive them from; pinning prose to prose would assert agreement between two
+    hand-typed strings and prove nothing. What is checked is every figure the
+    JSON holds as a value.
+    """
+    baseline = json.loads(BASELINE.read_text(encoding="utf-8"))
+    text = BENCHMARKS.read_text(encoding="utf-8")
+    ratio = float(baseline["peakBytesPerInputByte"])
+    budget = float(baseline["maxMemoryRegressionFactor"])
+    trips = int(baseline["memoryTrips"])
+    for figure in (f"{ratio:.1f}x", f"{budget:.2f}x", f"{trips:,}-trip"):
+        assert figure in text, (
+            f"docs/BENCHMARKS.md does not quote {figure} from perf/baseline.json; "
+            "the doc and the measured baseline have drifted apart"
+        )

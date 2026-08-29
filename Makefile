@@ -8,8 +8,8 @@
 
 # Every gate `make verify` runs, in reporting order. Each one is independent:
 # see the recipe below for why that matters.
-VERIFY_GATES := lockfile lint format typecheck test docs-check contract-check i18n-check \
-	audit npm-audit secrets a11y citation-cff
+VERIFY_GATES := lockfile action-lock lint format typecheck test docs-check contract-check \
+	i18n-check audit npm-audit secrets a11y citation-cff
 
 # The gates run one after another and every one of them runs, whatever the ones
 # before it did. This is deliberate. When `verify` was a prerequisite list, make
@@ -51,6 +51,40 @@ verify:
 lockfile:
 	uv lock --check
 
+# requirements-action.lock is the hash-pinned runtime set action.yml installs
+# with `pip install --require-hashes --only-binary=:all:`. It used to be
+# maintained by hand, with a comment telling the next person to run
+# `pip download` and `pip hash`, and nothing compared it to anything. On
+# 2026-08-29 it pinned click==8.1.8 while uv.lock, requirements-dev.lock and
+# every CI job resolved click==8.4.2: the published composite action had been
+# installing a different click from the one this project tests against, and no
+# gate could say so.
+#
+# It is generated now, by the command its own header records, and this gate
+# regenerates it into a temporary file and diffs. The command reads uv.lock and
+# needs no index, so the gate is offline. The `; sys_platform == 'win32'` line
+# for colorama is uv's, not an error: pip evaluates the marker and skips the
+# line on the Linux runner the action uses, verified against pip's real
+# --require-hashes path rather than assumed.
+#
+# Regenerate with the command in the file's header, redirecting to the file:
+#   uv export --frozen --no-dev --no-emit-project --format requirements-txt \
+#     > requirements-action.lock
+ACTION_LOCK_EXPORT := uv export --frozen --no-dev --no-emit-project --format requirements-txt
+
+action-lock:
+	@out="$$(mktemp)" && \
+	$(ACTION_LOCK_EXPORT) > "$$out" && \
+	if diff -u requirements-action.lock "$$out"; then \
+		rm -f "$$out"; \
+		echo "requirements-action.lock is what uv.lock exports"; \
+	else \
+		rm -f "$$out"; \
+		echo "requirements-action.lock has drifted from uv.lock. Regenerate it:" >&2; \
+		echo "  $(ACTION_LOCK_EXPORT) > requirements-action.lock" >&2; \
+		exit 1; \
+	fi
+
 lint:
 	ruff check src tests scripts
 
@@ -63,9 +97,30 @@ typecheck:
 test:
 	pytest --cov --cov-report=term-missing --cov-fail-under=90
 
+# Two independent drift checks, and both of them run.
+#
+# These were two recipe lines. make aborts a recipe at its first failing line,
+# so a stale docs/rules.md meant check_doc_currency.py did not run at all: the
+# gate reported a generated-doc problem and never performed a currency check.
+# That is the same failure the `a11y` and `npm-audit` comments below describe,
+# one level down. `verify` isolates gates from each other; nothing was
+# isolating the checks inside one gate. Each reports its own result now, and
+# docs-check exits non-zero if either failed.
 docs-check:
-	python scripts/generate_rules_doc.py --check
-	python scripts/check_doc_currency.py
+	@status=0; \
+	printf '%s\n' '' 'docs check 1 of 2: generated docs match the rule registry'; \
+	if python scripts/generate_rules_doc.py --check; then \
+		printf '%s\n' 'generated docs: PASS'; \
+	else \
+		status=1; printf '%s\n' 'generated docs: FAIL'; \
+	fi; \
+	printf '%s\n' '' 'docs check 2 of 2: stamped pages are current'; \
+	if python scripts/check_doc_currency.py; then \
+		printf '%s\n' 'doc currency: PASS'; \
+	else \
+		status=1; printf '%s\n' 'doc currency: FAIL'; \
+	fi; \
+	exit $$status
 
 contract-check:
 	python scripts/check_public_contract.py

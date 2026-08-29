@@ -1,6 +1,6 @@
 {
-  "measuredAt": "2026-08-27",
-  "note": "Byte budgets for the HTML this project ships, closing the bundle half of the performance gap in docs/CONFORMANCE-GAPS.md. Bytes are exact, so these are absolute ceilings with deliberate headroom rather than ratios against a noisy measurement. Raising one is a decision: say why here, in the same commit. Measured by scripts/check_bundle_budget.py; tests/test_bundle_budget.py runs the same comparison inside make test.",
+  "measuredAt": "2026-08-29",
+  "note": "Byte budgets for the HTML this project ships, closing the bundle half of the performance gap in docs/CONFORMANCE-GAPS.md. Bytes are exact, so these are absolute ceilings with deliberate headroom rather than ratios against a noisy measurement. Raising one is a decision: say why here, in the same commit. Measured by scripts/check_bundle_budget.py, regenerated with its --update flag; tests/test_bundle_budget.py runs the same comparison inside make test and holds the measured block, the rationale figures and the docs/BENCHMARKS.md table to a live measurement, so a stale number here fails rather than sitting quietly under its ceiling.",
   "limits": {
     "playgroundPageBytes": 12288,
     "publishedSiteBytes": 262144,
@@ -8,14 +8,14 @@
     "reportBytesAt10kFindings": 3145728
   },
   "measured": {
-    "playgroundPageBytes": 7465,
-    "publishedSiteBytes": 112626,
+    "playgroundPageBytes": 10363,
+    "publishedSiteBytes": 176501,
     "publishedPageCount": 45,
     "reportBytesAt10kFindings": 2348762
   },
   "rationale": {
-    "playgroundPageBytes": "12 KiB against 7.4 KiB measured. The page is a single self-contained file with no external assets bar the SRI-pinned Pyodide script, and it should stay one screenful of markup plus its boot script. A 60% rise is a redesign, not a tweak.",
-    "publishedSiteBytes": "256 KiB against 110 KiB measured, sized so the rule catalog can roughly double (a whole new rule band) without the budget firing, while a build that started emitting something unintended into web/ would.",
+    "playgroundPageBytes": "12 KiB against 10.1 KiB measured. The page is a single self-contained file with no external assets bar the SRI-pinned Pyodide script, and it should stay one screenful of markup plus its boot script. The meta, canonical and og tags that landed with the 45-page catalog took it from 7.3 KiB to 10.1 KiB and left 16% headroom, which is tight on purpose: the next addition of that size has to be argued for rather than absorbed.",
+    "publishedSiteBytes": "256 KiB against 172 KiB measured. The ceiling was sized when the tree was 110 KiB, so the rule catalog could roughly double before it fired; the per-page meta and canonical tags have since taken the tree to 172 KiB, so the remaining headroom is about ten more rule pages rather than a doubling. A build that started emitting something unintended into web/ still fires it.",
     "publishedPageCount": "60 against 45. One page per rule plus two indexes; 43 rules today. Catches a generator that starts writing pages nobody asked for, which a byte total alone can miss.",
     "reportBytesAt10kFindings": "3 MiB against 2.24 MiB measured, about 235 bytes per finding. This is the number that can grow silently: a template change adding 80 bytes to a row is invisible on a fixture and adds 800 KB here. FIX-15's contract is that a 10,000-finding report stays usable, and a report that has to be downloaded before it can be read is not."
   }
