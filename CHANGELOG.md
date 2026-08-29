@@ -175,6 +175,45 @@ Fixed:
   the honest answer to "the page this repository publishes", and which goes
   green again on the deploy that resolves any real drift.
 
+- The secret-scan gate could not see the working tree. `make secrets` ran
+  `gitleaks detect --source .`, which walks commits, under a comment claiming
+  it covered "working tree + history". Measured: a file at the repository root
+  holding an AWS key pair, a GitHub PAT and a Slack bot token, saved and never
+  added to the index, gave "283 commits scanned / no leaks found" and exit 0;
+  the same tree with `--no-git` gave "leaks found: 1" and exit 1. The gate now
+  runs both scans, each reporting its own result, and neither can
+  short-circuit the other. `.gitleaks.toml` scopes the working-tree scan away
+  from `.venv/` and `node_modules/`, which `verify.yml` populates before it
+  runs `make verify`.
+- The performance budget could only fail for one reason, and doing less work
+  made it greener. `scripts/check_perf_budget.py` divided an assumed row count
+  (`trips * 2`) by CPU time and discarded the timed run's result entirely, so
+  a validator that had stopped reading the feed would have burned almost no
+  CPU, reported an enormous rate, and passed further inside the budget than a
+  correct one. Every repetition now counts the rows the loader actually
+  parsed, refuses to report a rate below the floor the generator writes, and
+  refuses when two repetitions disagree about the count.
+  `maxRegressionFactor` is also bounded: it was read unbounded from the same
+  file as the baseline, where a large enough value retires the gate rather
+  than loosening it.
+- `mypy` did not check the scripts that are the gates. `ruff` covered
+  `src tests scripts`; `mypy` had `files = ["src"]`, leaving
+  `check_public_contract.py`, `check_npm_audit.py`, `generate_rules_doc.py`
+  and `spec_watch.py` unchecked. Now `["src", "scripts"]`, 44 files. One real
+  error surfaced and is fixed: `spec_watch.py`'s spec fetch returned `Any`
+  from a function declared `-> str`.
+- `make verify` could be green on a tree CI rejects, without saying so. Two
+  `pull_request` jobs had no `make` equivalent and no mention in the Makefile
+  header that enumerates CI-only work: `perf`, and the VS Code extension
+  package job (path-filtered to `editor/vscode/**`, which is why it went
+  unnoticed). Both are named now, and `tests/test_ci_gate_parity.py` compares
+  the header to the workflows so the next one cannot go unnamed.
+- `docs/read-api.md` was outside the currency gate. It documents ten of the
+  nineteen names the v1 contract freezes and carried no `Last verified` stamp,
+  so `make docs-check` had nothing to fail on when it drifted. Added to
+  `STAMPED`, and `tests/test_doc_currency.py` now derives its parametrize from
+  that list instead of restating it.
+
 Changed:
 
 - `loader.py` now pools cell values per file: equal cells in one file share one
@@ -268,6 +307,42 @@ Added:
   a pin PyPI did not serve, so `micropip.install` rejected it for every
   visitor while every gate stayed green). Runs in `pages.yml` after each
   deploy and weekly in `playground-deployment.yml` (#146).
+- `src/tods_validate/py.typed`. The package declared no type information, so
+  every downstream type checker treated an installed `tods-validate` as
+  untyped and refused to look inside it: a five-line consumer importing
+  `validate_feed` got `Skipping analyzing "tods_validate": ... missing library
+  stubs or py.typed marker` and exit 1 from `mypy --strict`, and gets
+  "Success" now. `mypy --strict` has run over `src/` on every pull request
+  since 0.1.0 without any of that reaching a caller.
+- Tests for the two public exports nothing exercised.
+  `tods_validate.read.to_dataframe` and `tods_validate.__version__` are both in
+  `docs/v1-contract-candidate.json` and were named in none of the 52 test
+  modules, which a 90% line-coverage floor cannot see. Both are covered, and
+  `tests/test_contract_surface.py` adds the floor that finds the next one.
+- `tests/test_readme_claims.py`: every `--flag` the README names must exist in
+  the CLI, or be attributed to another program, or be recorded as
+  documented-absent with a link to the gap that tracks it.
+
+Documentation:
+
+- The Observability section claimed an opt-in `--log-format json` flag. No
+  such flag exists, and no module under `src/` imports `logging`, so there are
+  no log records for one to format. The section says that now, the Standards
+  Conformance table points at the new
+  `docs/CONFORMANCE-GAPS.md#observability` row, and the row sets out both ways
+  to close it without picking one.
+- `docs/api.md` listed seven `Finding` fields and two helpers. The dataclass
+  has ten fields and three helpers, and `docs/report.schema.json` already
+  required the three it omitted (`data`, `caused_by`, `severity_original`) and
+  `fingerprint()`, which is the identity `--baseline` matches on.
+- `docs/read-api.md` now documents `FeedFile.readable` and `LoadProblem`;
+  `problems` had been documented without its element type.
+- Two smaller README corrections: "16 reference checks" is now "the 16 checks
+  that read GTFS files" (six of the sixteen are field, semantic or coverage
+  rules), and the `ingest-ready` paragraph records that it currently resolves
+  to the same settings as `strict`.
+- `docs/plans/v1.0.0-readiness.md`, an item-by-item readiness assessment with
+  evidence per item, and `docs/plans/improvement-plan.md`, the log behind it.
 
 ## [0.10.0] - 2026-08-21
 
