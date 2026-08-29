@@ -7,6 +7,25 @@ new checks may be added in minor releases.
 
 Added:
 
+- Every published file is compared with the deployment, not just the front
+  page. `pages.yml` uploads the whole `web` directory, 46 files today, and
+  `scripts/check-deployed-playground.sh` compared exactly one of them, once a
+  week. `scripts/check-deployed-tree.sh` walks the tracked tree and names every
+  file whose live bytes are not the published bytes;
+  `.github/workflows/live-integrity.yml` runs it daily and on demand. It refuses
+  to pass vacuously: a comparison set under 40 files, a fetch that does not
+  succeed, and an origin that answers a guaranteed-missing path with anything but
+  404 are failures rather than a quiet OK. The `drift` job moves out of
+  `playground-deployment.yml`, which keeps the two jobs that need a browser on
+  their weekly cadence.
+
+  It is red on arrival, and that is the finding rather than a defect in the
+  check: all 46 published files currently differ from the deployment. The last
+  successful deploy was 2026-08-22, and the page metadata added since then has
+  never reached the site. The version pin both the boot check and the
+  accessibility audit read is identical on both sides, which is why nothing
+  already running could see it.
+
 - Every published page says what it is and where it is. The playground and all
   44 rule-catalog pages carried a `<title>` and nothing else in the head: no
   description, no canonical, no Open Graph, no Twitter card. Each page now
