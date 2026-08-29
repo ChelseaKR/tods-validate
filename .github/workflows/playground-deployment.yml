@@ -46,18 +46,11 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  drift:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      # No fetch-depth: 0. The expected page is web/index.html in this
-      # checkout; the deep fetch was only ever there to resolve release tags.
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
-        with:
-          persist-credentials: false
-      - name: Compare the deployed page with web/index.html on the default branch
-        run: ./scripts/check-deployed-playground.sh
-
+  # The byte comparison that used to be this workflow's `drift` job now lives in
+  # live-integrity.yml. It moved because it needs no browser and can therefore run
+  # daily rather than weekly, and because it now walks the whole tracked `web` tree
+  # instead of comparing web/index.html alone. The two jobs below still need Chrome,
+  # so they stay on the weekly cadence they were written for.
   boots:
     runs-on: ubuntu-latest
     timeout-minutes: 15

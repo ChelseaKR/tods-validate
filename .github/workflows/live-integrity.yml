@@ -1,0 +1,66 @@
+# Does every published page say what this repository says, or only the front one?
+#
+# pages.yml uploads the whole `web` directory: the playground, its README, the
+# rule index, and 44 per-rule reference pages. Until now exactly one of those 46
+# files was ever compared with the deployment, and only once a week.
+#
+# On 2026-08-29 all 46 differed. #157 gave every page a canonical URL, a
+# description and a title; the last successful deploy was 2026-08-22; and the
+# version pin the boot check reads was identical on both sides, so nothing that
+# ran daily could see it. That is the gap this closes.
+#
+# scripts/check-deployed-tree.sh walks the tracked tree and compares each file
+# with the bytes the origin serves. It is the same oracle its sibling uses, for
+# the reason recorded at the top of that script: the default branch is the honest
+# answer to "the page this repository publishes", and it is self-healing, red
+# exactly while the deployment is behind and green again on the deploy that fixes
+# it. This is deliberately NOT a pull-request gate, so an unmerged PR editing a
+# page never trips it.
+#
+# It runs daily rather than weekly and needs no browser, which is why it is here
+# rather than in playground-deployment.yml: that workflow boots a headless Chrome
+# and audits accessibility, and running those seven times as often to get a byte
+# comparison seven times as often would be paying the wrong cost. The drift job
+# that used to live there is now this workflow.
+#
+# Runs daily and on demand (Actions > live integrity sentinel > Run workflow).
+name: live integrity sentinel
+
+on:
+  schedule:
+    - cron: "41 15 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: live-integrity
+  cancel-in-progress: false
+
+jobs:
+  tree:
+    name: every published file is the file this repository publishes
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          ref: main
+          persist-credentials: false
+
+      - name: Compare every published file with the deployment
+        run: |
+          set -uo pipefail
+          expected_sha="$(git rev-parse HEAD)"
+          ./scripts/check-deployed-tree.sh
+          check_rc="$?"
+          # A deploy for a newer commit may have landed while this ran, in which
+          # case the tree differing from THIS commit is the deploy working. Only
+          # that exact case is excused, and only by re-reading the remote after.
+          remote_sha="$(git ls-remote --exit-code origin refs/heads/main | cut -f1)"
+          if [ "$remote_sha" != "$expected_sha" ]; then
+            echo "::warning::main moved to ${remote_sha} while this ran; re-run once its deploy finishes"
+            exit 0
+          fi
+          exit "$check_rc"
