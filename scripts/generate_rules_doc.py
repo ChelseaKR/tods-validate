@@ -19,11 +19,51 @@ import sys
 from pathlib import Path
 
 from tods_validate.findings import Severity
+from tods_validate.report import RULE_PAGE_BASE
 from tods_validate.rules import EXAMPLES, Rule, all_rules, render_example_markdown
 from tods_validate.schema import SPEC_VERSION
 
 DOC_PATH = Path(__file__).parent.parent / "docs" / "rules.md"
 WEB_RULES_DIR = Path(__file__).parent.parent / "web" / "rules"
+
+# Each page's canonical URL is the address SARIF already publishes for it.
+#
+# ``RULE_PAGE_BASE`` is what ``helpUri`` points at and what editor hovers open,
+# so reusing it here means a rule page's canonical and the URL the tool hands a
+# CI annotation cannot drift apart: there is one string, and
+# tests/test_generate_rules_doc.py holds the pages to it.
+#
+# It matters that the base carries ``/tods-validate/``. These pages are served
+# at a path under chelseakr.github.io, which five sibling projects also publish
+# under, and https://chelseakr.github.io/ is itself a 404. A canonical naming
+# the bare origin would tell a crawler that six unrelated projects are one
+# page, and a root-relative href would resolve to another project or to
+# nothing. Neither is visible in a browser.
+_CATALOG_URL = RULE_PAGE_BASE + "index.html"
+
+
+def _head_metadata(*, title: str, description: str, canonical: str) -> str:
+    """The description, canonical and share card shared by every page here.
+
+    Every description is the page's own text: a rule page describes itself with
+    the rule's registered description, and the catalog with its own lede. None
+    of them states a rule count. The count is derived from the registry at
+    build time, README claims about it are pinned by
+    tests/test_readme_claims.py, and a number copied into a meta tag would be a
+    third copy that nothing derives and nothing checks.
+    """
+    esc = html.escape
+    return (
+        f'    <meta name="description" content="{esc(description, quote=True)}" />\n'
+        f'    <link rel="canonical" href="{esc(canonical, quote=True)}" />\n'
+        f'    <meta property="og:type" content="article" />\n'
+        f'    <meta property="og:site_name" content="tods-validate" />\n'
+        f'    <meta property="og:url" content="{esc(canonical, quote=True)}" />\n'
+        f'    <meta property="og:title" content="{esc(title, quote=True)}" />\n'
+        f'    <meta property="og:description" content="{esc(description, quote=True)}" />\n'
+        f'    <meta name="twitter:card" content="summary" />\n'
+    )
+
 
 _BANDS = {
     "1": "Package and file structure",
@@ -177,13 +217,21 @@ def _rule_page_html(r: Rule) -> str:
     notes_html = f"<p class='meta'>{esc(notes)}</p>\n    " if notes else ""
     spec_href = esc(r.spec_section, quote=True)
     spec_text = esc(r.spec_section)
+    title = f"{r.id}: {r.title} — tods-validate rule catalog"
+    # The rule's registered description, which is the paragraph the page
+    # renders below. Two statements about one rule, from one string.
+    metadata = _head_metadata(
+        title=title,
+        description=r.description,
+        canonical=f"{RULE_PAGE_BASE}{r.id}.html",
+    )
     return f"""<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>{esc(r.id)}: {esc(r.title)} — tods-validate rule catalog</title>
-    <style>
+    <title>{esc(title)}</title>
+{metadata}    <style>
 {_PAGE_STYLE}    </style>
   </head>
   <body>
@@ -220,13 +268,22 @@ def _index_page_html(rules: list[Rule]) -> str:
             '    <ul class="rule-list">\n' + "\n".join(items) + "\n    </ul>\n"
         )
     body = "\n".join(sections)
+    metadata = _head_metadata(
+        title="tods-validate rule catalog",
+        description=(
+            f"Every rule tods-validate checks against TODS v{SPEC_VERSION}, one permanent "
+            f"page per rule ID. These are the URLs SARIF helpUri, editor hovers and CI "
+            f"annotations link back to."
+        ),
+        canonical=_CATALOG_URL,
+    )
     return f"""<!doctype html>
 <html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>tods-validate rule catalog</title>
-    <style>
+{metadata}    <style>
 {_PAGE_STYLE}    </style>
   </head>
   <body>

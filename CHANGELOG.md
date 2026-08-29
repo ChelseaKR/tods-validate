@@ -5,7 +5,40 @@ new checks may be added in minor releases.
 
 ## [Unreleased]
 
+Added:
+
+- Every published page says what it is and where it is. The playground and all
+  44 rule-catalog pages carried a `<title>` and nothing else in the head: no
+  description, no canonical, no Open Graph, no Twitter card. Each page now
+  carries all of them. A rule page describes itself with the rule's registered
+  description, which is the paragraph it already renders, so there is one
+  string rather than two. Its canonical is `RULE_PAGE_BASE + <id>.html`, the
+  same URL SARIF `helpUri` and editor hovers already publish, so a page's
+  canonical and the link a CI annotation hands a reader cannot drift apart.
+
+  Every absolute URL carries `/tods-validate/`. These pages are served at a
+  path on an origin five sibling projects share, and
+  `https://chelseakr.github.io/` is itself a 404, so a canonical naming the
+  bare origin would tell a crawler that six unrelated projects are one page,
+  and a root-relative href would resolve to another project or to nothing.
+
+  No description states a rule count, a conformance level, or coverage: those
+  are derived from the registry, and a figure in a meta tag would be a copy
+  nothing derives. None of them implies that Cal-ITP, MobilityData or the TODS
+  working group has endorsed this; see NOTICE.
+  `tests/test_generate_rules_doc.py` and `tests/test_playground.py` fail on
+  each of those, and their expected origins are written out rather than read
+  from `RULE_PAGE_BASE`, because a check that derives its expectation from the
+  constant it is checking moves with the mistake.
+
 Fixed:
+
+- `test_rule_page_carries_expected_fields_and_escapes_html` asserted
+  `"<link " not in page` to enforce "no external assets". That stated the rule
+  more broadly than the rule is: what must not appear is a link that makes the
+  browser fetch something. It now names the rels that load (`stylesheet`,
+  `icon`, `preload`, `prefetch`, `preconnect`, `manifest`) and permits
+  `rel="canonical"`, which fetches nothing.
 
 - The 44 rule-catalog pages published at `web/rules/` had never been audited
   for accessibility. `pages.yml` deploys the whole `web/` tree; `make a11y`

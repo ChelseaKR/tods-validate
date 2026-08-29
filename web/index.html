@@ -15,7 +15,41 @@
       http-equiv="Content-Security-Policy"
       content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src https://cdn.jsdelivr.net https://files.pythonhosted.org https://pypi.org; img-src 'self' data:; frame-src 'self'; worker-src blob:; child-src blob:;"
     />
-    <title>tods-validate playground</title>
+    <title>tods-validate playground: check a TODS feed in your browser</title>
+    <!--
+      The description below is the lede, and nothing the lede does not say.
+      No rule count, no conformance level, no coverage claim: the rule set
+      moves with the spec, docs/rules.md is generated from the registry, and
+      tests/test_readme_claims.py holds the README's figures to it, so a
+      number here would be a copy nothing derives. It also does not suggest
+      that Cal-ITP, MobilityData or the TODS working group have anything to do
+      with this. See NOTICE.
+
+      Every absolute URL carries /tods-validate/. GitHub Pages serves this
+      page at a path under chelseakr.github.io, which five sibling projects
+      also publish under, and https://chelseakr.github.io/ is itself a 404, so
+      a canonical naming the bare origin would tell a crawler that six
+      unrelated projects are one page. A root-relative href would be the same
+      mistake in the other direction: it would resolve to another project or
+      to nothing. tests/test_playground.py fails on either.
+    -->
+    <meta
+      name="description"
+      content="Validate a Transit Operational Data Standard (TODS) feed in your browser. Nothing is uploaded: the validator runs on your machine via Pyodide, so it is safe for non-public operational data."
+    />
+    <link rel="canonical" href="https://chelseakr.github.io/tods-validate/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="tods-validate" />
+    <meta property="og:url" content="https://chelseakr.github.io/tods-validate/" />
+    <meta
+      property="og:title"
+      content="tods-validate playground: check a TODS feed in your browser"
+    />
+    <meta
+      property="og:description"
+      content="Validate a Transit Operational Data Standard (TODS) feed in your browser. Nothing is uploaded: the validator runs on your machine via Pyodide, so it is safe for non-public operational data."
+    />
+    <meta name="twitter:card" content="summary" />
     <style>
       :root {
         color-scheme: light dark;
