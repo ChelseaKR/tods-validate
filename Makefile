@@ -1,9 +1,24 @@
 # make verify runs every merge-blocking gate that can run on a laptop, with the
 # same command CI runs (CICD-27). Run it before opening a PR; the release
 # workflows re-run it at the tagged commit before anything publishes
-# (REL-14/15). CI additionally runs what needs GitHub itself -- the composite
-# action's self-test, CodeQL, Semgrep and zizmor -- so a green `make verify` is
-# a necessary condition for merge, not a sufficient one.
+# (REL-14/15).
+#
+# CI additionally runs five things this file does not, so a green `make verify`
+# is a necessary condition for merge and not a sufficient one:
+#
+#   - the composite action's self-test, CodeQL, Semgrep and zizmor, which need
+#     GitHub itself;
+#   - the `perf` job, which runs `make perf-check` and `make memory-check`
+#     against baselines recorded on the runner's machine class (see those
+#     targets below);
+#   - the VS Code extension package job, which type-checks, audits and builds
+#     a VSIX out of editor/vscode. It is path-filtered to that directory, so it
+#     is absent from most pull requests, which is how it stayed off this list
+#     for as long as it did.
+#
+# This paragraph is checked against the workflows by
+# tests/test_ci_gate_parity.py, so a job added later cannot reject a tree that
+# `make verify` has just called green without saying so here.
 .PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation-cff perf-check memory-check
 
 # Every gate `make verify` runs, in reporting order. Each one is independent:
