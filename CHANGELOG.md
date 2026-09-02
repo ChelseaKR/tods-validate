@@ -86,6 +86,18 @@ Changed:
 
 Fixed:
 
+- The deployed-playground check drove one broken fixture through the live page
+  and asserted the report mentioned that fixture's rule. A page that answered
+  every feed with findings passed that unchanged, so "the playground validates"
+  and "the playground complains" were not distinguishable by any gate. It now
+  runs the valid fixture through the same page afterwards and fails if the
+  report carries any rule ID at all (#146). Running it second also exercises
+  the cleanup in `web/index.html` that unlinks the previous run's files from
+  `/feed`: a leak there now surfaces as findings carried over from the run
+  before. Re-selecting an identical file list is not a `change` event, so the
+  file input is cleared between runs; without that the second upload silently
+  reused the first one's selection.
+
 - `test_rule_page_carries_expected_fields_and_escapes_html` asserted
   `"<link " not in page` to enforce "no external assets". That stated the rule
   more broadly than the rule is: what must not appear is a link that makes the

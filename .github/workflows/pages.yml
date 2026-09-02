@@ -111,10 +111,12 @@ jobs:
       # The step above proves the right bytes are being served and the step
       # below proves they render accessibly with Pyodide switched off. Neither
       # opens the playground the way a person does. This one does: it waits for
-      # micropip to install the pinned wheel from PyPI and runs a fixture
-      # through it, so a release cannot report a green deploy of a page that
-      # cannot install itself.
-      - name: Boot the deployed page and validate a fixture through it
+      # micropip to install the pinned wheel from PyPI and runs two fixtures
+      # through it, a broken one that must report its rule and the valid one
+      # that must report nothing, so a release cannot report a green deploy of
+      # a page that cannot install itself, or of one that answers every feed
+      # alike.
+      - name: Boot the deployed page and validate a broken and a clean feed through it
         run: |
           set -euo pipefail
           pin="$(sed -n 's/.*TODS_VALIDATE_VERSION = "\([^"]*\)".*/\1/p' web/index.html | head -1)"

@@ -18,10 +18,13 @@ name: Playground deployment check
 #    in scripts/check-deployed-playground.sh.
 # 2. Boot and validate: the page is driven in a real browser until it has
 #    loaded Pyodide, micropip-installed its pinned wheel from PyPI, and
-#    rendered a report for a synthetic fixture. Checks 1 and 3 are both
-#    satisfied by a page that is byte-perfect, accessible, and broken for
-#    every visitor -- which this project has shipped (#136). Nothing verified
-#    the playground actually runs until this job existed (#146).
+#    rendered a report for a synthetic broken fixture, then for the valid
+#    fixture, which must come back with no findings. Both halves are needed:
+#    a page that answered everything with findings would pass the broken run
+#    on its own. Checks 1 and 3 are both satisfied by a page that is
+#    byte-perfect, accessible, and broken for every visitor -- which this
+#    project has shipped (#136). Nothing verified the playground actually
+#    runs until this job existed (#146).
 # 3. Accessibility: pa11y-ci (axe + HTML_CodeSniffer, WCAG2AA) against the live
 #    URL, so the page people actually open is held to the standard the
 #    repository copy is already held to. Note that it loads the page with
@@ -69,7 +72,7 @@ jobs:
           boot_chrome="$(command -v google-chrome)"
           test -x "$boot_chrome"
           echo "PUPPETEER_EXECUTABLE_PATH=$boot_chrome" >> "$GITHUB_ENV"
-      - name: Boot the deployed page and validate a fixture through it
+      - name: Boot the deployed page and validate a broken and a clean feed through it
         run: |
           set -euo pipefail
           # The pin this repository publishes. The live page must not merely

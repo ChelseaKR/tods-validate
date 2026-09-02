@@ -34,10 +34,17 @@
 //   3. The declared pin matches PLAYGROUND_EXPECTED_PIN when the caller sets
 //      it, so a live page installing a different release than the one the
 //      repository publishes is caught even though it "works".
-//   4. A synthetic fixture uploads, Validate runs the real wheel in the
-//      browser, and the report frame renders the finding the fixture is
+//   4. A synthetic broken fixture uploads, Validate runs the real wheel in
+//      the browser, and the report frame renders the finding the fixture is
 //      built to trigger. A wheel that installs but whose API the page calls
 //      no longer matches fails here rather than in a user's browser.
+//   5. The valid fixture uploads into the same page and reports nothing. A
+//      page that answers every feed with findings satisfies step 4 exactly as
+//      well as a working one does, so step 4 alone cannot tell "it validates"
+//      from "it complains". #146 asks for both halves for that reason. Running
+//      it second, in the session step 4 just dirtied, also exercises the
+//      cleanup path in web/index.html that unlinks the previous run's files
+//      from /feed: a leak there shows up here as findings from the run before.
 //
 // Usage:
 //   node scripts/check-playground-boots.cjs
@@ -45,8 +52,10 @@
 // Environment:
 //   PLAYGROUND_URL              page to drive (default: the project's Pages URL)
 //   PLAYGROUND_EXPECTED_PIN     require the page to declare this wheel version
-//   PLAYGROUND_FIXTURE          feed file to upload (default: the TODS-E201 fixture)
+//   PLAYGROUND_FIXTURE          broken feed file (default: the TODS-E201 fixture)
 //   PLAYGROUND_EXPECTED_RULE    rule id the report must contain (default: TODS-E201)
+//   PLAYGROUND_VALID_FIXTURE    directory of a feed that must validate clean
+//                               (default: tests/fixtures/valid/tods)
 //   PLAYGROUND_BOOT_TIMEOUT_MS  wait for Pyodide + micropip (default 300000)
 //   PLAYGROUND_RUN_TIMEOUT_MS   wait for a validation run (default 180000)
 //   PUPPETEER_EXECUTABLE_PATH   Chrome binary (CI passes the hosted one)
@@ -84,8 +93,28 @@ const expectedRule = process.env.PLAYGROUND_EXPECTED_RULE || "TODS-E201";
 const fixture =
   process.env.PLAYGROUND_FIXTURE ||
   path.join(REPO_ROOT, "tests", "fixtures", "invalid", "TODS-E201", "run_events.txt");
+const validFixtureDir =
+  process.env.PLAYGROUND_VALID_FIXTURE ||
+  path.join(REPO_ROOT, "tests", "fixtures", "valid", "tods");
 const bootTimeoutMs = Number(process.env.PLAYGROUND_BOOT_TIMEOUT_MS || 300000);
 const runTimeoutMs = Number(process.env.PLAYGROUND_RUN_TIMEOUT_MS || 180000);
+
+// The page writes uploads into a flat /feed directory keyed by File.name, which
+// is the shape a TODS package already has, so the valid fixture's files go up
+// as a flat list. Sorted, so a failure message names them in a stable order.
+function feedFilesIn(dir) {
+  return fs
+    .readdirSync(dir)
+    .filter((name) => name.endsWith(".txt"))
+    .sort()
+    .map((name) => path.join(dir, name));
+}
+
+// Any rule id the report may have rendered. The clean run asserts on this
+// rather than on the "No problems found." wording alone: the wording is a
+// string in report.py that could change, while a rendered rule id means the
+// page found something in a feed that has nothing to find.
+const RULE_ID = /TODS-[EWI]\d{3}/g;
 
 function fail(message) {
   // ::error:: so the failure lands as a GitHub Actions annotation, the same
@@ -125,9 +154,66 @@ async function waitForStatus(page, { what, done, abortOn, timeoutMs }) {
   }
 }
 
+// Upload `files`, click Validate, and return the text the report frame
+// actually rendered. Shared by both runs so the clean feed is put through the
+// identical path the broken one is, rather than a second, subtly different one.
+async function validateThrough(page, files) {
+  const shown = files.map((f) => path.relative(REPO_ROOT, f));
+  console.log(`uploading ${shown.length === 1 ? shown[0] : `${shown.length} files`} and running Validate`);
+
+  // Clear the input first. Selecting a file list identical to the one already
+  // there is not a change, so the page's `change` handler never runs and the
+  // status line keeps whatever the previous run left on it. That is only
+  // reachable when two runs upload the same files, which the default pair does
+  // not do, so without this the script passes for the wrong reason on the pair
+  // it ships with and hangs for anyone who points both runs at one fixture.
+  const input = await page.$("#files");
+  await input.evaluate((el) => {
+    el.value = "";
+  });
+  await input.uploadFile(...files);
+  // The change handler reads each file asynchronously; clicking before it
+  // finishes just gets "Select your feed files first." Match the count too:
+  // "includes" would accept a stale line from the run before.
+  await waitForStatus(page, {
+    what: "reading the selected file(s)",
+    done: (text) => text === `${files.length} file(s) selected.`,
+    abortOn: [],
+    timeoutMs: 60000,
+  });
+
+  await page.click("#run");
+  await waitForStatus(page, {
+    what: "validating the fixture",
+    done: (text) => text === "Done.",
+    abortOn: ["Validation error:"],
+    timeoutMs: runTimeoutMs,
+  });
+
+  // The report iframe is srcdoc with sandbox="allow-same-origin", so it
+  // keeps the parent origin and its rendered DOM is readable here. Assert on
+  // what the frame actually rendered rather than the srcdoc attribute: that
+  // is the report a person sees.
+  const frameHandle = await page.$("#report");
+  const frame = await frameHandle.contentFrame();
+  if (!frame) {
+    throw new Error("the report frame is not accessible");
+  }
+  return frame.evaluate(() => document.body.innerText);
+}
+
 async function main() {
   if (!fs.existsSync(fixture)) {
     fail(`fixture not found: ${fixture}`);
+    return;
+  }
+  if (!fs.existsSync(validFixtureDir)) {
+    fail(`valid fixture directory not found: ${validFixtureDir}`);
+    return;
+  }
+  const validFiles = feedFilesIn(validFixtureDir);
+  if (validFiles.length === 0) {
+    fail(`no .txt feed files in ${validFixtureDir}`);
     return;
   }
 
@@ -188,47 +274,34 @@ async function main() {
       );
     }
 
-    // 4. Upload the fixture, run it, and read the rendered report.
-    console.log(`uploading ${path.relative(REPO_ROOT, fixture)} and running Validate`);
-    const input = await page.$("#files");
-    await input.uploadFile(fixture);
-    // The change handler reads each file asynchronously; clicking before it
-    // finishes just gets "Select your feed files first."
-    await waitForStatus(page, {
-      what: "reading the selected file",
-      done: (text) => text.includes("file(s) selected"),
-      abortOn: [],
-      timeoutMs: 60000,
-    });
-
-    await page.click("#run");
-    await waitForStatus(page, {
-      what: "validating the fixture",
-      done: (text) => text === "Done.",
-      abortOn: ["Validation error:"],
-      timeoutMs: runTimeoutMs,
-    });
-
-    // The report iframe is srcdoc with sandbox="allow-same-origin", so it
-    // keeps the parent origin and its rendered DOM is readable here. Assert on
-    // what the frame actually rendered rather than the srcdoc attribute: that
-    // is the report a person sees.
-    const frameHandle = await page.$("#report");
-    const frame = await frameHandle.contentFrame();
-    if (!frame) {
-      throw new Error("the report frame is not accessible");
-    }
-    const reportText = await frame.evaluate(() => document.body.innerText);
-    if (!reportText.includes(expectedRule)) {
+    // 4. The broken fixture must produce the finding it is built to produce.
+    const brokenReport = await validateThrough(page, [fixture]);
+    if (!brokenReport.includes(expectedRule)) {
       throw new Error(
         `the report rendered, but does not mention ${expectedRule}, which ` +
           `${path.relative(REPO_ROOT, fixture)} is built to trigger. Rendered report began: ` +
-          JSON.stringify(reportText.slice(0, 400))
+          JSON.stringify(brokenReport.slice(0, 400))
       );
     }
+    console.log(`  reported ${expectedRule}, as the fixture is built to`);
+
+    // 5. The valid fixture must produce nothing, in the same session. Step 4
+    // proves the page can find a problem; only this proves it does not invent
+    // one, and that the previous run left nothing behind in /feed.
+    const cleanReport = await validateThrough(page, validFiles);
+    const rendered = [...new Set(cleanReport.match(RULE_ID) || [])].sort();
+    if (rendered.length > 0) {
+      throw new Error(
+        `the deployed page reported ${rendered.join(", ")} for ` +
+          `${path.relative(REPO_ROOT, validFixtureDir)}, which validates clean. ` +
+          `Rendered report began: ${JSON.stringify(cleanReport.slice(0, 400))}`
+      );
+    }
+    console.log(`  reported nothing for the ${validFiles.length}-file valid feed`);
 
     console.log(
-      `the deployed playground booted on tods-validate ${livePin} and reported ${expectedRule} for the fixture`
+      `the deployed playground booted on tods-validate ${livePin}, reported ` +
+        `${expectedRule} for the broken fixture, and reported nothing for the valid one`
     );
     if (pageErrors.length > 0) {
       // Not fatal: the run demonstrably worked. Still worth printing, because
