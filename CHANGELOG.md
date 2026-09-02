@@ -258,6 +258,24 @@ Changed:
 
 Added:
 
+- [`docs/phase-gates.json`](docs/phase-gates.json) and
+  `scripts/check_phase_gates.py`, a monthly tripwire for the eight gates
+  `docs/MULTIYEAR-PLAN.md` is waiting on: the TODS Board's answer on a shared
+  conformance corpus (#153), the `employee_run_dates.txt` primary key (#156),
+  the three upstream spec proposals (#45, #42/#43, #46), a real production feed
+  (#76), an assistive-technology walkthrough (#74), and the dated
+  deployed-playground record (#146). The plan's rule is that "a phase is not
+  scheduled until it can be worked", which left one thing unanswered: how
+  anybody would find out that it can be. All eight were re-read live on
+  2026-08-27 and all eight are still open, so phase 5 has not started and
+  neither of phase 6's triggers has fired.
+
+  It files an issue when a gate moves **and when it could not read one**,
+  because a tripwire that goes quiet when it breaks converts an outage into a
+  green tick. A partial read reports how many of the recorded gates it actually
+  compared, so a run that read two of eight cannot be mistaken for a complete
+  one.
+
 - The four stewardship contracts that had been open with nobody assigned, each
   as a *checked* contract rather than a document, because the portfolio defines
   AUTO-GATE as merge-blocking with no `|| true`:
