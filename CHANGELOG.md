@@ -5,6 +5,28 @@ new checks may be added in minor releases.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-09-01
+
+The release that made this repository's own gates testable. Several could
+report a pass they had not earned: the secret scan never saw the working tree,
+the throughput budget could not fail from below, the public-contract check
+compared a declaration of the exports against itself, the weekly mutation job
+was wired so that a halved kill rate rendered the same as an unchanged one,
+and the deployed-playground check could not tell a working validator from a
+page that answers every feed with findings. Each is now falsifiable, and each
+has a test that fails when the repair is removed.
+
+For consumers, the change that matters is `py.typed`. The package ships a PEP
+561 marker, so `mypy --strict` against the installed library resolves types
+instead of skipping it, and the v1 public API is now something a downstream
+type checker can actually hold this project to.
+
+Also here: a companion GTFS file that parsed but did not read in full no
+longer counts as a clean read, the branch ruleset is applied and committed as
+an export of what is enforced, and PyPI publishing is scoped to a `pypi`
+environment restricted to version tags.
+
+
 Changed:
 
 - The `pypi` deployment environment exists as a configured object rather than
