@@ -205,24 +205,65 @@ and memory ceilings are documented with the machine class they were measured
 on; the HTML report is usable at ten thousand findings; and every claim in
 this phase says whether it was verified against real data or synthetic.
 
-## Phase 4: surfaces, and room for a second maintainer (2027 Q4 to 2028 Q1)
+## Phase 4: surfaces, and room for a second maintainer (2027 Q4 to 2028 Q1) [PARTLY EXECUTED]
 
 **Delivers.** The work that widens who can use and who can maintain this.
 
-- Publish the VS Code extension to the Marketplace and Open VSX (EXP-10). CI
-  already builds a reviewable VSIX; `editor/vscode/README.md` already says
-  honestly that it is not published.
-- The remaining reporting and workflow surfaces from
-  `ideation/03-expansions.md` Horizon 2 that are not yet built.
-- The standards work that is about operating a project rather than shipping
-  code: the incident-response label convention, postmortem template and
-  secret-exposure runbook; the data-governance data card and source
-  inventory; the DORA quarterly review cadence (QM-11); the AI-development
-  diagnostic baseline. All four are open rows in `CONFORMANCE-GAPS.md` with
-  nobody assigned.
-- `CODEOWNERS` already exists and is waiting for a second person. Solo
-  self-review is a structural limitation no ruleset fixes, and that limit is
-  what this phase is really about.
+The surfaces half turned out to be almost entirely built already, and checking
+that was the work rather than a formality. Every Horizon 2 item in
+`ideation/03-expansions.md` except EXP-10 and EXP-12 ships today: EXP-07's read
+API is in the v1 contract as `tods_validate.read`, EXP-08's rule catalog is
+deployed, EXP-09's workspace ledger is the `trend` command, EXP-11's `doctor`
+is a subcommand. `tods-validate --help` lists fourteen commands. EXP-12 belongs
+to phase 5.
+
+Executed:
+
+- **All four stewardship rows**, each closed as a *checked* contract rather
+  than a document, because the portfolio defines AUTO-GATE as merge-blocking
+  with no `|| true`:
+  - **Incident response.** `.github/labels.yml` declares the `incident`,
+    `sev1` to `sev4`, `deploy-caused` convention; `docs/incidents/TEMPLATE.md`
+    carries every section IR-07 names; `docs/runbooks/secret-exposure.md` works
+    IR-10 to IR-14 in order with a per-credential revocation table.
+    `scripts/check_incident_contract.py` gates all of it, plus IR-15 (no
+    wildcard `git add` in unattended automation) and IR-16 (no scripted commit
+    without a secret scan). Both of those were already clean, so each reports
+    what it scanned: a guard with nothing to catch and a guard that is not
+    looking otherwise render identically.
+  - **Data governance.** Five sources classified under the v2.0.0 tiers with a
+    card each, and `scripts/check_data_cards.py` failing in both directions.
+    The user-feed card is written to decline ownership rather than assert it.
+  - **DORA quarterly review (QM-11).** `docs/DORA-2026-Q3.md` plus a JSON
+    snapshot and a collector. Three of five metrics come back breached and one
+    N/A, which is the point of measuring.
+  - **AI-development measurement.** The `AI-DEV-MEASUREMENT: APPLIES`
+    declaration, the diagnostic share measured and stated as never-gating, and
+    two BASELINE counterweights each carrying a dated graduation decision of
+    2026-11-30.
+- **The extension's non-publication recorded as steps rather than an excuse**,
+  in `docs/runbooks/publish-vscode-extension.md`. The VSIX builds, type-checks,
+  audits, and verifies its own contents in CI today; what is missing is an
+  Azure DevOps publisher and an Eclipse Contributor Agreement, both signed by a
+  person.
+
+Three past events would have been `incident` issues had the convention existed:
+`v0.9.1` tagged but never released, leaving the deployed playground unable to
+boot for three weeks (#136); the playground drift oracle comparing against an
+immutable tag, so it could never go green (#150); and three gates that could
+report a pass they had not earned (#147). None is backfilled into
+`docs/incidents/`, because reconstructing a timeline nobody recorded would
+invent the one thing a postmortem exists to hold. They are counted in the DORA
+review, where the evidence is the changelog and the tag dates rather than a
+memory.
+
+Not executed, and why:
+
+| Item | Blocked on |
+| --- | --- |
+| Publishing the extension to the Marketplace and Open VSX (EXP-10) | Two publisher accounts and a legal acceptance: an Azure DevOps organisation with a Marketplace-scoped PAT, and an Eclipse Foundation account with the Contributor Agreement signed. Neither is something a repository can hold. The runbook is written so this is one session's work. |
+| Creating the six incident labels | They are declared in `.github/labels.yml`, not created; `gh label list` shows none exist. Creating them is a repository change, with the command in that file's header. IR-02's live check needs them first. |
+| A second maintainer | A person, not a milestone. `.github/CODEOWNERS` has been ready since it landed. The measured consequence is now written down rather than felt: 113 of 118 merged pull requests had zero review. |
 
 **Depends on.** Publisher accounts and human UI steps for the extension.
 A second maintainer is a person, not a milestone; the phase delivers the

@@ -81,6 +81,9 @@
             "context": "semgrep"
           },
           {
+            "context": "stewardship"
+          },
+          {
             "context": "test (3.12)"
           },
           {

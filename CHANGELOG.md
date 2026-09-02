@@ -258,6 +258,42 @@ Changed:
 
 Added:
 
+- The four stewardship contracts that had been open with nobody assigned, each
+  as a *checked* contract rather than a document, because the portfolio defines
+  AUTO-GATE as merge-blocking with no `|| true`:
+  - **Incident response.** [`.github/labels.yml`](.github/labels.yml) declares
+    the `incident` / `sev1`-`sev4` / `deploy-caused` convention (IR-02, IR-04,
+    IR-17); [`docs/incidents/TEMPLATE.md`](docs/incidents/TEMPLATE.md) carries
+    every section IR-07 names; and
+    [`docs/runbooks/secret-exposure.md`](docs/runbooks/secret-exposure.md)
+    works IR-10 to IR-14 in order, with a per-credential revocation table for
+    the tokens this project could actually leak.
+    `scripts/check_incident_contract.py` gates all of it plus IR-15 (no
+    wildcard `git add` in unattended automation) and IR-16 (no scripted commit
+    without a secret scan). Both of those were already clean, so each reports
+    what it scanned rather than only whether it found anything.
+  - **Data governance.** Five sources classified under the v2.0.0 tiers in
+    [`docs/data/`](docs/data/), four at L1 and a user's own feed at L3, with
+    `scripts/check_data_cards.py` failing in both directions (a declared source
+    with no card, a card with no declared source) and additionally on a
+    tier disagreement or a source path that no longer exists (DG-01).
+  - **QM-11, the DORA quarterly review.**
+    [`docs/DORA-2026-Q3.md`](docs/DORA-2026-Q3.md) plus a JSON snapshot and
+    `scripts/delivery_metrics.py`. Three of five metrics come back breached
+    and one N/A; the collector writes `null` with a reason rather than `0` for
+    anything it cannot measure, which `tests/test_delivery_metrics.py` pins.
+  - **AI-development measurement.** The `AI-DEV-MEASUREMENT: APPLIES`
+    declaration in the metrics ledger, the diagnostic share measured and
+    stated as never-gating, and two BASELINE counterweights each carrying a
+    dated graduation decision of 2026-11-30.
+- [`docs/runbooks/publish-vscode-extension.md`](docs/runbooks/publish-vscode-extension.md),
+  recording why the extension is not on the Marketplace as the steps to publish
+  it rather than as an excuse (EXP-10). The VSIX builds, type-checks, audits,
+  and verifies its own contents in CI today; what is missing is an Azure DevOps
+  publisher and a signed Eclipse Contributor Agreement.
+- A `stewardship` job in `ci.yml` running the two new AUTO-GATEs, and both
+  added to `make verify`, which now runs fifteen gates.
+
 - [`docs/a11y/STATEMENT.md`](docs/a11y/STATEMENT.md): the dated accessibility
   statement, carried by the `docs-check` currency gate, naming **WCAG 2.1
   Level AA** as the target and deliberately making no conformance *claim*,
