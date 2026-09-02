@@ -43,26 +43,3 @@ waivers:
     granted: 2026-08-15
     expires: 2026-11-15
     link: https://github.com/advisories/GHSA-jmr9-qjv8-65gv
-
-  - id: WVR-003
-    control: SEC-10
-    repo: tods-validate
-    kind: playground-version-pin
-    check: tests/test_playground.py::test_playground_installs_this_projects_version
-    pinned_version: 0.10.0
-    project_version: 0.11.0
-    reason: >-
-      Ordinary release-staging state, not a defect. pyproject.toml is bumped to
-      0.11.0 in the release commit, and 0.11.0 does not exist on PyPI until the
-      tag is pushed and pypi-publish.yml has run, so web/index.html must keep
-      pinning 0.10.0 -- the version micropip can actually install -- until then.
-      Pinning 0.11.0 first would take the live playground down for the whole
-      window between merging the release and publishing it. The check this
-      waives is right in general: a pin left behind after a release did publish
-      is #136's root cause, and stays a failure. Retire this waiver in the same
-      change that repins the playground to 0.11.0, once PyPI serves it.
-    owner: chelseakr
-    granted: 2026-09-01
-    expires: 2026-10-01
-    link: https://github.com/ChelseaKR/tods-validate/issues/136
-
