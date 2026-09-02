@@ -86,7 +86,14 @@ def _check_source(source: dict[str, object]) -> list[str]:
                 f"docs/data/{identifier}.md says tier {found.group(1)} but "
                 f"{SOURCES.name} says {tier}"
             )
-    for path in source.get("paths", []) or []:  # type: ignore[union-attr]
+    declared_paths = source.get("paths") or []
+    if not isinstance(declared_paths, list):
+        problems.append(
+            f"source {identifier!r} declares 'paths' as {type(declared_paths).__name__}, "
+            "not a list; nothing about the card's coverage can be checked"
+        )
+        declared_paths = []
+    for path in declared_paths:
         if not (ROOT / str(path)).exists():
             problems.append(
                 f"source {identifier!r} points at {path}, which does not exist; the card "

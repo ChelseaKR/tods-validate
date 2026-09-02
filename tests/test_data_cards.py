@@ -99,6 +99,21 @@ def test_a_source_pointing_at_a_deleted_path_fails(
     assert any("which does not exist" in p for p in gate.check())
 
 
+def test_a_source_whose_paths_is_not_a_list_fails(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    # A bare string is the plausible typo, and it is the dangerous one: it is
+    # iterable, so a loop over it walks characters and finds no file named "g".
+    # Saying so beats reporting five paths the card never claimed.
+    gate = _tree(
+        monkeypatch,
+        tmp_path,
+        [{"id": "feeds", "tier": "L1", "paths": "gone/"}],
+        {"feeds.md": _card("L1")},
+    )
+    assert any("not a list" in p for p in gate.check())
+
+
 def test_a_matching_set_passes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     # Positive control for all four above, which a gate that always reported a
     # problem would satisfy.
