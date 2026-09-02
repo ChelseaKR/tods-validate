@@ -190,6 +190,19 @@ def test_playground_api_symbols_exist() -> None:
 # stays green.
 _PUBLISHED_AT = "https://chelseakr.github.io/tods-validate/"
 
+# The share card, written out for the same reason as the URL above. 1200x630 is
+# the size LinkedIn, Slack and X all render whole; anything else they crop.
+_SOCIAL_CARD_FILE = "og-card.png"
+_SOCIAL_CARD_SIZE = (1200, 630)
+
+
+def _png_size(path: Path) -> tuple[int, int]:
+    """Width and height from a PNG IHDR, so no decoder is needed to check one."""
+    header = path.read_bytes()[:24]
+    assert header[:8] == b"\x89PNG\r\n\x1a\n", f"{path} is not a PNG"
+    return int.from_bytes(header[16:20], "big"), int.from_bytes(header[20:24], "big")
+
+
 # Words that would make the description claim something this project does not.
 # TODS is somebody else's specification: NOTICE says in full that this is not
 # affiliated with, endorsed by, or sponsored by Cal-ITP, MobilityData, the TODS
@@ -245,7 +258,33 @@ def test_the_playground_carries_a_share_card_that_agrees_with_the_page() -> None
     assert _meta("property", "og:title") == title.group(1)
     assert _meta("property", "og:type") == "website"
     assert _meta("property", "og:site_name") == "tods-validate"
-    assert _meta("name", "twitter:card") == "summary"
+    assert _meta("name", "twitter:card") == "summary_large_image"
+
+
+def test_the_playground_share_card_is_a_landscape_image_that_is_published() -> None:
+    """The page said what it was and showed nothing.
+
+    The head carried og:title, og:description and og:url and no image at all,
+    so every share of the playground arrived as grey text on LinkedIn, Slack
+    and X. Two ways an image tag goes wrong just as quietly, and both are
+    checked here rather than discovered in someone else's feed: a URL naming a
+    file that is not in web/, which pages.yml uploads whole, so the card 404s;
+    and a file that is there at the wrong shape, which the networks then crop
+    to their landscape box with the project name outside the frame.
+    """
+    card = _meta("property", "og:image")
+    assert card == f"{_PUBLISHED_AT}{_SOCIAL_CARD_FILE}", (
+        f"og:image must be the published card's absolute URL, not {card!r}"
+    )
+    assert _meta("name", "twitter:image") == card
+    assert (_meta("property", "og:image:alt") or "").strip()
+    assert (_meta("name", "twitter:image:alt") or "").strip()
+
+    published = _HTML.parent / _SOCIAL_CARD_FILE
+    assert published.is_file(), f"{_SOCIAL_CARD_FILE} is advertised but not in web/"
+    assert _png_size(published) == _SOCIAL_CARD_SIZE
+    assert _meta("property", "og:image:width") == str(_SOCIAL_CARD_SIZE[0])
+    assert _meta("property", "og:image:height") == str(_SOCIAL_CARD_SIZE[1])
 
 
 def test_the_playground_description_claims_nothing_the_page_does_not() -> None:

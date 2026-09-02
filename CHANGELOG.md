@@ -7,6 +7,27 @@ new checks may be added in minor releases.
 
 Fixed:
 
+- Every page the site publishes advertised a share card with no image on it.
+  `web/index.html` and all 45 catalog pages carried `og:title`,
+  `og:description` and `og:url` and no `og:image` or `twitter:image`, with
+  `twitter:card` set to `summary`, so a link to the playground or to a rule
+  page unfurled on LinkedIn, Slack or X as grey text. `web/og-card.png` is
+  1200x630, the box all three fit an unfurled image to, and `twitter:card` is
+  now `summary_large_image`. The catalog pages get theirs from
+  `scripts/generate_rules_doc.py`, which derives the card's absolute URL from
+  `RULE_PAGE_BASE` so the site root has one definition; a relative one would be
+  fetched from `https://chelseakr.github.io/`, the 404 these pages share with
+  five sibling projects. `tests/test_playground.py` and
+  `tests/test_generate_rules_doc.py` now read the PNG header, so a card that is
+  missing from `web/` or is not 1200x630 fails the gate instead of failing in
+  someone else's feed.
+
+- The README opened with `Status: Beta` on the line under the heading, ahead of
+  any sentence saying what the tool is, so the first fact a reader got about
+  `tods-validate` was a caveat about something they had not been told about
+  yet. The status line now follows the one-sentence description instead of
+  preceding it. The text is unchanged and nothing was dropped.
+
 - The release-triggered playground deploy had never completed. `pypi-publish.yml`
   reaches `github-pages` through `deploy-playground`, which calls `pages.yml`
   during a `release: published` run, where the ref is a tag; that environment
@@ -27,6 +48,13 @@ Fixed:
   nothing.
 
 Changed:
+
+- `perf/bundle-baseline.json` raises the `web/index.html` ceiling from 12,288
+  to 13,312 bytes. The share-card tags and their alternative text cost 1.1 KiB
+  of head on a page whose budget deliberately ran a tight 16% headroom, and
+  absorbing them at the old ceiling would have left 6%. The card itself is a
+  static asset and enters neither byte figure. Recorded with its reason in the
+  file, and in `docs/BENCHMARKS.md`, as that budget requires.
 
 - The browser playground installs 0.11.0, and WVR-003 is retired now that PyPI
   serves it.
