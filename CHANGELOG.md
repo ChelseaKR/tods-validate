@@ -5,6 +5,30 @@ new checks may be added in minor releases.
 
 ## [Unreleased]
 
+Changed:
+
+- The branch ruleset is applied, and `docs/rulesets/main.json` is the export of
+  what is enforced rather than a description of what was wanted. Four documents
+  said no ruleset was enabled on this repository; `protect-main` had been active
+  since 2026-07-09, with ten required checks and an admin bypass, so the file and
+  the setting had never been compared. It now requires sixteen checks, `contract`
+  among them, so the gate protecting the v1 public contract can no longer be red
+  on a pull request that merges. `bypass_actors` is empty, which means it binds
+  the maintainer too.
+
+  Two settings went in weaker than the committed file asked for, because the
+  file asked for something unsatisfiable. `required_approving_review_count: 1`
+  with `require_code_owner_review: true`, against a `CODEOWNERS` naming one
+  person and no bypass, blocks every merge: GitHub does not count a
+  self-approval. `tests/test_branch_ruleset.py` had asserted both, so the suite
+  was green about a configuration that could not run. The assertion now derives
+  from the number of code owners, and starts demanding an approval on its own
+  the moment a second one is added.
+
+  Applying it also corrected the documented command. Updating a ruleset is
+  `PUT .../rulesets/{id}`; the `POST` form the docs carried creates a second
+  ruleset, and two rulesets both apply.
+
 Added:
 
 - Every published file is compared with the deployment, not just the front

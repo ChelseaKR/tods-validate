@@ -254,17 +254,25 @@ audit`), so CI-vs-local drift is structural, not a copy-paste discipline.
 `CONTRIBUTING.md` now says `make verify` and links `docs/standards/`.
 
 **Still open:**
-- **CICD-03/11-18** — ⛔ **the branch-ruleset gap**, now half closed. The
-  artifact exists: [`docs/rulesets/main.json`](rulesets/main.json) is the
-  ruleset payload, in the shape `POST /repos/{owner}/{repo}/rulesets` accepts,
-  and `tests/test_branch_ruleset.py` keeps its required-status-check list in
-  step with the checks the workflows actually report. **No ruleset is enabled
-  live.** That still needs an interactive decision on GitHub (Settings → Rules
-  → Rulesets, or `gh api repos/ChelseaKR/tods-validate/rulesets --input
-  docs/rulesets/main.json`), which no automated pass makes. Once applied,
-  replace the file with the export so the artifact records what is enforced
-  rather than what was intended; see
+- **CICD-03/11-18** — ✅ **closed 2026-09-01.** The ruleset `protect-main`
+  (id 18752857) is active on the default branch, and
+  [`docs/rulesets/main.json`](rulesets/main.json) is the export of it.
+  `tests/test_branch_ruleset.py` keeps its required-status-check list in step
+  with the checks the workflows actually report.
+
+  Applying it corrected two errors in this entry. The update endpoint is
+  `PUT /repos/{owner}/{repo}/rulesets/{id}`; the `POST` form named here
+  creates a second ruleset, and against a live ruleset under a different name
+  that is what it would have done. And the live ruleset was already active
+  under the name `protect-main` while this entry said none was enabled, so the
+  committed file described a ruleset that did not exist alongside a real one
+  nothing was comparing it to. Re-export after any change; see
   [`docs/rulesets/README.md`](rulesets/README.md).
+
+  What is still open is narrower than the row it replaces: nothing compares
+  the committed export with GitHub. The test checks the file against the
+  workflows, which is the drift that happens on its own, but a settings change
+  made in the UI would not show up in any diff.
 
   Writing the prose down as a file found a defect in the prose. This entry
   previously said to require `zizmor` among the status checks. `zizmor.yml` is

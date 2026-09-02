@@ -2,12 +2,19 @@
 
 ## What this directory is, and what it is not
 
-`main.json` is the **intended** ruleset for the default branch, in the exact
-shape `POST /repos/{owner}/{repo}/rulesets` accepts. It is not an export of a
-live ruleset, and committing it does not apply it. No ruleset is enabled on
-this repository as of 2026-08-27; `docs/CONFORMANCE-GAPS.md` records that gap
-under **CQ-37 to 43** and **CICD-03/11-18**, and it stays open until somebody
-applies this file and replaces it with the export.
+`main.json` is the **export** of the ruleset enforced on the default branch:
+`protect-main`, id 18752857, applied 2026-09-01. Server-assigned fields (`id`,
+`node_id`, `created_at`, `updated_at`, `source`, `_links`,
+`current_user_can_bypass`) are stripped, so what is left is both a readable
+record and a payload the API will accept back.
+
+It was an intended ruleset until 2026-09-01, and the gap between the two
+shapes cost something. The file said `name: main` while the live ruleset was
+`protect-main`, so the documented apply command would have created a second
+ruleset rather than updating the one already there, and three other documents
+described a repository with no protection at all while `protect-main` had been
+active since July. Committing an intent next to an unexamined live setting is
+how that happens.
 
 Writing it down is worth doing anyway. The gap entry previously carried the
 intended ruleset as a paragraph of prose, which is the definition of tribal
@@ -31,33 +38,51 @@ path-filtered workflow. `tests/test_branch_ruleset.py` enforces the rule in
 both directions, so this cannot be re-introduced by editing the file, and
 zizmor becomes requirable the moment its trigger stops being filtered.
 
-## Applying it
+## Changing it
 
-This needs a live GitHub settings change, which no automated pass makes.
+Editing this file changes nothing by itself. Apply it, then re-export.
+
+**Update** the existing ruleset with `PUT` and its id. `PATCH` matches no
+route on this endpoint and returns 404, which reads like a permissions problem
+and is not one:
 
 ```sh
-gh api --method POST repos/ChelseaKR/tods-validate/rulesets \
+gh api -X PUT repos/ChelseaKR/tods-validate/rulesets/18752857 \
   --input docs/rulesets/main.json
 ```
 
-Then replace this file with the export, so the committed artifact becomes a
-record of what is enforced rather than of what was intended:
+`POST /repos/{owner}/{repo}/rulesets` creates a ruleset. Use it only for a
+genuinely new one; against a name that already exists it produces a second
+ruleset, and two rulesets both apply.
+
+Then re-export, dropping the server-assigned fields:
 
 ```sh
-gh api repos/ChelseaKR/tods-validate/rulesets            # find the id
-gh api repos/ChelseaKR/tods-validate/rulesets/<id> > docs/rulesets/main.json
+gh api repos/ChelseaKR/tods-validate/rulesets/18752857 | python3 -c '
+import json, sys
+live = json.load(sys.stdin)
+keep = ("name", "target", "enforcement", "conditions", "bypass_actors", "rules")
+print(json.dumps({k: live[k] for k in keep}, indent=2))
+' > docs/rulesets/main.json
 ```
 
-The export carries server-assigned fields (`id`, `node_id`, `created_at`,
-`_links`, `source`) that the create payload does not. `tests/test_branch_ruleset.py`
-reads only `rules`, so it keeps working across that swap.
+Read the result before committing it. GitHub fills in parameters the payload
+omits, so an export can contain settings nobody chose: applying the 2026-09-01
+payload came back with `require_extra_approval_for_unattributed_changes: true`
+on the `pull_request` rule, which was never sent.
 
 ## The limit no ruleset fixes
 
-`bypass_actors` is empty and `require_code_owner_review` is on, which on a
-solo-maintained repository means the maintainer cannot approve their own pull
-request and cannot bypass the requirement either. That is deliberate: the
-honest state is "self-review is a structural limitation", not "self-review
-counts as review". `.github/CODEOWNERS` is ready for a second person; until
-there is one, expect to need an explicit, recorded bypass to merge, and
-record it. See phase 4 of [`../MULTIYEAR-PLAN.md`](../MULTIYEAR-PLAN.md).
+`bypass_actors` is empty, so the ruleset binds the maintainer: a red required
+check cannot be overridden without editing the ruleset, which is the point.
+
+Required approvals are zero and `require_code_owner_review` is off. Those were
+both set the other way while the file was an intention, and applying it that
+way would have blocked every merge: `.github/CODEOWNERS` names one person, and
+GitHub does not count a self-approval, so a repository with one maintainer can
+never satisfy a one-approval rule. Zero approvals still requires a pull
+request, still forbids a direct push to `main`, and still requires review
+threads to be resolved. What it cannot do is manufacture a second reviewer.
+Self-review remains a structural limitation rather than something the ruleset
+fixes, and `CODEOWNERS` is ready for a second person. See phase 4 of
+[`../MULTIYEAR-PLAN.md`](../MULTIYEAR-PLAN.md).

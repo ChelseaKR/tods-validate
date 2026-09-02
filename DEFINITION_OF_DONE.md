@@ -74,10 +74,16 @@ Reviewed at each release; update this file in the same PR that changes what
 
 ## Branch protection
 
-**Not yet enabled as a live GitHub ruleset** — this needs an interactive
-GitHub Settings change, which is outside what this repo's files can express
-or what an automated remediation pass should do unattended. See
-`docs/CONFORMANCE-GAPS.md#ci-cd` for the exact ruleset this DoD assumes
-(PR required, required status checks including the security jobs above,
-CODEOWNERS review, linear history, no force-push, no admin bypass) and the
-one-time setup command/UI path to enable it.
+Enabled as a live GitHub ruleset on 2026-09-01: `protect-main`, id 18752857.
+It requires a pull request, sixteen status checks, and linear history; it
+forbids force-push and deletion; and its `bypass_actors` list is empty, so it
+binds the maintainer too. `docs/rulesets/main.json` is the export of what is
+enforced, not a statement of intent, and `docs/rulesets/README.md` says how to
+re-export it after any change.
+
+Two things this DoD once assumed are deliberately not in it. Required
+approvals are set to zero rather than one, and code-owner review is off,
+because `CODEOWNERS` names one person and GitHub does not accept a
+self-approval: requiring one on a solo repository blocks every merge rather
+than reviewing anything. The PR requirement and thread resolution are the
+parts that still bite with one maintainer, and those are on.
