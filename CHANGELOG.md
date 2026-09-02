@@ -5,6 +5,16 @@ new checks may be added in minor releases.
 
 ## [Unreleased]
 
+Added:
+
+- `TODS-W109` (structure warning): a file defined by a supported TODS spec
+  version other than the one being validated against is now reported as
+  recognized but belonging to that other version, instead of falling through
+  to `TODS-I102` "not a TODS file at all". A v1.0.0 file in a package
+  validated at the 2.1.0 default gets the new warning and points at
+  `--spec-version`. `TODS-I102` keeps every file that is in neither version's
+  inventory. [#143](https://github.com/ChelseaKR/tods-validate/issues/143)
+
 Fixed:
 
 - Every page the site publishes advertised a share card with no image on it.
