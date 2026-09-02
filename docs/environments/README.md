@@ -16,9 +16,13 @@ not already know to look at the environment.
 reaches it through `deploy-playground`, which calls `pages.yml` during a
 `release: published` run, where the ref is a tag. That stage failed on v0.10.0
 and again on v0.11.0 and had never once completed, while the comment above it
-described the deploy sequencing it provides as structural. The playground was
-still reaching production, by the `push`-to-`main` path that the sequencing
-exists to replace, so nothing downstream looked wrong.
+described the deploy sequencing it provides as structural.
+
+The site did not visibly fall behind, because someone dispatched `pages.yml`
+by hand afterwards: its run history shows two `workflow_dispatch` runs on
+2026-08-22, the day v0.10.0 shipped. `pages.yml` has no `push` trigger, so
+there was no automatic fallback. Every release since the sequencing landed has
+depended on a person noticing that the deploy had not happened.
 
 `tests/test_deployment_environments.py` compares this file with the workflows
 in the direction that drifts: a job that deploys somewhere its ref cannot
