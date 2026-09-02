@@ -57,6 +57,10 @@ jobs:
     runs-on: ubuntu-latest
     # Scopes the OIDC token PyPI accepts (CICD-06). See the header for why the
     # PyPI side has to be changed after this, not before.
+    #
+    # The environment's deployment branch policy admits the tag pattern `v*`
+    # and nothing else, so `workflow_dispatch` from a branch is refused here
+    # rather than partway through a publish. Dispatch from a version tag.
     environment:
       name: pypi
       url: https://pypi.org/project/tods-validate/

@@ -295,17 +295,19 @@ audit`), so CI-vs-local drift is structural, not a copy-paste discipline.
   entry deleted after. Doing it in that order leaves no window in which a
   release has no publisher to match.
 
-  Two things this close does not claim. Nothing in this repository can read
-  PyPI's project settings, so the PyPI half is recorded on the maintainer's
-  word and the first release after this date is what actually demonstrates it;
-  if that release fails to publish, this is the entry to reopen. And the
-  `pypi` environment does not yet exist as a GitHub object — a referenced
-  environment is created on first use — so it currently carries no protection
-  rules. Creating it explicitly (`gh api -X PUT
-  repos/ChelseaKR/tods-validate/environments/pypi`) is what makes deployment
-  branch restrictions or a required reviewer available on it, and is worth
-  doing if the release path should be narrower than "any ref that triggers the
-  workflow".
+  The `pypi` environment was created explicitly rather than left to appear on
+  first use, so it can carry rules: its deployment branch policy admits the
+  tag pattern `v*` and nothing else. A publish therefore has to originate from
+  a version tag, which is what the release path already does, and a
+  `workflow_dispatch` run from a branch is refused at the job rather than
+  after it has built something. There is deliberately no required-reviewer
+  rule; on a solo repository that would stall every release waiting for an
+  approval only the person who triggered it could give.
+
+  One thing this close does not claim. Nothing in this repository can read
+  PyPI's project settings, so that half is recorded on the maintainer's word,
+  and the first release after this date is what actually demonstrates it. If
+  that release fails to publish, this is the entry to reopen.
 - **CICD-29** — a Metrics table now exists (`docs/roadmap.md` §Metrics
   ledger, added this pass), so this is substantially addressed; revisit
   whether every optional CI stage is declared applicable/N/A there as the

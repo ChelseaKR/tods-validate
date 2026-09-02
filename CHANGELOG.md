@@ -7,6 +7,16 @@ new checks may be added in minor releases.
 
 Changed:
 
+- The `pypi` deployment environment exists as a configured object rather than
+  one GitHub would create on first use, and its deployment branch policy admits
+  the tag pattern `v*` and nothing else. A publish has to originate from a
+  version tag; a `workflow_dispatch` run from a branch is refused at the job
+  instead of partway through. No required-reviewer rule is set, because on a
+  solo repository that stalls every release waiting for an approval only the
+  person who triggered it could give.
+
+Changed:
+
 - The branch ruleset is applied, and `docs/rulesets/main.json` is the export of
   what is enforced rather than a description of what was wanted. Four documents
   said no ruleset was enabled on this repository; `protect-main` had been active
