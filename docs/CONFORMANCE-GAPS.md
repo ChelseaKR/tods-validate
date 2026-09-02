@@ -284,12 +284,17 @@ audit`), so CI-vs-local drift is structural, not a copy-paste discipline.
   by itself (`CODEOWNERS` is ready for when a second maintainer joins), and
   with `bypass_actors` empty, expect to need a recorded bypass to merge until
   there is a second person.
-- **CICD-06** — the PyPI trusted-publisher scoping leaves the GitHub
-  Environment blank (`pypi-publish.yml` comment already notes this). ⛔
-  Fixing it requires creating a `pypi` GitHub Environment (Settings →
-  Environments) *and* updating the trusted-publisher config on PyPI's
-  project settings page to match — both are live, interactive, and
-  specific to the maintainer's PyPI account. Not done this pass.
+- **CICD-06** — the repository half is done: `pypi-publish.yml`'s `publish`
+  job runs in a `pypi` environment, so the OIDC token it mints carries that
+  claim. ⛔ until the PyPI side matches. A trusted publisher with a blank
+  environment accepts a token from any environment, so until the environment
+  is set on PyPI's project settings page the claim is made and not checked,
+  and any workflow here that can mint a token could still publish. That change
+  is on the maintainer's PyPI account and cannot be made from this repository.
+
+  The order is load-bearing in one direction only. Setting the environment on
+  PyPI before the workflow declares one breaks publishing; declaring it here
+  first is a no-op until PyPI enforces it.
 - **CICD-29** — a Metrics table now exists (`docs/roadmap.md` §Metrics
   ledger, added this pass), so this is substantially addressed; revisit
   whether every optional CI stage is declared applicable/N/A there as the
