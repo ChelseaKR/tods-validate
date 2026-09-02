@@ -45,10 +45,24 @@ all.
 
 ## `Finding`
 
-A frozen dataclass: `rule_id`, `severity`, `message`, `file`, `row`, `field`,
-`suggestion`. Helpers: `location()` (human string) and `pointer()` (a stable
-`file.txt#L4/field` identifier). `to_dict()` matches
-[docs/report.schema.json](report.schema.json).
+A frozen dataclass. Fields: `rule_id`, `severity`, `message`, `file`, `row`,
+`field`, `suggestion`, `data` (the rule's own machine context, such as the
+offending value or the ID a reference failed to resolve), `caused_by` (set
+when this finding is a downstream echo of another, carrying that root's
+`pointer()`), and `severity_original` (set when a config `[severity]` remap
+moved the level, so the change is disclosed rather than silent).
+
+Helpers: `location()` (human string), `pointer()` (a stable
+`file.txt#L4/field` identifier), and `fingerprint()` (a content hash over rule
+ID, file, field and `data`, deliberately not over row or message, so inserting
+an unrelated row does not change every later finding's identity; this is what
+`--baseline` matches on). `to_dict()` matches
+[docs/report.schema.json](report.schema.json), which requires every field
+above.
+
+The last three fields and `fingerprint()` were missing from this list while
+the report schema already required them, so a caller reading only this page
+did not know what they were being handed.
 
 ## `suggest_fixes(path, gtfs=None, *, enable=(), encoding=None, spec_version=SPEC_VERSION)`
 
@@ -121,12 +135,16 @@ stable. The lower-level `tods_validate.runner.run` is available too, but
 
 ---
 
-Last verified: 2026-08-14, against tods-validate 0.8.0. Every signature,
+Last verified: 2026-08-28, against tods-validate 0.10.0. Every signature,
 `ValidationResult` and `Finding` member, `Suggestion` field, and test helper on
 this page was called and checked against the implementation, including the
 documented `PackageNotFoundError` and the `SUPPORTED_SPEC_VERSIONS` values.
+The `Finding` list was checked field by field against `findings.py` and
+`report.schema.json` this time, which is how the four missing entries were
+found; the previous stamp said 0.8.0 while the tree shipped 0.10.0, and this
+gate compares content rather than versions, so it had no way to say so.
 Recheck cadence: every release, and whenever this page changes —
 `make docs-check` fails if the page is edited without a fresh verification.
 
-<!-- doc-currency: sha256=603b2ea973ec -->
+<!-- doc-currency: sha256=bd77bb402218 -->
 

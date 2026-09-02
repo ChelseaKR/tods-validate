@@ -1,0 +1,40 @@
+# gitleaks configuration for the `make secrets` gate (SEC-17/18).
+#
+# `make secrets` runs two scans, because they answer different questions and
+# neither answers the other's:
+#
+#   gitleaks detect --source .            -> every commit reachable from HEAD
+#   gitleaks detect --no-git --source .   -> the files on disk right now
+#
+# The history scan is blind to a secret that has been written but not yet
+# committed, which is exactly the state a working tree is in when a gate runs
+# against it. Measured on this repository: a file containing an AWS key pair, a
+# GitHub PAT and a Slack bot token, saved at the repository root and never
+# added to the index, produced "no leaks found" and exit 0 from the history
+# scan and "leaks found: 1" and exit 1 from the --no-git scan.
+#
+# This file exists so the second scan has a stable scope. Without it the
+# working-tree scan also walks .venv/ and node_modules/, which the release
+# verification workflow populates before it runs `make verify`: roughly 29 MB
+# of third-party code whose test fixtures are a standing source of findings
+# this project cannot fix. Paths below are build output and installed
+# dependencies, never project source.
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Build output, installed dependencies and tool caches"
+paths = [
+    '''(^|/)\.git/''',
+    '''(^|/)\.venv/''',
+    '''(^|/)node_modules/''',
+    '''(^|/)\.mypy_cache/''',
+    '''(^|/)\.ruff_cache/''',
+    '''(^|/)\.pytest_cache/''',
+    '''(^|/)\.hypothesis/''',
+    '''(^|/)\.worktrees/''',
+    '''(^|/)dist/''',
+    '''(^|/)htmlcov/''',
+    '''(^|/)__pycache__/''',
+]

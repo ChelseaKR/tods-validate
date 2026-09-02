@@ -20,25 +20,103 @@ code-quality and documentation sections.
 
 ## ai-development-measurement
 
-**Still open:** the repository records delivery and quality metrics in
-`docs/roadmap.md`, but it has no dated AI-development diagnostic baseline or
-graduation decision. AI-product evaluation remains separately N/A because the
-validator itself has no model runtime.
+**Closed 2026-08-27.** `docs/roadmap.md`'s metrics ledger now carries the
+`AI-DEV-MEASUREMENT: APPLIES` declaration the standard's section 8 asks for,
+with the diagnostic share measured (32 of 160 commits on `main` carry a
+`Co-Authored-By: Claude` trailer) and stated as diagnostic-only, never gating.
+The two quality-debt counterweights the standard pairs with throughput, revert
+rate and unreviewed-merge rate, are BASELINE rows each carrying a dated
+graduation decision of **2026-11-30**, because a BASELINE row without one is a
+conformance failure in its own right. The quarterly review that reads them is
+[`docs/DORA-2026-Q3.md`](DORA-2026-Q3.md), run jointly with QM-11 per that
+standard's own cadence line.
+
+AI-product evaluation remains separately N/A because the validator itself has
+no model runtime.
 
 ## data-governance
 
 **Current boundary:** validation is local and process-lifetime only;
 `docs/RESPONSIBLE-TECH-AUDITS.md` records that feeds are not retained.
 
-**Still open:** classify bundled, fixture, and user-supplied feed data under the
-v2.0.0 tiers and add a mechanically checked data-card/source inventory without
-claiming ownership of users' input feeds.
+**Closed 2026-08-27.** Five sources are classified under the v2.0.0 tiers in
+[`docs/data/sources.json`](data/sources.json), each with a card in
+[`docs/data/`](data/): the spec transcription, the conformance corpus, the
+example feed, and the generated benchmark packages at **L1**; a user's own feed
+at **L3**. `scripts/check_data_cards.py` is the AUTO-GATE DG-01 asks for and
+fails in either direction, on a declared source with no card and on a card with
+no declared source, and additionally when a card and the list disagree about a
+tier or when a source's paths no longer exist.
+
+The user-feed card is the one that needed care, and it is written to *decline*
+ownership rather than assert it: a feed is the input to a local validator that
+holds it for one process lifetime and writes nothing back, so this project has
+no standing to state a licence, a refresh cadence, or a retention line over an
+agency's records. The card names the three L3 fields (`employee_id`,
+`license_plate`, `vehicle_label`), points at the existing DPIA-lite, and records
+that its "not retained" line stops being true by construction the day #76
+succeeds.
+
+## observability
+
+**Current boundary:** Tier C, per `OBSERVABILITY-STANDARD.md` §0. OTel tracing
+is out of scope and the README's `## Observability` section declares it: there
+is no network surface to trace, and the tool is offline by design.
+
+**Still open (found 2026-08-28):** Tier C also asks for "an opt-in
+`--log-format json` flag backed by `structlog`" (`OBSERVABILITY-STANDARD.md`
+§3, and `QUALITY-AND-METRICS-STANDARD.md` line 190 restates it as a must). The
+flag does not exist anywhere in `src/`. Until today the README reproduced the
+standard's own declaration sentence verbatim, ending "Opt-in `--log-format
+json` only", which reads as a statement that the flag is there; nothing in
+this ledger recorded otherwise, and no gate compared the sentence to the CLI.
+`tests/test_readme_claims.py` now does, so the claim cannot return without the
+flag returning with it.
+
+Two ways to close it, and the choice is a product decision rather than a
+remediation:
+
+1. **Restate the tier.** Nothing under `src/` imports `logging`; the package
+   emits no log records at all, so there is no stream for a format flag to
+   select. The machine-readable surface here is the *report* (`--format json`,
+   `--format sarif`, `docs/report.schema.json`), which is a different artifact
+   from a log. If the standard's intent is "a machine can consume this tool's
+   output", that is already met, and the row should say so in those words
+   rather than by naming a flag.
+2. **Implement it.** `structlog` would be a second runtime dependency for a
+   tool that deliberately has one (`click`), added to satisfy a sentence
+   rather than a user. Weaker unless an operator asks for parseable progress
+   logs on large feeds.
+
+Not on the v1.0.0 critical path either way: `--log-format` does not appear in
+`docs/v1-contract-candidate.json`, so adding it later is an additive minor
+release. What was on the critical path was shipping v1.0.0 with the README
+claiming it.
 
 ## incident-response
 
-**Still open:** security reporting and release recovery exist, but the v2.0.0
-`incident`/`sevN` label convention, committed postmortem template, and
-secret-exposure response runbook have not been adopted as one checked contract.
+**Closed 2026-08-27** as a checked contract.
+[`.github/labels.yml`](../.github/labels.yml) declares the `incident`, `sev1`
+to `sev4`, and `deploy-caused` convention (IR-02/IR-04/IR-17);
+[`docs/incidents/TEMPLATE.md`](incidents/TEMPLATE.md) carries every section
+IR-07 names; and [`docs/runbooks/secret-exposure.md`](runbooks/secret-exposure.md)
+works IR-10 to IR-14 in order, rotate before revoke before scope before the
+history decision before closing the entry point, with the per-credential
+revocation table this repository would actually need.
+
+`scripts/check_incident_contract.py` is the gate, in `make verify` and in the
+`stewardship` CI job. Two of its four checks (IR-15, no wildcard `git add` in
+unattended automation; IR-16, no scripted commit without a secret scan) were
+already clean when they landed, so each prints what it scanned rather than only
+whether it found anything: a guard with nothing to catch and a guard that is
+not looking otherwise render identically, and this repository has shipped the
+second kind before.
+
+**Still open:** the labels are declared, not created. `gh label list` on
+2026-08-27 showed none of the six exist on the repository; the create command
+is in the header of `.github/labels.yml`. IR-02's live check (every open
+`incident` issue carries exactly one `sevN`) needs those labels and a scheduled
+run against the API, so it is not wired yet.
 
 ## performance
 
@@ -176,17 +254,25 @@ audit`), so CI-vs-local drift is structural, not a copy-paste discipline.
 `CONTRIBUTING.md` now says `make verify` and links `docs/standards/`.
 
 **Still open:**
-- **CICD-03/11-18** — ⛔ **the branch-ruleset gap**, now half closed. The
-  artifact exists: [`docs/rulesets/main.json`](rulesets/main.json) is the
-  ruleset payload, in the shape `POST /repos/{owner}/{repo}/rulesets` accepts,
-  and `tests/test_branch_ruleset.py` keeps its required-status-check list in
-  step with the checks the workflows actually report. **No ruleset is enabled
-  live.** That still needs an interactive decision on GitHub (Settings → Rules
-  → Rulesets, or `gh api repos/ChelseaKR/tods-validate/rulesets --input
-  docs/rulesets/main.json`), which no automated pass makes. Once applied,
-  replace the file with the export so the artifact records what is enforced
-  rather than what was intended; see
+- **CICD-03/11-18** — ✅ **closed 2026-09-01.** The ruleset `protect-main`
+  (id 18752857) is active on the default branch, and
+  [`docs/rulesets/main.json`](rulesets/main.json) is the export of it.
+  `tests/test_branch_ruleset.py` keeps its required-status-check list in step
+  with the checks the workflows actually report.
+
+  Applying it corrected two errors in this entry. The update endpoint is
+  `PUT /repos/{owner}/{repo}/rulesets/{id}`; the `POST` form named here
+  creates a second ruleset, and against a live ruleset under a different name
+  that is what it would have done. And the live ruleset was already active
+  under the name `protect-main` while this entry said none was enabled, so the
+  committed file described a ruleset that did not exist alongside a real one
+  nothing was comparing it to. Re-export after any change; see
   [`docs/rulesets/README.md`](rulesets/README.md).
+
+  What is still open is narrower than the row it replaces: nothing compares
+  the committed export with GitHub. The test checks the file against the
+  workflows, which is the drift that happens on its own, but a settings change
+  made in the UI would not show up in any diff.
 
   Writing the prose down as a file found a defect in the prose. This entry
   previously said to require `zizmor` among the status checks. `zizmor.yml` is
@@ -198,12 +284,28 @@ audit`), so CI-vs-local drift is structural, not a copy-paste discipline.
   by itself (`CODEOWNERS` is ready for when a second maintainer joins), and
   with `bypass_actors` empty, expect to need a recorded bypass to merge until
   there is a second person.
-- **CICD-06** — the PyPI trusted-publisher scoping leaves the GitHub
-  Environment blank (`pypi-publish.yml` comment already notes this). ⛔
-  Fixing it requires creating a `pypi` GitHub Environment (Settings →
-  Environments) *and* updating the trusted-publisher config on PyPI's
-  project settings page to match — both are live, interactive, and
-  specific to the maintainer's PyPI account. Not done this pass.
+- **CICD-06** — ✅ **closed 2026-09-01.** Both halves are set.
+  `pypi-publish.yml`'s `publish` job runs in a `pypi` environment, asserted by
+  `tests/test_publish_scoping.py`, and the trusted publisher on PyPI now names
+  that environment instead of accepting any. The subject the standard asks for,
+  `repo:ChelseaKR/tods-validate:environment:pypi`, is the one PyPI checks.
+
+  PyPI publishers are immutable, so this was an add-then-remove rather than an
+  edit: the scoped publisher was created alongside the `(Any)` one and the old
+  entry deleted after. Doing it in that order leaves no window in which a
+  release has no publisher to match.
+
+  Two things this close does not claim. Nothing in this repository can read
+  PyPI's project settings, so the PyPI half is recorded on the maintainer's
+  word and the first release after this date is what actually demonstrates it;
+  if that release fails to publish, this is the entry to reopen. And the
+  `pypi` environment does not yet exist as a GitHub object — a referenced
+  environment is created on first use — so it currently carries no protection
+  rules. Creating it explicitly (`gh api -X PUT
+  repos/ChelseaKR/tods-validate/environments/pypi`) is what makes deployment
+  branch restrictions or a required reviewer available on it, and is worth
+  doing if the release path should be narrower than "any ref that triggers the
+  workflow".
 - **CICD-29** — a Metrics table now exists (`docs/roadmap.md` §Metrics
   ledger, added this pass), so this is substantially addressed; revisit
   whether every optional CI stage is declared applicable/N/A there as the
@@ -321,7 +423,22 @@ clock, so a busy shared runner does not read as a regression; the baseline is
 recorded from the CI runner's machine class, and the check fails rather than
 passes when it has no baseline to compare against.
 
-**Still open:** QM-11 (DORA quarterly review — no cadence established yet).
+**Updated 2026-08-27:** QM-11 closed for this quarter.
+[`docs/DORA-2026-Q3.md`](DORA-2026-Q3.md) is the first review, with
+[`DORA-2026-Q3.json`](DORA-2026-Q3.json) as the machine-readable snapshot and
+`scripts/delivery_metrics.py` as the collector. Cadence: quarterly, next due
+**2026-11-30**, carried by the `docs-check` currency gate so the document
+cannot drift without saying so.
+
+Three of the five DORA metrics come back breached and one comes back N/A, which
+is the point of measuring rather than a reason not to publish: deployment
+frequency 1 per 7.9 days against a weekly floor, lead-time p90 131h against a
+1-day floor, change fail rate 20% against 15%, and rework rate N/A because zero
+reverts in 160 commits leaves no ratio to compute. The collector writes `null`
+with a reason rather than `0` for anything it cannot measure, and
+`tests/test_delivery_metrics.py` pins that, because the standard says the
+collector "never fabricates a zero" and a 0% change fail rate that means "we
+counted nothing" reads exactly like a good one.
 
 ## documentation
 

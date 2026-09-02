@@ -139,9 +139,46 @@ def test_the_ruleset_blocks_the_things_it_exists_for() -> None:
     assert ruleset["enforcement"] == "active"
     assert ruleset["bypass_actors"] == [], "an admin bypass is what CQ-43 asks not to have"
     pull_request = next(r for r in ruleset["rules"] if r["type"] == "pull_request")
-    assert pull_request["parameters"]["required_approving_review_count"] >= 1
     assert pull_request["parameters"]["dismiss_stale_reviews_on_push"] is True
-    assert pull_request["parameters"]["require_code_owner_review"] is True
+    assert pull_request["parameters"]["required_review_thread_resolution"] is True
+
+
+def test_the_review_requirement_matches_the_number_of_people_who_could_meet_it() -> None:
+    """Require an approval exactly when someone other than the author could give one.
+
+    This asserted `required_approving_review_count >= 1` and
+    `require_code_owner_review is True` until 2026-09-01, when the file stopped
+    being an intention and had to be applied. Neither is satisfiable here:
+    GitHub does not count a self-approval, `CODEOWNERS` names one person, and
+    `bypass_actors` is empty by design, so a one-approval rule on this
+    repository blocks every merge instead of reviewing anything. Asserting it
+    made the suite green about a configuration that could not run.
+
+    Tying the assertion to the owner count keeps the aspiration without the
+    fiction: the moment a second owner is added, zero approvals starts failing
+    here and has to be raised.
+    """
+    ruleset = json.loads(RULESET.read_text(encoding="utf-8"))
+    parameters = next(r for r in ruleset["rules"] if r["type"] == "pull_request")["parameters"]
+    owners = {
+        word
+        for line in (ROOT / ".github" / "CODEOWNERS").read_text(encoding="utf-8").splitlines()
+        if not line.lstrip().startswith("#")
+        for word in line.split()
+        if word.startswith("@")
+    }
+    if len(owners) > 1:
+        assert parameters["required_approving_review_count"] >= 1, (
+            f"CODEOWNERS names {sorted(owners)}, so an approval is now obtainable "
+            "from someone other than the author and should be required"
+        )
+        assert parameters["require_code_owner_review"] is True
+    else:
+        assert parameters["required_approving_review_count"] == 0, (
+            f"CODEOWNERS names only {sorted(owners)}; a required approval no one "
+            "can give blocks every merge rather than reviewing anything"
+        )
+        assert parameters["require_code_owner_review"] is False
 
 
 def test_the_path_filtered_workflow_this_guards_against_is_still_path_filtered() -> None:

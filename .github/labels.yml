@@ -1,0 +1,40 @@
+# The incident-response label convention (IR-02, IR-04, IR-17).
+#
+# This file is the declared convention, not a mirror of what the repository
+# currently has. Applying it is a repository change no automated pass makes;
+# `gh label list` on 2026-08-27 showed none of these labels existed. Create
+# them with:
+#
+#   while read -r name colour description; do
+#     gh label create "$name" --color "$colour" --description "$description" --force
+#   done < <(python -c "import yaml,sys;
+#   [print(l['name'], l['color'], l['description']) for l in
+#    yaml.safe_load(open('.github/labels.yml'))['labels']]")
+#
+# `tests/test_incident_contract.py` asserts this file declares exactly the set
+# the standard names, so the convention cannot drift into prose.
+#
+# Severity definitions and their acknowledge/resolve targets are in
+# docs/standards/INCIDENT-RESPONSE-STANDARD.md section 1. This repository is a
+# library/CLI/local-first tool, so per that standard's section 0 it has no
+# deployment-availability incidents (no SEV1 "service down"), while
+# data-exposure and secret-leak incidents apply in full.
+labels:
+  - name: incident
+    color: B60205
+    description: An incident issue. Always carries exactly one sevN label (IR-02).
+  - name: sev1
+    color: B60205
+    description: Critical. Secret or PII exposure reaching a public surface. Ack 4h, contain 24h.
+  - name: sev2
+    color: D93F0B
+    description: High. Core function degraded, or a secret staged but caught before push. Ack 24h, resolve 3d.
+  - name: sev3
+    color: FBCA04
+    description: Moderate. Subset of users affected, or a CI gate found silently disabled. Ack 3d, resolve 2w.
+  - name: sev4
+    color: FEF2C0
+    description: Low or near-miss. No user impact; a control almost failed. Best-effort, no SLA.
+  - name: deploy-caused
+    color: 5319E7
+    description: Opened within 24h of a release and attributed to it. Feeds Change Fail Rate (IR-04).

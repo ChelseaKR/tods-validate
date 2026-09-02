@@ -121,21 +121,23 @@ Not executed, and why:
 | Promoting `v1-contract-audit.md` from candidate to contract | A conformance-only release shipping first. `v0.10.0` disqualified itself, and `Unreleased` changes behavior again, so the earliest qualifying release is two releases away. Only the maintainer can cut one. The preconditions are now written down and dated in that document. |
 | The `employee_run_dates.txt` primary key, `TODS-E204` versus `TODS-W408` | Upstream PR #156, open and last updated 2026-07-17. Freezing on it today would freeze this repository's reading of an issue thread as though it were published text. |
 | Tagging `v1.0.0` | The maintainer. Signed, annotated tags are not something an automated pass creates. |
-| Enabling the branch ruleset (CQ-37 to 43, CICD-03/11-18) and the PyPI environment scoping (CICD-06) | Live GitHub and PyPI settings. The ruleset payload is committed and checked; applying it is one command in `docs/rulesets/README.md`. |
+| ~~Enabling the branch ruleset (CQ-37 to 43, CICD-03/11-18) and the PyPI environment scoping (CICD-06)~~ | Both done 2026-09-01. `protect-main` requires sixteen checks with no bypass actors, and `docs/rulesets/main.json` is its export; the `publish` job is scoped to a `pypi` environment PyPI now names. |
 | Deleting the stray `v0` tag | The maintainer. `docs/CONFORMANCE-GAPS.md` already records that deleting a published ref is out of scope for a file-editing pass, and the two commands to do it. |
 | #143 (structure warning for a recognized-but-unexpected file) and #144 (a second advisory rule) | Nothing, except that both need a spec citation chosen and defended, both are labelled `good first issue` deliberately, and the plan already says neither blocks the release. Left open for a contributor rather than absorbed. |
 
-**Depends on.** Upstream PR #156 (people, not engineering). The branch ruleset
-(CQ-37 to 43, CICD-03/11-18) and the PyPI environment scoping (CICD-06) both
-need live GitHub and PyPI settings changes that no automated pass should make;
-they are prerequisites for the release *process* being what
-`DEFINITION_OF_DONE.md` says it is, and they are one interactive session's
-work whenever the maintainer chooses.
+**Depends on.** Upstream PR #156 (people, not engineering), and a
+conformance-only release, which only the maintainer can cut. The two settings
+prerequisites are no longer among them: both were applied on 2026-09-01, and
+what applying them found is recorded in `docs/CONFORMANCE-GAPS.md` — the
+committed ruleset had never been compared with the live one, and the review
+requirement it asked for could not have been satisfied by a repository with
+one code owner.
 
 **Done when.** `v1.0.0` is tagged, annotated and signed; the contract
-snapshot went one full release cycle unchanged before the tag;
-`v1-contract-audit.md` no longer says "candidate"; and the branch ruleset is
-enabled live, with `docs/rulesets/main.json` replaced by its export.
+snapshot went one full release cycle unchanged before the tag; and
+`v1-contract-audit.md` no longer says "candidate". The branch-ruleset half of
+this line is done: it is enabled live and `docs/rulesets/main.json` is its
+export.
 
 ## Phase 3: scale readiness and triage quality (2027 Q2 to Q3) [PARTLY EXECUTED]
 
@@ -205,24 +207,65 @@ and memory ceilings are documented with the machine class they were measured
 on; the HTML report is usable at ten thousand findings; and every claim in
 this phase says whether it was verified against real data or synthetic.
 
-## Phase 4: surfaces, and room for a second maintainer (2027 Q4 to 2028 Q1)
+## Phase 4: surfaces, and room for a second maintainer (2027 Q4 to 2028 Q1) [PARTLY EXECUTED]
 
 **Delivers.** The work that widens who can use and who can maintain this.
 
-- Publish the VS Code extension to the Marketplace and Open VSX (EXP-10). CI
-  already builds a reviewable VSIX; `editor/vscode/README.md` already says
-  honestly that it is not published.
-- The remaining reporting and workflow surfaces from
-  `ideation/03-expansions.md` Horizon 2 that are not yet built.
-- The standards work that is about operating a project rather than shipping
-  code: the incident-response label convention, postmortem template and
-  secret-exposure runbook; the data-governance data card and source
-  inventory; the DORA quarterly review cadence (QM-11); the AI-development
-  diagnostic baseline. All four are open rows in `CONFORMANCE-GAPS.md` with
-  nobody assigned.
-- `CODEOWNERS` already exists and is waiting for a second person. Solo
-  self-review is a structural limitation no ruleset fixes, and that limit is
-  what this phase is really about.
+The surfaces half turned out to be almost entirely built already, and checking
+that was the work rather than a formality. Every Horizon 2 item in
+`ideation/03-expansions.md` except EXP-10 and EXP-12 ships today: EXP-07's read
+API is in the v1 contract as `tods_validate.read`, EXP-08's rule catalog is
+deployed, EXP-09's workspace ledger is the `trend` command, EXP-11's `doctor`
+is a subcommand. `tods-validate --help` lists fourteen commands. EXP-12 belongs
+to phase 5.
+
+Executed:
+
+- **All four stewardship rows**, each closed as a *checked* contract rather
+  than a document, because the portfolio defines AUTO-GATE as merge-blocking
+  with no `|| true`:
+  - **Incident response.** `.github/labels.yml` declares the `incident`,
+    `sev1` to `sev4`, `deploy-caused` convention; `docs/incidents/TEMPLATE.md`
+    carries every section IR-07 names; `docs/runbooks/secret-exposure.md` works
+    IR-10 to IR-14 in order with a per-credential revocation table.
+    `scripts/check_incident_contract.py` gates all of it, plus IR-15 (no
+    wildcard `git add` in unattended automation) and IR-16 (no scripted commit
+    without a secret scan). Both of those were already clean, so each reports
+    what it scanned: a guard with nothing to catch and a guard that is not
+    looking otherwise render identically.
+  - **Data governance.** Five sources classified under the v2.0.0 tiers with a
+    card each, and `scripts/check_data_cards.py` failing in both directions.
+    The user-feed card is written to decline ownership rather than assert it.
+  - **DORA quarterly review (QM-11).** `docs/DORA-2026-Q3.md` plus a JSON
+    snapshot and a collector. Three of five metrics come back breached and one
+    N/A, which is the point of measuring.
+  - **AI-development measurement.** The `AI-DEV-MEASUREMENT: APPLIES`
+    declaration, the diagnostic share measured and stated as never-gating, and
+    two BASELINE counterweights each carrying a dated graduation decision of
+    2026-11-30.
+- **The extension's non-publication recorded as steps rather than an excuse**,
+  in `docs/runbooks/publish-vscode-extension.md`. The VSIX builds, type-checks,
+  audits, and verifies its own contents in CI today; what is missing is an
+  Azure DevOps publisher and an Eclipse Contributor Agreement, both signed by a
+  person.
+
+Three past events would have been `incident` issues had the convention existed:
+`v0.9.1` tagged but never released, leaving the deployed playground unable to
+boot for three weeks (#136); the playground drift oracle comparing against an
+immutable tag, so it could never go green (#150); and three gates that could
+report a pass they had not earned (#147). None is backfilled into
+`docs/incidents/`, because reconstructing a timeline nobody recorded would
+invent the one thing a postmortem exists to hold. They are counted in the DORA
+review, where the evidence is the changelog and the tag dates rather than a
+memory.
+
+Not executed, and why:
+
+| Item | Blocked on |
+| --- | --- |
+| Publishing the extension to the Marketplace and Open VSX (EXP-10) | Two publisher accounts and a legal acceptance: an Azure DevOps organisation with a Marketplace-scoped PAT, and an Eclipse Foundation account with the Contributor Agreement signed. Neither is something a repository can hold. The runbook is written so this is one session's work. |
+| Creating the six incident labels | They are declared in `.github/labels.yml`, not created; `gh label list` shows none exist. Creating them is a repository change, with the command in that file's header. IR-02's live check needs them first. |
+| A second maintainer | A person, not a milestone. `.github/CODEOWNERS` has been ready since it landed. The measured consequence is now written down rather than felt: 113 of 118 merged pull requests had zero review. |
 
 **Depends on.** Publisher accounts and human UI steps for the extension.
 A second maintainer is a person, not a milestone; the phase delivers the
@@ -232,7 +275,7 @@ readiness for one either way.
 records why it is not; and each of the four standards rows above is either
 closed or has a dated decision saying it will not be.
 
-## Phase 5: upstream standing (2028)
+## Phase 5: upstream standing (2028) [NOT STARTED, GATE VERIFIED 2026-08-27]
 
 **Delivers.** The position `CLAUDE.md`'s "adoption, not ownership" framing
 has always pointed at, and which `ideation/03-expansions.md` calls the
@@ -246,17 +289,34 @@ endgame.
   paired with a rule ID and an interpretation note, with the eight open
   ambiguities in `docs/spec-questions.md` decided as part of adoption.
 
+**Gate state, re-read 2026-08-27.** MobilityData issue #153, "Would the TODS
+Board like to adopt a shared conformance corpus?", is **open with no comments,
+last updated 2026-07-12**. Nothing has been declined and nothing has been
+adopted; the question has not been answered.
+
+Nothing in this phase has been started, and starting it would be the overclaim
+the plan already warns against. Attestations that nobody upstream recognises
+are a certificate this project issues to itself, and an annex proposed to a
+board that has not answered the smaller question first is a worse version of
+asking it. The fallback, a well-maintained third-party catalog, is what exists
+today and is already useful; every rule already has a permanent URL, a spec
+citation, and a fixture.
+
+What *is* new is that the gate is now watched rather than remembered.
+[`docs/phase-gates.json`](phase-gates.json) records the state, and
+`scripts/check_phase_gates.py` re-reads it monthly, because "a phase is not
+scheduled until it can be worked" is only honest if somebody would notice when
+it can be.
+
 **Depends on.** Entirely on the TODS Board and MobilityData. This is the
 phase this repository cannot execute alone, and saying otherwise would be the
-same kind of overclaim the validator is built to refuse. The fallback, a
-well-maintained third-party catalog, is what exists today and is already
-useful.
+same kind of overclaim the validator is built to refuse.
 
 **Done when.** At least one spec release cites rule IDs from this catalog,
 whatever repository they live in by then; or the Board declines, and that is
 recorded so nobody re-litigates it from scratch.
 
-## Phase 6: only on a trigger (2028 H2 to 2029)
+## Phase 6: only on a trigger (2028 H2 to 2029) [NEITHER TRIGGER FIRED, CHECKED 2026-08-27]
 
 Two large bets, neither scheduled, each with a written trigger. A phase with
 no trigger met is a phase that does not start.
@@ -266,23 +326,45 @@ no trigger met is a phase that does not start.
   MobilityData-family spec would be a schema module rather than a new
   project. **Trigger:** a concrete second spec with a committed user. Not
   speculation, and not before v1.0's stability promise can absorb the split.
+
+  **Not fired.** There is no second spec and no committed user; no issue in
+  this repository asks for one. The second half of the trigger is also unmet
+  by construction: v1.0 is not released, so there is no stability promise for
+  a split to be absorbed by. Two independent reasons, either sufficient.
+
 - **Planned versus actual, TODS against TIDES (EXP-16).** Explicitly parked.
   It crosses the spirit of the current out-of-scope line, and needs a
   documented scope decision, real TIDES data, and real operational partners.
   **Trigger:** real-feed adoption (#76) succeeding first, then an explicit
   decision to renegotiate the scope line.
 
+  **Not fired.** #76 is open, last updated 2026-08-21, with one comment and no
+  feed. The trigger is explicitly two-stage and the first stage has not
+  happened, so the second is not a question anyone has to answer yet.
+
+Both remain unbuilt, which is the correct state and not a shortfall. A trigger
+manufactured to justify starting is worse than a phase that has not started,
+because it spends the one thing this repository trades on. `docs/phase-gates.json`
+watches #76 for the second; the first has nothing to watch, which is itself the
+honest answer.
+
 ## Standing work that no phase owns
 
 These run across every phase and are gated on people. They are listed here
 rather than scheduled because a date on them would be fiction.
 
+Every row's gate is recorded in [`phase-gates.json`](phase-gates.json) and
+re-read monthly by `scripts/check_phase_gates.py`, which opens an issue when a
+state moves **or when it could not read one**. The states below were verified
+live on **2026-08-27**; all eight gates were still open.
+
 | Work | Gate | What is honest meanwhile |
 | --- | --- | --- |
-| Real production feeds (#76) | An agency or vendor sharing a feed, privately is fine | Synthetic corpora, clearly labeled; `anonymize` exists to lower the sharing barrier, and its docs say it pseudonymizes rather than anonymizes |
-| Screen-reader and keyboard walkthrough (#74) | A human with assistive technology, ideally a real AT user | The blocking axe and HTML_CodeSniffer gates are a floor; `docs/a11y/2026-08-21-automated-only-not-a-substitute.md` already records that automated checks are not evidence of usability |
-| Confirming the deployed playground end to end (#146) | Recording browser, OS and date against the live page | `scripts/check-playground-boots.cjs` now boots the live page in a real browser and asserts a finding renders, which answers most of it; the dated record is the remainder |
-| Spec additions upstream (rosters, runtimes, chargers) | Upstream adopting any of the three | `docs/research/E1-upstream-spec-state.md` records that all three are open and unmerged, one dormant since 2023; `spec_watch` is the tripwire for when that changes |
+| Real production feeds (#76) | An agency or vendor sharing a feed, privately is fine. Open, updated 2026-08-21 | Synthetic corpora, clearly labeled; `anonymize` exists to lower the sharing barrier, and its docs say it pseudonymizes rather than anonymizes. Every number in `BENCHMARKS.md` says synthetic |
+| Screen-reader and keyboard walkthrough (#74) | A human with assistive technology, ideally a real AT user. Open, updated 2026-08-21 | The blocking axe and HTML_CodeSniffer gates are a floor; `docs/a11y/STATEMENT.md` names WCAG 2.1 AA as the target and deliberately makes no conformance claim, because automated checks are not evidence of usability |
+| Confirming the deployed playground end to end (#146) | Recording browser, OS and date against the live page. Open, updated 2026-08-23 | `scripts/check-playground-boots.cjs` now boots the live page in a real browser and asserts a finding renders, which answers most of it; the dated record is the remainder |
+| Spec additions upstream: rosters (#45), runtimes (#42, #43), chargers (#46) | Upstream adopting any of the four. All open; #45 last touched 2024-08-26, #42 and #43 2024-08-28, #46 2023-12-29 | `docs/research/E1-upstream-spec-state.md` records that none is merged and one has been dormant for over two and a half years; `spec_watch` is the tripwire for the spec text, `check_phase_gates.py` for the proposals themselves |
+| Two good first rules (#143, #144) | A contributor, or a maintainer deciding to absorb them. Open, updated 2026-08-23 | Both are labelled `good first issue` on purpose and neither blocks the v1.0.0 release; `docs/authoring-rules.md` carries the contract, fixture requirement, and doc-regeneration step for each |
 
 ## What would tell us this plan is wrong
 

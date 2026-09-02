@@ -1,0 +1,65 @@
+name: Phase gates (advisory)
+
+# Advisory only: never runs on pull_request or push, so it cannot block a
+# merge. docs/MULTIYEAR-PLAN.md says "a phase is not scheduled until it can be
+# worked", which leaves one question unanswered: how anybody finds out that it
+# can be. This is the answer. It re-reads the gates recorded in
+# docs/phase-gates.json and files an issue when one moves.
+#
+# It also files an issue when it could not read one. That is deliberate and it
+# is the same lesson spec-watch learned: a tripwire that goes quiet when it
+# breaks converts an outage into a green tick, and "we could not look" is news
+# in exactly the way "it moved" is.
+
+on:
+  workflow_dispatch:
+  schedule:
+    # First Monday-ish of each month at 08:00 UTC. Staggered off the weekly
+    # advisory jobs (mutation 06:00 Mon, spec-watch 07:00 Mon) so they do not
+    # contend for runners.
+    - cron: "0 8 1 * *"
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  phase-gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405 # v6
+        with:
+          python-version: "3.12"
+      - name: Re-read the recorded gates
+        id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          python scripts/check_phase_gates.py > gates.md || true
+          if [ -s gates.md ] && grep -qF "Phase gates: attention needed" gates.md; then
+            echo "news=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "news=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Open or update the phase-gate issue
+        if: steps.check.outputs.news == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TITLE: "Phase gates: attention needed"
+        run: |
+          existing="$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number // empty')"
+          if [ -n "$existing" ]; then
+            gh issue comment "$existing" --body-file gates.md
+          else
+            gh issue create --title "$TITLE" --body-file gates.md
+          fi
+      - name: Upload the report
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: phase-gates-report
+          path: gates.md
+          if-no-files-found: ignore

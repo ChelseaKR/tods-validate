@@ -1,15 +1,30 @@
 # make verify runs every merge-blocking gate that can run on a laptop, with the
 # same command CI runs (CICD-27). Run it before opening a PR; the release
 # workflows re-run it at the tagged commit before anything publishes
-# (REL-14/15). CI additionally runs what needs GitHub itself -- the composite
-# action's self-test, CodeQL, Semgrep and zizmor -- so a green `make verify` is
-# a necessary condition for merge, not a sufficient one.
-.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check audit npm-audit secrets a11y citation-cff perf-check memory-check
+# (REL-14/15).
+#
+# CI additionally runs five things this file does not, so a green `make verify`
+# is a necessary condition for merge and not a sufficient one:
+#
+#   - the composite action's self-test, CodeQL, Semgrep and zizmor, which need
+#     GitHub itself;
+#   - the `perf` job, which runs `make perf-check` and `make memory-check`
+#     against baselines recorded on the runner's machine class (see those
+#     targets below);
+#   - the VS Code extension package job, which type-checks, audits and builds
+#     a VSIX out of editor/vscode. It is path-filtered to that directory, so it
+#     is absent from most pull requests, which is how it stayed off this list
+#     for as long as it did.
+#
+# This paragraph is checked against the workflows by
+# tests/test_ci_gate_parity.py, so a job added later cannot reject a tree that
+# `make verify` has just called green without saying so here.
+.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff perf-check memory-check
 
 # Every gate `make verify` runs, in reporting order. Each one is independent:
 # see the recipe below for why that matters.
 VERIFY_GATES := lockfile action-lock lint format typecheck test docs-check contract-check \
-	i18n-check audit npm-audit secrets a11y citation-cff
+	i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff
 
 # The gates run one after another and every one of them runs, whatever the ones
 # before it did. This is deliberate. When `verify` was a prerequisite list, make
@@ -144,8 +159,36 @@ audit:
 # Secret scan over the working tree + history (SEC-17/18). Requires the
 # gitleaks binary (see https://github.com/gitleaks/gitleaks#installing); the
 # CI job installs it explicitly rather than via the license-gated Action.
+#
+# Two scans, because one of them cannot see what the other is for. `gitleaks
+# detect --source .` walks commits: it answers "was a secret ever committed",
+# and it is blind to a file that exists on disk and has not been committed
+# yet. That is the state every working tree is in while a gate runs against
+# it. Measured on this repository at v0.10.0: a file at the repository root
+# holding an AWS key pair, a GitHub PAT and a Slack bot token, saved and never
+# added to the index, gave "283 commits scanned / no leaks found" and exit 0
+# from the history scan, and "leaks found: 1" and exit 1 from --no-git. The
+# comment above this recipe had said "working tree + history" since the gate
+# was written; only the history half existed.
+#
+# Both run, whatever the other one did, and each reports its own result -- the
+# same reason `verify` does not stop at its first failure. `.gitleaks.toml`
+# scopes the working-tree scan away from installed dependencies; see that file.
 secrets:
-	gitleaks detect --source . --redact --exit-code 1
+	@status=0; \
+	printf '%s\n' '' 'gitleaks scan 1 of 2: committed history'; \
+	if gitleaks detect --source . --redact --exit-code 1; then \
+		printf '%s\n' 'gitleaks history: PASS'; \
+	else \
+		status=1; printf '%s\n' 'gitleaks history: FAIL'; \
+	fi; \
+	printf '%s\n' '' 'gitleaks scan 2 of 2: working tree, uncommitted files included'; \
+	if gitleaks detect --no-git --source . --redact --exit-code 1; then \
+		printf '%s\n' 'gitleaks working tree: PASS'; \
+	else \
+		status=1; printf '%s\n' 'gitleaks working tree: FAIL'; \
+	fi; \
+	exit $$status
 
 # Node dependency vulnerability audit (SEC-11). This used to be the first line
 # of the `a11y` recipe, which meant a HIGH advisory anywhere in the npm
@@ -185,6 +228,16 @@ citation-cff:
 # runner's machine class, so a laptop's number is not comparable to it. Run it
 # to see the measurement locally; the merge-blocking comparison is the `perf`
 # job in .github/workflows/ci.yml.
+# The incident-response contract as a gate rather than a document (IR-05/07/
+# 15/16/17), and the data-card presence check DG-01 marks AUTO-GATE. Both are
+# in VERIFY_GATES rather than in a workflow of their own because the
+# portfolio's definition of AUTO-GATE is merge-blocking, with no `|| true`.
+incident-check:
+	python scripts/check_incident_contract.py
+
+data-cards-check:
+	python scripts/check_data_cards.py
+
 perf-check:
 	python scripts/check_perf_budget.py
 

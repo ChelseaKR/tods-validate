@@ -102,7 +102,18 @@ max-complexity = 10
 
 [tool.mypy]
 strict = true
-files = ["src"]
+# `scripts/` is in scope because those files *are* the gates: `make docs-check`,
+# `make contract-check`, `make npm-audit`, `make i18n-check` and the weekly spec
+# tripwire are all scripts/*.py. Until now `ruff check src tests scripts` covered
+# them and `mypy` did not, so the merge-blocking checks were the least verified
+# code in the repository. Bringing them in cost one annotation
+# (scripts/spec_watch.py) once `src/tods_validate/py.typed` existed; before that
+# marker every `from tods_validate import ...` in a script was an import mypy
+# reported as untyped and then refused to follow, which is also why adding the
+# marker and adding this path belong together.
+#
+# `tests/` stays out of scope; see docs/CONFORMANCE-GAPS.md.
+files = ["src", "scripts"]
 
 [[tool.mypy.overrides]]
 # pandas is an optional extra (tods_validate.read.to_dataframe); its stubs are

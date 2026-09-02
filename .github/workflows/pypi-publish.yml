@@ -4,7 +4,15 @@ name: Publish to PyPI
 # No API token is stored anywhere; PyPI verifies this workflow's identity.
 # One-time setup on PyPI: add a GitHub trusted publisher for project
 # "tods-validate" pointing at owner ChelseaKR, repo tods-validate,
-# workflow "pypi-publish.yml" (environment left blank).
+# workflow "pypi-publish.yml", environment "pypi" (CICD-06).
+#
+# The environment is the second half of the scoping. Without it, any workflow
+# in this repository that can mint an OIDC token can publish; with it, PyPI
+# accepts only a token minted by the `pypi` environment, which the repository
+# can restrict independently. Order matters when changing this: PyPI treats a
+# blank environment as "any", so adding the line below is safe on its own, and
+# setting the environment on PyPI is what starts enforcing it. Do it in that
+# order, or a release will fail to publish.
 #
 # Supply-chain hardening (SECURITY-AND-SUPPLY-CHAIN-STANDARD Section 6):
 #   - CycloneDX 1.7 SBOM for the built wheel/sdist, blocking (Section 6.2).
@@ -47,6 +55,11 @@ jobs:
   publish:
     needs: [verify]
     runs-on: ubuntu-latest
+    # Scopes the OIDC token PyPI accepts (CICD-06). See the header for why the
+    # PyPI side has to be changed after this, not before.
+    environment:
+      name: pypi
+      url: https://pypi.org/project/tods-validate/
     permissions:
       contents: write # attach the SBOM to the GitHub release
       id-token: write # OIDC for PyPI Trusted Publishing + provenance

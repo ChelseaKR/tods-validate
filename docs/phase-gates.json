@@ -1,0 +1,86 @@
+{
+  "note": "Every phase of docs/MULTIYEAR-PLAN.md that is gated on somebody else, with the state each gate was last observed in and the date it was observed. scripts/check_phase_gates.py re-reads them and fails when a state has moved, or when it could not read one. Recorded states are observations, not wishes: a gate whose state has changed means a phase may have become workable, which is exactly the thing this repository has no other way to notice.",
+  "recordedAt": "2026-08-27",
+  "gates": [
+    {
+      "id": "corpus-adoption",
+      "phase": 5,
+      "repo": "MobilityData/transit-operational-data-standard",
+      "kind": "issue",
+      "number": 153,
+      "recordedState": "open",
+      "trigger": "The TODS Board answering, either way.",
+      "unblocks": "Phase 5 in full. EXP-12 attestations mean nothing until the corpus has upstream standing, and EXP-15's annex is the same decision at a larger scale."
+    },
+    {
+      "id": "employee-run-dates-pk",
+      "phase": 2,
+      "repo": "MobilityData/transit-operational-data-standard",
+      "kind": "pull",
+      "number": 156,
+      "recordedState": "open",
+      "trigger": "PR #156 merging, which publishes the (date, service_id, run_id, employee_id) primary key as spec text.",
+      "unblocks": "The TODS-E204 versus TODS-W408 decision in docs/v1-contract-audit.md, and with it the contract freeze."
+    },
+    {
+      "id": "upstream-rosters",
+      "phase": 0,
+      "repo": "MobilityData/transit-operational-data-standard",
+      "kind": "issue",
+      "number": 45,
+      "recordedState": "open",
+      "trigger": "Adoption upstream. Functionally superseded by a narrower shipped file per docs/research/E1-upstream-spec-state.md.",
+      "unblocks": "Experimental roster rules (RESEARCH-ROADMAP E1)."
+    },
+    {
+      "id": "upstream-runtimes",
+      "phase": 0,
+      "repo": "MobilityData/transit-operational-data-standard",
+      "kind": "issue",
+      "number": 42,
+      "recordedState": "open",
+      "trigger": "Adoption upstream. Unresolved design questions, no draft spec text.",
+      "unblocks": "Experimental runtime rules (RESEARCH-ROADMAP E1)."
+    },
+    {
+      "id": "upstream-chargers",
+      "phase": 0,
+      "repo": "MobilityData/transit-operational-data-standard",
+      "kind": "issue",
+      "number": 46,
+      "recordedState": "open",
+      "trigger": "Adoption upstream. Dormant since 2023-12-29.",
+      "unblocks": "Experimental charger rules (RESEARCH-ROADMAP E1)."
+    },
+    {
+      "id": "real-production-feeds",
+      "phase": 0,
+      "repo": "ChelseaKR/tods-validate",
+      "kind": "issue",
+      "number": 76,
+      "recordedState": "open",
+      "trigger": "An agency or vendor sharing a feed, privately is fine.",
+      "unblocks": "Calibration of every synthetic number in docs/BENCHMARKS.md, and phase 6's EXP-16, whose own trigger requires this one first."
+    },
+    {
+      "id": "assistive-technology-walkthrough",
+      "phase": 0,
+      "repo": "ChelseaKR/tods-validate",
+      "kind": "issue",
+      "number": 74,
+      "recordedState": "open",
+      "trigger": "A human with assistive technology, ideally a real AT user.",
+      "unblocks": "The only accessibility claim automation cannot make. See docs/a11y/STATEMENT.md."
+    },
+    {
+      "id": "deployed-playground-record",
+      "phase": 0,
+      "repo": "ChelseaKR/tods-validate",
+      "kind": "issue",
+      "number": 146,
+      "recordedState": "open",
+      "trigger": "Recording browser, OS and date against the live page.",
+      "unblocks": "The dated half of the deployed-playground evidence; scripts/check-playground-boots.cjs answers the rest."
+    }
+  ]
+}
