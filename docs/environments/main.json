@@ -1,0 +1,36 @@
+{
+  "pypi": {
+    "deployment_branch_policy": {
+      "protected_branches": false,
+      "custom_branch_policies": true
+    },
+    "branch_policies": [
+      {
+        "type": "tag",
+        "name": "v*"
+      }
+    ],
+    "protection_rule_types": [
+      "branch_policy"
+    ]
+  },
+  "github-pages": {
+    "deployment_branch_policy": {
+      "protected_branches": false,
+      "custom_branch_policies": true
+    },
+    "branch_policies": [
+      {
+        "type": "branch",
+        "name": "main"
+      },
+      {
+        "type": "tag",
+        "name": "v*"
+      }
+    ],
+    "protection_rule_types": [
+      "branch_policy"
+    ]
+  }
+}

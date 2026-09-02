@@ -5,6 +5,30 @@ new checks may be added in minor releases.
 
 ## [Unreleased]
 
+Fixed:
+
+- The release-triggered playground deploy had never completed. `pypi-publish.yml`
+  reaches `github-pages` through `deploy-playground`, which calls `pages.yml`
+  during a `release: published` run, where the ref is a tag; that environment
+  admitted the branch `main` and nothing else, so the job was refused before its
+  first step on both v0.10.0 and v0.11.0. A refused deploy renders as a failed
+  job with no steps and no retrievable log. Nothing downstream looked wrong
+  because the playground still reached production by the push-to-`main` path
+  the sequencing exists to replace, which is the race the comment above that
+  stage says it fixed. The environment now admits the tag pattern `v*`.
+- `docs/environments/main.json` records both deployment environments' branch
+  policies, and `tests/test_deployment_environments.py` checks them against the
+  workflows, following local `uses:` calls because a reusable workflow runs at
+  its caller's ref. Writing that test found the same class of defect in itself:
+  `lstrip("./")` strips every leading `.` and `/`, so the called-workflow path
+  resolved to one that does not exist and the check passed while reaching
+  nothing.
+
+Changed:
+
+- The browser playground installs 0.11.0, and WVR-003 is retired now that PyPI
+  serves it.
+
 ## [0.11.0] - 2026-09-01
 
 The release that made this repository's own gates testable. Several could
