@@ -3,10 +3,9 @@
 
 DOCUMENTATION-STANDARD §6.5: a document whose correctness depends on something
 outside itself carries a ``Last verified: YYYY-MM-DD`` line and a
-``Recheck cadence:`` line. ``docs/getting-started.md``, ``docs/api.md``, and
-``docs/a11y/STATEMENT.md``
-document commands and API members that the code can move out from under, and
-had neither.
+``Recheck cadence:`` line. ``docs/getting-started.md``, ``docs/api.md``,
+``docs/read-api.md`` and ``docs/a11y/STATEMENT.md`` document commands and API
+members that the code can move out from under, and had neither.
 
 A date on its own is only a claim. This check makes the claim falsifiable: the
 stamp records a fingerprint of the page as it was when someone verified it, and
@@ -27,7 +26,16 @@ from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-STAMPED = ("docs/getting-started.md", "docs/api.md", "docs/a11y/STATEMENT.md")
+# docs/read-api.md joined the list on 2026-08-28. It documents ten of the
+# nineteen names the v1 contract freezes -- the whole `tods_validate.read`
+# namespace -- against code that can move under it exactly as api.md's can,
+# and it was the half of the published API surface with no stamp to fail on.
+STAMPED = (
+    "docs/getting-started.md",
+    "docs/api.md",
+    "docs/read-api.md",
+    "docs/a11y/STATEMENT.md",
+)
 
 VERIFIED_RE = re.compile(r"^Last verified: (\d{4}-\d{2}-\d{2})\b", re.MULTILINE)
 CADENCE_RE = re.compile(r"^Recheck cadence: \S", re.MULTILINE)

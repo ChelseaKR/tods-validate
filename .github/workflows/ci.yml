@@ -214,8 +214,11 @@ jobs:
         if: ${{ !cancelled() }}
         run: make npm-audit
 
-  # Secret scan over the PR/push diff and full history (SEC-17/18). Installs
-  # the gitleaks CLI directly (checksum-verified) rather than the third-party
+  # Secret scan over the full history and, separately, the checked-out tree
+  # (SEC-17/18). `make secrets` runs both: a commit scan cannot see a file that
+  # was never committed, and the tree scan cannot see a secret that was
+  # committed and later deleted. See the Makefile recipe. Installs the gitleaks
+  # CLI directly (checksum-verified) rather than the third-party
   # `gitleaks/gitleaks-action`, which is license-gated for organizations.
   secrets:
     runs-on: ubuntu-latest

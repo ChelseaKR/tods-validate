@@ -156,7 +156,11 @@ def fetch_spec_text(spec_file: str | None, spec_url: str) -> str:
         with urllib.request.urlopen(  # noqa: S310  # nosemgrep
             safe_spec_url, timeout=20
         ) as resp:
-            return resp.read().decode("utf-8")
+            # Annotated because urlopen's return is Any: without this the
+            # decoded value is Any too, and `-> str` would be a promise mypy
+            # never checked.
+            body: bytes = resp.read()
+            return body.decode("utf-8")
     except (urllib.error.URLError, TimeoutError, ValueError, OSError) as exc:
         raise SpecFetchError(f"could not fetch spec from {spec_url!r}: {exc}") from exc
 
