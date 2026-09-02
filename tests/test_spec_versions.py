@@ -87,12 +87,14 @@ def test_v1_bad_time_is_e203() -> None:
 def test_v1_feed_under_default_version_is_not_recognized() -> None:
     # The same valid v1.0.0 feed, read against the default (2.1.0) schema:
     # deadheads.txt/ops_locations.txt/deadhead_times.txt/runs_pieces.txt are
-    # not v2.1.0 files at all (TODS-I102), and run_events.txt exists in both
-    # versions but with a different, incompatible field set, so it fails
-    # v2.1.0's required-column check instead of validating clean.
+    # TODS files of the other spec version (TODS-W109), not unknown files, and
+    # run_events.txt exists in both versions but with a different, incompatible
+    # field set, so it fails v2.1.0's required-column check instead of
+    # validating clean.
     _, findings = run(V1_FIXTURES / "valid")
     rule_ids = {f.rule_id for f in findings}
-    assert "TODS-I102" in rule_ids
+    assert "TODS-W109" in rule_ids
+    assert "TODS-I102" not in rule_ids
     assert "TODS-E106" in rule_ids
 
 

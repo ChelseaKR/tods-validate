@@ -7,6 +7,7 @@ from tods_validate.findings import Finding, Severity
 
 RULES = (
     "TODS-W101",
+    "TODS-W109",
     "TODS-I102",
     "TODS-E103",
     "TODS-E104",
@@ -43,6 +44,22 @@ def test_unknown_file_is_info_only() -> None:
     unknown = [f for f in findings if f.rule_id == "TODS-I102"]
     assert [f.file for f in unknown] == ["notes.txt"]
     assert all(f.severity is Severity.INFO for f in unknown)
+
+
+def test_other_version_file_is_recognized_not_unknown() -> None:
+    findings = run_invalid_fixture("TODS-W109")
+    warned = [f for f in findings if f.rule_id == "TODS-W109"]
+    assert [f.file for f in warned] == ["deadheads.txt"]
+    assert all(f.severity is Severity.WARNING for f in warned)
+    # The v1 file must no longer fall through to the unknown-file rule.
+    assert "TODS-I102" not in rule_ids(findings)
+
+
+def test_other_version_file_message_names_the_active_version() -> None:
+    findings = run_invalid_fixture("TODS-W109")
+    warned = [f for f in findings if f.rule_id == "TODS-W109"]
+    assert "2.1.0" in warned[0].message
+    assert warned[0].suggestion is not None
 
 
 def test_empty_file_reports_unreadable_not_missing_columns() -> None:
