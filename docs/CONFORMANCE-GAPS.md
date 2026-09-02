@@ -284,17 +284,28 @@ audit`), so CI-vs-local drift is structural, not a copy-paste discipline.
   by itself (`CODEOWNERS` is ready for when a second maintainer joins), and
   with `bypass_actors` empty, expect to need a recorded bypass to merge until
   there is a second person.
-- **CICD-06** — the repository half is done: `pypi-publish.yml`'s `publish`
-  job runs in a `pypi` environment, so the OIDC token it mints carries that
-  claim. ⛔ until the PyPI side matches. A trusted publisher with a blank
-  environment accepts a token from any environment, so until the environment
-  is set on PyPI's project settings page the claim is made and not checked,
-  and any workflow here that can mint a token could still publish. That change
-  is on the maintainer's PyPI account and cannot be made from this repository.
+- **CICD-06** — ✅ **closed 2026-09-01.** Both halves are set.
+  `pypi-publish.yml`'s `publish` job runs in a `pypi` environment, asserted by
+  `tests/test_publish_scoping.py`, and the trusted publisher on PyPI now names
+  that environment instead of accepting any. The subject the standard asks for,
+  `repo:ChelseaKR/tods-validate:environment:pypi`, is the one PyPI checks.
 
-  The order is load-bearing in one direction only. Setting the environment on
-  PyPI before the workflow declares one breaks publishing; declaring it here
-  first is a no-op until PyPI enforces it.
+  PyPI publishers are immutable, so this was an add-then-remove rather than an
+  edit: the scoped publisher was created alongside the `(Any)` one and the old
+  entry deleted after. Doing it in that order leaves no window in which a
+  release has no publisher to match.
+
+  Two things this close does not claim. Nothing in this repository can read
+  PyPI's project settings, so the PyPI half is recorded on the maintainer's
+  word and the first release after this date is what actually demonstrates it;
+  if that release fails to publish, this is the entry to reopen. And the
+  `pypi` environment does not yet exist as a GitHub object — a referenced
+  environment is created on first use — so it currently carries no protection
+  rules. Creating it explicitly (`gh api -X PUT
+  repos/ChelseaKR/tods-validate/environments/pypi`) is what makes deployment
+  branch restrictions or a required reviewer available on it, and is worth
+  doing if the release path should be narrower than "any ref that triggers the
+  workflow".
 - **CICD-29** — a Metrics table now exists (`docs/roadmap.md` §Metrics
   ledger, added this pass), so this is substantially addressed; revisit
   whether every optional CI stage is declared applicable/N/A there as the

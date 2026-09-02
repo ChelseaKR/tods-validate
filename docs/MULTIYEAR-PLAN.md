@@ -121,21 +121,23 @@ Not executed, and why:
 | Promoting `v1-contract-audit.md` from candidate to contract | A conformance-only release shipping first. `v0.10.0` disqualified itself, and `Unreleased` changes behavior again, so the earliest qualifying release is two releases away. Only the maintainer can cut one. The preconditions are now written down and dated in that document. |
 | The `employee_run_dates.txt` primary key, `TODS-E204` versus `TODS-W408` | Upstream PR #156, open and last updated 2026-07-17. Freezing on it today would freeze this repository's reading of an issue thread as though it were published text. |
 | Tagging `v1.0.0` | The maintainer. Signed, annotated tags are not something an automated pass creates. |
-| Enabling the branch ruleset (CQ-37 to 43, CICD-03/11-18) and the PyPI environment scoping (CICD-06) | Live GitHub and PyPI settings. The ruleset payload is committed and checked; applying it is one command in `docs/rulesets/README.md`. |
+| ~~Enabling the branch ruleset (CQ-37 to 43, CICD-03/11-18) and the PyPI environment scoping (CICD-06)~~ | Both done 2026-09-01. `protect-main` requires sixteen checks with no bypass actors, and `docs/rulesets/main.json` is its export; the `publish` job is scoped to a `pypi` environment PyPI now names. |
 | Deleting the stray `v0` tag | The maintainer. `docs/CONFORMANCE-GAPS.md` already records that deleting a published ref is out of scope for a file-editing pass, and the two commands to do it. |
 | #143 (structure warning for a recognized-but-unexpected file) and #144 (a second advisory rule) | Nothing, except that both need a spec citation chosen and defended, both are labelled `good first issue` deliberately, and the plan already says neither blocks the release. Left open for a contributor rather than absorbed. |
 
-**Depends on.** Upstream PR #156 (people, not engineering). The branch ruleset
-(CQ-37 to 43, CICD-03/11-18) and the PyPI environment scoping (CICD-06) both
-need live GitHub and PyPI settings changes that no automated pass should make;
-they are prerequisites for the release *process* being what
-`DEFINITION_OF_DONE.md` says it is, and they are one interactive session's
-work whenever the maintainer chooses.
+**Depends on.** Upstream PR #156 (people, not engineering), and a
+conformance-only release, which only the maintainer can cut. The two settings
+prerequisites are no longer among them: both were applied on 2026-09-01, and
+what applying them found is recorded in `docs/CONFORMANCE-GAPS.md` — the
+committed ruleset had never been compared with the live one, and the review
+requirement it asked for could not have been satisfied by a repository with
+one code owner.
 
 **Done when.** `v1.0.0` is tagged, annotated and signed; the contract
-snapshot went one full release cycle unchanged before the tag;
-`v1-contract-audit.md` no longer says "candidate"; and the branch ruleset is
-enabled live, with `docs/rulesets/main.json` replaced by its export.
+snapshot went one full release cycle unchanged before the tag; and
+`v1-contract-audit.md` no longer says "candidate". The branch-ruleset half of
+this line is done: it is enabled live and `docs/rulesets/main.json` is its
+export.
 
 ## Phase 3: scale readiness and triage quality (2027 Q2 to Q3) [PARTLY EXECUTED]
 

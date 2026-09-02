@@ -7,11 +7,13 @@ repository that can ask for one, which is a wider grant than "the release
 workflow may publish".
 
 Declaring `environment: pypi` on the publishing job is the repository half of
-narrowing it. The other half is on PyPI's project settings page and cannot be
-asserted from here, which is why `docs/CONFORMANCE-GAPS.md` keeps CICD-06 open
-until both sides match. What this module can do is stop the repository half
-from being removed by accident: the declaration is three lines in a YAML file
-and nothing else in the build would notice if they went.
+narrowing it. The other half is the publisher config on PyPI, set on
+2026-09-01, which nothing here can read: PyPI's project settings are visible
+only to its owner, so no gate in this repository can confirm the two still
+agree. What this module can do is stop the half that lives here from being
+removed by accident. The declaration is four lines of YAML, and without this
+nothing else in the build would notice if they went — least of all the release
+that would then publish with an unscoped token.
 """
 
 from __future__ import annotations
