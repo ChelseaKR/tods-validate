@@ -131,16 +131,18 @@ ceilings, recorded in `perf/bundle-baseline.json`.
 
 | Surface | Measured | Budget |
 | --- | --- | --- |
-| `web/index.html` | 11,513 | 13,312 |
+| `web/index.html` | 11,513 | 12,288 |
 | Whole published `web/` tree | 207,219 | 262,144 |
 | Published page count | 45 | 60 |
 | HTML report at 10,000 findings | 2,348,762 | 3,145,728 |
 
-The `web/index.html` ceiling moved from 12,288 when the share card landed:
-the head advertised a title, a description and a URL and no image, so every
-share of the playground arrived as grey text. The image tags cost 1.1 KiB
-and are a one-time addition to the head; the 1200x630 PNG is a static asset
-and does not enter either byte figure.
+The `web/index.html` ceiling did not move when the share card landed. The
+head advertised a title, a description and a URL and no image, so every share
+of the playground arrived as grey text; the image tags cost 1.1 KiB and fit
+under the existing 12,288 ceiling, leaving 6% headroom rather than 16%. That
+is deliberate: this page is not supposed to grow, so the next addition of
+this size gets argued for when it is needed. The 1200x630 PNG is a static
+asset and does not enter either byte figure.
 
 The last row is the one that can grow without anyone noticing: about 235 bytes
 per finding, so a template change adding 80 bytes to a row is invisible on a
