@@ -14,6 +14,7 @@ import tomllib
 from pathlib import Path
 
 PYPROJECT = Path(__file__).parent.parent / "pyproject.toml"
+DOCS = Path(__file__).parent.parent / "docs"
 
 # Packages that exist to develop, test, or audit this project and never to run
 # it. The list is explicit because it cannot be derived from the tables: pygls
@@ -72,6 +73,36 @@ def test_development_tooling_is_not_an_extra_of_the_published_package() -> None:
     assert not offenders, (
         "development tooling declared as a published extra (CQ-27): "
         f"{', '.join(sorted(offenders))}. Move it to [dependency-groups]."
+    )
+
+
+def test_no_page_under_docs_still_describes_a_dev_extra() -> None:
+    # The half the gate above cannot see. CQ-27 moved the dev dependencies on
+    # 2026-08-27, and `docs/adr/0005-uv-lockfile-adoption.md` went on listing
+    # them as living in `[project.optional-dependencies].dev` for another week,
+    # in the same file whose header already recorded the move. The code was
+    # right and the page describing it was wrong, which is the failure mode
+    # this repository keeps hitting: a claim that outlives what it describes.
+    #
+    # `.dev` is the discriminator. Naming the table is fine and several pages
+    # legitimately do (the standard states the requirement, CONFORMANCE-GAPS
+    # states the close). Naming a `dev` *member* of it asserts a key that
+    # pyproject.toml no longer has. CHANGELOG.md is out of scope by design: a
+    # changelog records what was true at a version and is supposed to keep
+    # saying so.
+    extras = _pyproject()["project"].get("optional-dependencies", {})
+    if "dev" in extras:  # pragma: no cover - the extra is gone; see CQ-27
+        return
+    stale = sorted(
+        f"{path.relative_to(DOCS)}:{number}"
+        for path in DOCS.rglob("*.md")
+        for number, line in enumerate(path.read_text(encoding="utf-8").splitlines(), 1)
+        if "[project.optional-dependencies].dev" in line
+    )
+    assert not stale, (
+        "pyproject.toml has no `dev` extra, but these lines under docs/ still "
+        f"name one: {', '.join(stale)}. Rewrite the claim in the present tense "
+        "or mark it as a dated correction, the way ADR 0005 does."
     )
 
 

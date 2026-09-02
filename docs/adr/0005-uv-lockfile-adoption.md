@@ -37,12 +37,22 @@ be updated"). `uv lock --check` now runs as its own step before every
 in `make verify`. The frozen install is retained: the two commands answer
 different questions, and CQ-09 asks both.
 
-Deliberate scope cut, still open: the `docs-drift`/`i18n`/`action-self-test`/
-`merge-handoff` CI jobs remain on plain `pip install` (they do not consume
-the dev extra), and dev dependencies still live in
-`[project.optional-dependencies].dev` rather than PEP 735
-`[dependency-groups]` (CQ-27). Both are tracked in
+Deliberate scope cut, still open: the `docs-drift`/`contract`/`i18n`/
+`action-self-test`/`merge-handoff` CI jobs remain on plain `pip install`
+(they do not consume the dev dependencies). Tracked in
 `docs/CONFORMANCE-GAPS.md`.
+
+**Correction (2026-09-02, CQ-27).** Until this correction the paragraph
+above also named CQ-27, dev dependencies declared in
+`[project.optional-dependencies]` instead of PEP 735 `[dependency-groups]`,
+as a scope cut that was still open. It had not been open since 2026-08-27.
+The dev dependencies moved in #145, `docs/CONFORMANCE-GAPS.md` records the
+close, and `tests/test_packaging.py` is the gate that fails if development
+tooling reappears as a published extra. The amendment note at the top of
+this file recorded the move on the day it happened, so this document spent a
+week asserting an open gap and its own close at the same time.
+`tests/test_packaging.py` now also fails if any page under `docs/` names the
+dev extra that no longer exists.
 
 ## Consequences
 
