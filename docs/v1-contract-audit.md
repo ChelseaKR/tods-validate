@@ -85,8 +85,11 @@ why the document still says "candidate".
    than a statement of intent. `contract` is among the sixteen required
    checks, so the gate that protects this document's subject can no longer be
    red on a pull request that merges. Closed.
-4. **`CICD-06`**, the PyPI trusted-publisher environment scoping, is still
-   unset. Both halves are live settings changes.
+4. **`CICD-06`**, the PyPI trusted-publisher environment scoping, is set on
+   both sides as of 2026-09-01: the `publish` job runs in a `pypi`
+   environment and PyPI's publisher names it. Closed, with the caveat that no
+   gate here can read PyPI's settings, so the next release is what
+   demonstrates it.
 
 What this pass did instead of promoting the document: closed the fail-open in
 the gate the promotion would rest on. `pythonExports` was compared against
