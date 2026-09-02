@@ -12,10 +12,12 @@ Fixed:
   during a `release: published` run, where the ref is a tag; that environment
   admitted the branch `main` and nothing else, so the job was refused before its
   first step on both v0.10.0 and v0.11.0. A refused deploy renders as a failed
-  job with no steps and no retrievable log. Nothing downstream looked wrong
-  because the playground still reached production by the push-to-`main` path
-  the sequencing exists to replace, which is the race the comment above that
-  stage says it fixed. The environment now admits the tag pattern `v*`.
+  job with no steps and no retrievable log. The site did not visibly fall
+  behind, because `pages.yml` was dispatched by hand afterwards: two
+  `workflow_dispatch` runs on 2026-08-22, the day v0.10.0 shipped. It has no
+  `push` trigger, so there was no automatic fallback and every release since
+  depended on someone noticing. The environment now admits the tag pattern
+  `v*`.
 - `docs/environments/main.json` records both deployment environments' branch
   policies, and `tests/test_deployment_environments.py` checks them against the
   workflows, following local `uses:` calls because a reusable workflow runs at
@@ -28,6 +30,13 @@ Changed:
 
 - The browser playground installs 0.11.0, and WVR-003 is retired now that PyPI
   serves it.
+
+- Corrects a claim made in the entry above when it landed. It said the
+  playground kept reaching production by a push-to-`main` path; `pages.yml` has
+  no `push` trigger and never had one, and the real fallback was a manual
+  dispatch. The correction matters because the two readings differ in what was
+  at risk: an automatic path degrading quietly, versus a release step that only
+  completed when a person remembered to run it.
 
 ## [0.11.0] - 2026-09-01
 
