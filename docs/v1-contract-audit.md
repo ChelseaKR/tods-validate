@@ -80,10 +80,11 @@ why the document still says "candidate".
    response in an issue thread, not published spec text, and freezing a
    contract on it would freeze a guess. This is the single hardest blocker,
    and it is gated on other people.
-3. **The branch ruleset has to be live**, not only committed.
-   [`rulesets/main.json`](rulesets/main.json) exists and is checked against the
-   workflows, but no ruleset is enabled on the repository, so the release
-   process is not yet the one `DEFINITION_OF_DONE.md` describes.
+3. **The branch ruleset is live** as of 2026-09-01, and
+   [`rulesets/main.json`](rulesets/main.json) is now the export of it rather
+   than a statement of intent. `contract` is among the sixteen required
+   checks, so the gate that protects this document's subject can no longer be
+   red on a pull request that merges. Closed.
 4. **`CICD-06`**, the PyPI trusted-publisher environment scoping, is still
    unset. Both halves are live settings changes.
 
