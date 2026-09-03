@@ -49,12 +49,14 @@ Fixed:
 
 Changed:
 
-- `perf/bundle-baseline.json` raises the `web/index.html` ceiling from 12,288
-  to 13,312 bytes. The share-card tags and their alternative text cost 1.1 KiB
-  of head on a page whose budget deliberately ran a tight 16% headroom, and
-  absorbing them at the old ceiling would have left 6%. The card itself is a
-  static asset and enters neither byte figure. Recorded with its reason in the
-  file, and in `docs/BENCHMARKS.md`, as that budget requires.
+- The share-card tags and their alternative text cost 1.1 KiB of head on
+  `web/index.html`, taking the measured page to 11,513 bytes against the
+  12,288-byte ceiling in `perf/bundle-baseline.json`. The ceiling did not
+  move: the budget deliberately ran a tight margin so that an addition of this
+  size would be argued for rather than absorbed, and the argument is recorded
+  in the file's rationale and in `docs/BENCHMARKS.md`. Six percent headroom
+  remains, on a page that is not supposed to grow. The card itself is a static
+  asset and enters neither byte figure.
 
 - The browser playground installs 0.11.0, and WVR-003 is retired now that PyPI
   serves it.
