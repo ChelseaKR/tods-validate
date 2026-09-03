@@ -21,6 +21,60 @@
 # `make verify` has just called green without saying so here.
 .PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff perf-check memory-check
 
+# Run the tools this repository pins, not whichever ones the shell happens to
+# find first.
+#
+# Every gate below named its tool bare -- `mypy`, `ruff`, `pytest`, `python` --
+# so the gate ran whatever was on PATH. CONTRIBUTING.md says to
+# `. .venv/bin/activate` before `make verify`, and nothing enforced it; when
+# that step is missed the gates do not report a wrong environment, they report
+# wrong results about the code.
+#
+# Measured here, with the venv present but not activated: a pipx-installed
+# mypy -- the *same* 2.1.0 uv.lock pins, so neither a version drift nor a stub
+# problem -- cannot see click, pygls or lsprotocol. It emits 4
+# `import-not-found` errors, and then, because an unresolved `click.option` is
+# Any, `strict = true`'s disallow_untyped_decorators fires on every decorated
+# command: "Found 96 errors in 2 files", all in src/tods_validate/cli.py and
+# src/tods_validate/lsp.py, on a commit whose CI run was green. Handing that
+# same binary the project interpreter (`--python-executable .venv/bin/python`)
+# prints "Success: no issues found in 51 source files". The 89
+# untyped-decorator lines are a rendering of the 4 unresolved imports, and
+# reading them as a fault in the code has already cost one debugging session
+# that concluded "click stub drift" and went looking for something to silence.
+#
+# CI never saw it because every job running a Python gate prepends
+# `$PWD/.venv/bin` to $GITHUB_PATH by hand first -- the local/CI divergence the
+# header above promises does not exist. Resolving the tools here closes it at
+# the source rather than in each caller's shell.
+#
+# Explicit paths rather than an exported PATH, because `export PATH` does not
+# reach a recipe like `typecheck`'s. A recipe line with no shell metacharacters
+# is exec'd directly instead of through /bin/sh, and that path search does not
+# honour make's exported value (GNU Make 3.81, which is what macOS ships): with
+# `export PATH := $(CURDIR)/.venv/bin:$(PATH)` in force, `mypy` still found the
+# pipx build and still printed 96 errors, while `mypy; :` -- the same command
+# with a metacharacter, so run through the shell -- printed Success. A fix that
+# depends on whether a recipe happens to contain a semicolon is not a fix.
+#
+# TOOL is empty when there is no .venv, so the CI jobs that install with
+# `pip install .` into a setup-python interpreter keep resolving exactly as
+# before; it is gitignored, so those checkouts never have one.
+#
+# Not a silencing fix: no mypy setting is relaxed, no module is exempted from
+# disallow_untyped_decorators, and no `# type: ignore` is added. The gate stays
+# able to fail. It is only made to check the code against the dependency set
+# uv.lock actually describes.
+VENV_BIN := $(CURDIR)/.venv/bin
+TOOL := $(if $(wildcard $(VENV_BIN)/python),$(VENV_BIN)/,)
+
+PYTHON := $(TOOL)python
+MYPY := $(TOOL)mypy
+RUFF := $(TOOL)ruff
+PYTEST := $(TOOL)pytest
+PIP_AUDIT := $(TOOL)pip-audit
+TODS_VALIDATE := $(TOOL)tods-validate
+
 # Every gate `make verify` runs, in reporting order. Each one is independent:
 # see the recipe below for why that matters.
 VERIFY_GATES := lockfile action-lock lint format typecheck test docs-check contract-check \
@@ -101,16 +155,16 @@ action-lock:
 	fi
 
 lint:
-	ruff check src tests scripts
+	$(RUFF) check src tests scripts
 
 format:
-	ruff format --check src tests scripts
+	$(RUFF) format --check src tests scripts
 
 typecheck:
-	mypy
+	$(MYPY)
 
 test:
-	pytest --cov --cov-report=term-missing --cov-fail-under=90
+	$(PYTEST) --cov --cov-report=term-missing --cov-fail-under=90
 
 # Two independent drift checks, and both of them run.
 #
@@ -124,13 +178,13 @@ test:
 docs-check:
 	@status=0; \
 	printf '%s\n' '' 'docs check 1 of 2: generated docs match the rule registry'; \
-	if python scripts/generate_rules_doc.py --check; then \
+	if $(PYTHON) scripts/generate_rules_doc.py --check; then \
 		printf '%s\n' 'generated docs: PASS'; \
 	else \
 		status=1; printf '%s\n' 'generated docs: FAIL'; \
 	fi; \
 	printf '%s\n' '' 'docs check 2 of 2: stamped pages are current'; \
-	if python scripts/check_doc_currency.py; then \
+	if $(PYTHON) scripts/check_doc_currency.py; then \
 		printf '%s\n' 'doc currency: PASS'; \
 	else \
 		status=1; printf '%s\n' 'doc currency: FAIL'; \
@@ -138,8 +192,15 @@ docs-check:
 	exit $$status
 
 contract-check:
-	python scripts/check_public_contract.py
+	$(PYTHON) scripts/check_public_contract.py
 
+# The one gate that keeps a bare `python`. ci.yml's `i18n` job runs this
+# recipe's command directly instead of calling the target, and
+# tests/test_ci_gate_parity.py compares the two as text so they cannot
+# silently drift apart; `$(PYTHON)` here would fail that comparison against
+# the job's literal `python scripts/check_i18n.py`. That job installs with
+# `pip install .` into a setup-python interpreter and has no .venv, where
+# `$(PYTHON)` expands to bare `python` anyway, so this costs nothing there.
 i18n-check:
 	python scripts/check_i18n.py
 
@@ -153,7 +214,7 @@ audit:
 	req="$$(mktemp)" && \
 	uv export --frozen --group dev --no-emit-project --no-hashes --quiet \
 		--format requirements-txt -o "$$req" && \
-	pip-audit --strict --no-deps -r "$$req"; \
+	$(PIP_AUDIT) --strict --no-deps -r "$$req"; \
 	rc=$$?; rm -f "$$req"; exit $$rc
 
 # Secret scan over the working tree + history (SEC-17/18). Requires the
@@ -200,13 +261,20 @@ secrets:
 # and the alternative -- raising the severity floor -- would hide every finding
 # at that level. See waivers.yml.
 npm-audit:
-	python scripts/check_npm_audit.py
+	$(PYTHON) scripts/check_npm_audit.py
 
 # Blocking WCAG 2.1 AA automation for the browser playground and a generated
 # HTML report. npm ci must have been run first; CI and the reusable release
 # verification workflow both install from package-lock.json.
+# scripts/run-a11y.sh generates the report it audits by running the built
+# CLI, which is the console script this project installs into .venv/bin --
+# so the gate needed the venv on PATH for the same reason `typecheck` did,
+# and failed with `tods-validate: command not found` without it. The script
+# already takes TODS_VALIDATE_BIN; this hands it the same resolved path the
+# other gates use, and passes the script's own default through unchanged
+# when there is no .venv.
 a11y:
-	npm run a11y
+	TODS_VALIDATE_BIN=$(TODS_VALIDATE) npm run a11y
 
 # Validates CITATION.cff against the Citation File Format 1.2.0 schema
 # (DOC-08). Catches malformed citation metadata before a release ships it.
@@ -233,13 +301,13 @@ citation-cff:
 # in VERIFY_GATES rather than in a workflow of their own because the
 # portfolio's definition of AUTO-GATE is merge-blocking, with no `|| true`.
 incident-check:
-	python scripts/check_incident_contract.py
+	$(PYTHON) scripts/check_incident_contract.py
 
 data-cards-check:
-	python scripts/check_data_cards.py
+	$(PYTHON) scripts/check_data_cards.py
 
 perf-check:
-	python scripts/check_perf_budget.py
+	$(PYTHON) scripts/check_perf_budget.py
 
 # The other half of the scale budget (FIX-04). Kept out of VERIFY_GATES for the
 # same reason perf-check is: it measures rather than inspects, so it belongs in
@@ -247,4 +315,4 @@ perf-check:
 # tests/test_memory_budget.py runs the comparison logic and one real
 # measurement inside `make test`, so the budget is not only checked in CI.
 memory-check:
-	python scripts/check_memory_budget.py
+	$(PYTHON) scripts/check_memory_budget.py
