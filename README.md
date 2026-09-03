@@ -1,9 +1,9 @@
 # tods-validate
 
-Status: Beta
-
 A validator for [Transit Operational Data Standard (TODS)](https://tods-transit.org/)
 feeds, with a CLI and a GitHub Action.
+
+Status: Beta
 
 TODS is an open standard for describing scheduled transit operations: crew
 runs, deadheads, vehicle assignments, and other non-public service that GTFS

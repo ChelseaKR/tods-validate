@@ -61,7 +61,26 @@
       property="og:description"
       content="Validate a Transit Operational Data Standard (TODS) feed in your browser. Nothing is uploaded: the validator runs on your machine via Pyodide, so it is safe for non-public operational data."
     />
-    <meta name="twitter:card" content="summary" />
+    <!-- The share card is 1200x630, the box every network crops an unfurled
+         link to, and summary_large_image is what asks X for that box instead
+         of a square thumbnail. Absolute for the same reason the canonical is:
+         a crawler resolves og:image against nothing, so a relative one is
+         fetched from the shared origin's 404. pages.yml uploads web/ whole,
+         so the file is served at exactly this address. -->
+    <meta property="og:image" content="https://chelseakr.github.io/tods-validate/og-card.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="tods-validate: validate TODS feeds everywhere. CLI, CI, browser, editor, pre-commit, Docker, and LSP."
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://chelseakr.github.io/tods-validate/og-card.png" />
+    <meta
+      name="twitter:image:alt"
+      content="tods-validate: validate TODS feeds everywhere. CLI, CI, browser, editor, pre-commit, Docker, and LSP."
+    />
     <style>
       :root {
         color-scheme: light dark;

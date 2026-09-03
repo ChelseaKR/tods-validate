@@ -220,13 +220,29 @@ def test_every_page_carries_a_share_card_that_agrees_with_the_page() -> None:
         head = _head(page)
         assert '<meta property="og:type" content="article" />' in head, name
         assert '<meta property="og:site_name" content="tods-validate" />' in head, name
-        assert '<meta name="twitter:card" content="summary" />' in head, name
+        # `summary` asks X for a square thumbnail. These pages carry a 1200x630
+        # landscape card, which is the shape every network crops an unfurled
+        # link to; the mismatch is why the previous head shipped no image at all
+        # and every share of a rule page arrived as bare grey text.
+        assert '<meta name="twitter:card" content="summary_large_image" />' in head, name
         title = _attribute(head, r"<title>([^<]*)</title>")
         assert _attribute(head, r'<meta property="og:title" content="([^"]*)"') == title, name
         described = _attribute(head, r'<meta name="description" content="([^"]*)"')
         assert (
             _attribute(head, r'<meta property="og:description" content="([^"]*)"') == described
         ), name
+
+        # An og:image is a promise about bytes a stranger's machine will fetch,
+        # so it has to be absolute (a crawler resolves it against nothing) and
+        # it has to be published. web/ is uploaded whole by pages.yml, so the
+        # file on disk is the file that gets served.
+        card = _attribute(head, r'<meta property="og:image" content="([^"]*)"')
+        assert card == f"{gen.RULE_PAGE_BASE.removesuffix('rules/')}og-card.png", name
+        assert _attribute(head, r'<meta name="twitter:image" content="([^"]*)"') == card, name
+        assert _attribute(head, r'<meta property="og:image:alt" content="([^"]*)"'), name
+        assert _attribute(head, r'<meta name="twitter:image:alt" content="([^"]*)"'), name
+        assert _attribute(head, r'<meta property="og:image:width" content="([^"]*)"') == "1200"
+        assert _attribute(head, r'<meta property="og:image:height" content="([^"]*)"') == "630"
 
 
 def test_no_page_makes_a_root_relative_reference() -> None:

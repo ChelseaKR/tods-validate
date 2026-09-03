@@ -41,6 +41,22 @@ WEB_RULES_DIR = Path(__file__).parent.parent / "web" / "rules"
 # nothing. Neither is visible in a browser.
 _CATALOG_URL = RULE_PAGE_BASE + "index.html"
 
+# The share card, and the same shared-origin problem one step further out. A
+# crawler resolves og:image against nothing, so it has to be absolute; anything
+# relative is fetched from https://chelseakr.github.io/, which is a 404 these
+# pages share with five sibling projects. Derived from RULE_PAGE_BASE rather
+# than written out again so the site root has one definition: these pages live
+# under /rules/, the card sits at the root that pages.yml uploads, and the two
+# cannot drift apart. It is 1200x630 because every network that unfurls a link
+# fits the image to a landscape box; the previous `summary` card asked X for a
+# square thumbnail of an image that did not exist.
+_SITE_ROOT = RULE_PAGE_BASE.removesuffix("rules/")
+_SOCIAL_CARD = _SITE_ROOT + "og-card.png"
+_SOCIAL_CARD_ALT = (
+    "tods-validate: validate TODS feeds everywhere. CLI, CI, browser, "
+    "editor, pre-commit, Docker, and LSP."
+)
+
 # Semgrep's html.security.audit.missing-integrity rule fires on the canonical
 # link of every page this script writes, and the finding is a false positive.
 #
@@ -98,7 +114,14 @@ def _head_metadata(*, title: str, description: str, canonical: str) -> str:
         f'    <meta property="og:url" content="{esc(canonical, quote=True)}" />\n'
         f'    <meta property="og:title" content="{esc(title, quote=True)}" />\n'
         f'    <meta property="og:description" content="{esc(description, quote=True)}" />\n'
-        f'    <meta name="twitter:card" content="summary" />\n'
+        f'    <meta property="og:image" content="{_SOCIAL_CARD}" />\n'
+        f'    <meta property="og:image:type" content="image/png" />\n'
+        f'    <meta property="og:image:width" content="1200" />\n'
+        f'    <meta property="og:image:height" content="630" />\n'
+        f'    <meta property="og:image:alt" content="{_SOCIAL_CARD_ALT}" />\n'
+        f'    <meta name="twitter:card" content="summary_large_image" />\n'
+        f'    <meta name="twitter:image" content="{_SOCIAL_CARD}" />\n'
+        f'    <meta name="twitter:image:alt" content="{_SOCIAL_CARD_ALT}" />\n'
     )
 
 
