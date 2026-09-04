@@ -160,15 +160,6 @@ EXAMPLES: dict[str, RuleExample] = {
         after="agency.txt\nnotes.txt\nrun_events.txt\nvehicles.txt",
         note="Every TODS file is optional, but the package needs at least one to validate.",
     ),
-    "TODS-W109": RuleExample(
-        file="deadheads.txt",
-        before="deadhead_id,service_id,block_id,shape_id,to_trip_id,from_trip_id",
-        after="tods-validate --spec-version 1.0.0 <package> (or replace the v1.0.0 file with its 2.1.0 counterpart)",
-        note=(
-            "The file is a real TODS file, but it is defined by TODS v1.0.0, not by the "
-            "2.1.0 spec being validated against."
-        ),
-    ),
     "TODS-I102": RuleExample(
         file="notes.txt",
         before="note\nremember to update this feed",
@@ -231,6 +222,15 @@ EXAMPLES: dict[str, RuleExample] = {
         note=(
             "Not an error: the column is carried into the merged GTFS as an extension field. "
             "Prefix it TODS_ if it should stay TODS-only metadata instead."
+        ),
+    ),
+    "TODS-W109": RuleExample(
+        file="(package root)",
+        before="run_events.txt\ndeadheads.txt",
+        after="(re-run with --spec-version 1.0.0, or drop deadheads.txt)",
+        note=(
+            "Not a misspelled file: deadheads.txt is a real TODS file, defined by v1.0.0 and "
+            "not by the 2.1.0 spec this package was validated against."
         ),
     ),
     "TODS-E201": RuleExample(

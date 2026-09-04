@@ -132,8 +132,8 @@ ceilings, recorded in `perf/bundle-baseline.json`.
 | Surface | Measured | Budget |
 | --- | --- | --- |
 | `web/index.html` | 11,513 | 12,288 |
-| Whole published `web/` tree | 207,219 | 262,144 |
-| Published page count | 45 | 60 |
+| Whole published `web/` tree | 211,721 | 262,144 |
+| Published page count | 46 | 60 |
 | HTML report at 10,000 findings | 2,348,762 | 3,145,728 |
 
 The `web/index.html` ceiling did not move when the share card landed. The

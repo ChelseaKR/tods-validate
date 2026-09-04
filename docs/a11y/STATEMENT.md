@@ -1,6 +1,6 @@
 # Accessibility statement
 
-Last verified: 2026-09-02
+Last verified: 2026-09-04
 Recheck cadence: every release, and whenever a surface in the table below gains
 a page or an output format.
 
@@ -26,7 +26,7 @@ position from the attempt at a manual walkthrough, and #74 tracks the real one.
 | Terminal output (`--format text`) | WCAG 2.1 AA where applicable | Design review only: severity is carried by a word, never colour, and no ANSI colour is emitted at all, so `NO_COLOR` has nothing to disable | Design invariant, pinned by `tests/test_report.py` |
 | HTML report (`--format html`) | WCAG 2.1 AA | axe + HTML_CodeSniffer at `WCAG2AA`, on a freshly generated report, every pull request | Yes (`make a11y`) |
 | Playground page (`web/index.html`) | WCAG 2.1 AA | The same two runners, **on the `?a11y-static=1` branch**, which deliberately skips the Pyodide boot. The booted state is not audited | Yes (`make a11y`) |
-| Rule catalog (`web/rules/`, 45 published pages) | WCAG 2.1 AA | The same two runners, on the index and one rule page. All 44 come from one template in `scripts/generate_rules_doc.py`, which `--check` gates and `tests/test_generate_rules_doc.py` pins | Yes (`make a11y`), since 2026-08-27 |
+| Rule catalog (`web/rules/`, 45 published pages) | WCAG 2.1 AA | The same two runners, on the index and one rule page. All 45 come from one template in `scripts/generate_rules_doc.py`, which `--check` gates and `tests/test_generate_rules_doc.py` pins | Yes (`make a11y`), since 2026-08-27 |
 | The deployed playground | WCAG 2.1 AA | `scripts/pa11y-ci-live.cjs` against the live URL after each deploy and weekly, plus `scripts/check-playground-boots.cjs`, which drives the real page in a real browser | Yes (`pages.yml`, `playground-deployment.yml`) |
 | VS Code extension (`editor/vscode/`) | Not evaluated | Nothing. It is unpublished, and its UI is VS Code's own | No |
 | Machine formats (JSON, SARIF, Markdown, GitHub) | Not applicable | Not human-rendered surfaces | No |
@@ -72,4 +72,4 @@ bug. Open an issue at
 `SECURITY.md` if you would rather not do so publicly. Please say which surface
 and which assistive technology, including versions; both change behaviour.
 
-<!-- doc-currency: sha256=b44812ff36bb -->
+<!-- doc-currency: sha256=4d58acbc2b2e -->

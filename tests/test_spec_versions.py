@@ -98,6 +98,17 @@ def test_v1_feed_under_default_version_is_not_recognized() -> None:
     assert "TODS-E106" in rule_ids
 
 
+def test_v2_feed_under_v1_reports_the_mismatch_in_the_other_direction() -> None:
+    # TODS-W109 is symmetric: it compares against the active version, not
+    # against "the newest one". Read the valid 2.1.0 feed as 1.0.0 and the
+    # 2.1.0-only files are the ones that belong to another version.
+    _, findings = run(FIXTURES / "valid" / "tods", spec_version=SPEC_VERSION_V1)
+    mismatched = [f for f in findings if f.rule_id == "TODS-W109"]
+    assert "vehicles.txt" in {f.file for f in mismatched}
+    # The message names the version actually being validated against.
+    assert all(SPEC_VERSION_V1 in f.message for f in mismatched)
+
+
 def test_v2_only_rules_are_skipped_under_v1_with_a_clear_reason() -> None:
     _, findings, coverage = run_with_coverage(V1_FIXTURES / "valid", spec_version=SPEC_VERSION_V1)
     skipped_ids = {o.id for o in coverage.outcomes if o.status == STATUS_SKIPPED_SPEC_VERSION}

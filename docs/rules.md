@@ -211,19 +211,20 @@ Severity: WARNING.
 
 A file in the package is defined by a TODS spec version other than the one being validated against, so it was not validated. A v1.0.0 file in a package validated at the 2.1.0 default looks like an unknown file otherwise.
 
-Example (`deadheads.txt`):
+Example (`(package root)`):
 
 Before:
 ```csv
-deadhead_id,service_id,block_id,shape_id,to_trip_id,from_trip_id
+run_events.txt
+deadheads.txt
 ```
 
 After:
 ```csv
-tods-validate --spec-version 1.0.0 <package> (or replace the v1.0.0 file with its 2.1.0 counterpart)
+(re-run with --spec-version 1.0.0, or drop deadheads.txt)
 ```
 
-The file is a real TODS file, but it is defined by TODS v1.0.0, not by the 2.1.0 spec being validated against.
+Not a misspelled file: deadheads.txt is a real TODS file, defined by v1.0.0 and not by the 2.1.0 spec this package was validated against.
 
 Spec reference: <https://tods-transit.org/spec/#files>
 
