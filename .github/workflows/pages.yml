@@ -1,6 +1,7 @@
 name: Deploy playground
 
-# Publishes web/ (the in-browser Pyodide validator) to GitHub Pages.
+# Publishes web/ (the in-browser Pyodide validator, its README, the share card,
+# the rule catalog index and 43 per-rule pages -- 47 files) to GitHub Pages.
 # One-time setup: Settings -> Pages -> Source: "GitHub Actions".
 #
 # Runs as the last stage of a release, called from pypi-publish.yml after
@@ -15,6 +16,44 @@ name: Deploy playground
 # silently skipping. workflow_dispatch stays for out-of-band fixes (deploys
 # main, whose pin the guard checks against PyPI the same way).
 #
+# The push trigger below is new, and it closes the gap that made `live
+# integrity sentinel` structurally red. Everything in this repository that
+# looks at the deployment compares it with the DEFAULT BRANCH: the sentinel
+# checks out `main` and diffs all 47 published files against it daily, and
+# scripts/check-deployed-playground.sh records at length why the release tag
+# is the wrong oracle (a tag is not what a dispatch deploys, and an immutable
+# tag that shipped a stale pin held that check red for days against a
+# deployment that was correct -- #142). So the repository asserts the site
+# tracks main. Nothing deployed main when main changed. Every successful
+# deploy in this workflow's history has been a workflow_dispatch; #174
+# established there had never been a push trigger, and that "every release
+# since the sequencing landed has depended on a person noticing".
+#
+# The bill came due on #176, which gave web/index.html and every catalog page
+# an og:image and added web/og-card.png. The last deploy was the manual
+# dispatch of 80e5f9b on 2026-09-02, so 46 of the 47 published files went stale
+# in one commit, and og-card.png -- the share card those new tags advertise --
+# has 404ed on the live site ever since, which is the exact failure #176 added
+# tests to prevent. The sentinel has been red on every run since, and green
+# exactly once in eight, the morning after someone remembered to dispatch. A
+# daily check that only a person can clear is not a drift detector; it is an
+# alarm with no off switch. This makes the deploy follow main, so that red
+# means drift.
+#
+# This does not weaken the release property, because that property was never
+# enforced by the trigger. It is enforced by the pin guard below: the page
+# micropip-installs `tods-validate==<pin>` and this workflow refuses to publish
+# a page whose pin PyPI does not serve. main only ever names a released wheel
+# -- the release checklist deliberately leaves the pin at the previous release
+# for the whole staging window (#171, waived as WVR-003) and repins only after
+# the wheel is live -- so the push route publishes current main pinned to a
+# real release, which is what the release route publishes too, just sooner.
+#
+# The paths filter is exactly the tree `upload-pages-artifact` uploads, plus
+# this file, so a push that changes nothing published deploys nothing. If those
+# two ever drift apart, the sentinel is what notices -- the same backstop that
+# caught the missing trigger.
+#
 # The verify job below then checks that the deployment actually took effect,
 # that the deployed page really boots and validates a feed, and that it passes
 # WCAG 2.1 AA -- a deploy is not done because a job went green, it is done when
@@ -22,6 +61,11 @@ name: Deploy playground
 # .github/workflows/playground-deployment.yml re-runs all three checks weekly.
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "web/**"
+      - ".github/workflows/pages.yml"
   workflow_call:
   workflow_dispatch:
 
