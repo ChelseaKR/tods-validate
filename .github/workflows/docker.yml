@@ -36,6 +36,7 @@ jobs:
   build-push:
     needs: [verify]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       packages: write
       id-token: write # for keyless cosign signing
@@ -117,6 +118,7 @@ jobs:
     # `cosign sign` exiting 0 means a verifier will accept it later (REL-16).
     needs: [build-push]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     steps:

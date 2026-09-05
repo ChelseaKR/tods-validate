@@ -55,6 +55,7 @@ jobs:
   publish:
     needs: [verify]
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     # Scopes the OIDC token PyPI accepts (CICD-06). See the header for why the
     # PyPI side has to be changed after this, not before.
     #
@@ -128,6 +129,7 @@ jobs:
     needs: [publish]
     if: github.event_name == 'release'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
     env:

@@ -17,9 +17,14 @@ on:
 permissions:
   contents: read
 
+# CI-CD-STANDARD.md 11c: cancel superseded runs on the same ref.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 jobs:
   analyze:
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       contents: read
       security-events: write # upload SARIF to code scanning

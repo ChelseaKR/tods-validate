@@ -19,6 +19,7 @@ permissions:
 jobs:
   spec-watch:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     # Belt and suspenders: even a non-zero exit must not fail the workflow.
     continue-on-error: true
     steps:
@@ -27,6 +28,7 @@ jobs:
           persist-credentials: false
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
+          cache: 'pip'
           python-version: "3.12"
       - run: python -m pip install -e . --group dev
       # Two conditions get an issue, not one. "Spec drift detected" is news
