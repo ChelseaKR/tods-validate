@@ -388,7 +388,7 @@ exists: dated, carried by the `docs-check` currency gate, naming **WCAG 2.1
 Level AA** as the target and deliberately making no conformance *claim*,
 because the only evaluation run is automated. It tables every surface against
 what has actually been checked. Writing that table found an unaudited surface:
-the 44 rule-catalog pages `pages.yml` publishes had never had a runner pointed
+the 45 rule-catalog pages `pages.yml` publishes had never had a runner pointed
 at them. They are in the blocking gate now, and entering it they failed with
 141 colour-contrast errors and 43 link-distinguishability errors, both from one
 shared stylesheet that declared `color-scheme: light dark` and then painted

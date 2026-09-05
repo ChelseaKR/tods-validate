@@ -69,6 +69,7 @@
     ["TODS-E106", "ERROR", "core"],
     ["TODS-W107", "WARNING", "core"],
     ["TODS-I108", "INFO", "core"],
+    ["TODS-W109", "WARNING", "core"],
     ["TODS-E201", "ERROR", "core"],
     ["TODS-E202", "ERROR", "core"],
     ["TODS-E203", "ERROR", "core"],

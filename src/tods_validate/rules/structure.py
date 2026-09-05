@@ -6,10 +6,26 @@ from collections.abc import Iterator
 
 from ..findings import Finding, Severity
 from ..loader import BLOCKING_PROBLEM_CODES
-from ..schema import GTFS_FILENAMES, SPEC_URL, Presence, spec_link
+from ..schema import (
+    GTFS_FILENAMES,
+    SPEC_URL,
+    TABLES_BY_VERSION,
+    Presence,
+    spec_link,
+)
 from . import ValidationContext, rule
 
 _FILES_SECTION = f"{SPEC_URL}#files"
+
+
+def _other_version_files(context: ValidationContext) -> set[str]:
+    """Filenames defined by a supported spec version other than the active one."""
+    files: set[str] = set()
+    for version, tables in TABLES_BY_VERSION.items():
+        if version == context.spec_version:
+            continue
+        files.update(tables)
+    return files
 
 
 @rule(
@@ -49,21 +65,23 @@ def no_tods_files(context: ValidationContext) -> Iterator[Finding]:
     spec_section=_FILES_SECTION,
 )
 def unknown_file(context: ValidationContext) -> Iterator[Finding]:
+    others = _other_version_files(context)
     for name in context.package.files:
-        if name not in context.tables and name not in GTFS_FILENAMES:
-            yield Finding(
-                rule_id="TODS-I102",
-                severity=Severity.INFO,
-                file=name,
-                message=(
-                    f"{name} is not a TODS file and not a standard GTFS file; it was not validated."
-                ),
-                suggestion=(
-                    "If this was meant to be a TODS file, check the spelling against the "
-                    "file list in the spec."
-                ),
-                data={"value": name},
-            )
+        if name in context.tables or name in GTFS_FILENAMES or name in others:
+            continue
+        yield Finding(
+            rule_id="TODS-I102",
+            severity=Severity.INFO,
+            file=name,
+            message=(
+                f"{name} is not a TODS file and not a standard GTFS file; it was not validated."
+            ),
+            suggestion=(
+                "If this was meant to be a TODS file, check the spelling against the "
+                "file list in the spec."
+            ),
+            data={"value": name},
+        )
     for name in context.package.unparsed:
         yield Finding(
             rule_id="TODS-I102",
@@ -280,3 +298,41 @@ def unknown_column_supplement(context: ValidationContext) -> Iterator[Finding]:
                     ),
                     data={"value": column, "field": column},
                 )
+
+
+@rule(
+    id="TODS-W109",
+    severity=Severity.WARNING,
+    title="File belongs to a different TODS spec version",
+    description=(
+        "A file in the package is defined by a TODS spec version other than the one "
+        "being validated against, so it was not validated. A v1.0.0 file in a package "
+        "validated at the 2.1.0 default looks like an unknown file otherwise."
+    ),
+    spec_section=_FILES_SECTION,
+    example=(
+        "Before: a package validated with --spec-version 2.1.0 contains "
+        "deadheads.txt, a TODS v1.0.0 file. After: re-validate the package with "
+        "--spec-version 1.0.0, or replace the v1 file with its 2.1.0 counterpart."
+    ),
+)
+def other_version_file(context: ValidationContext) -> Iterator[Finding]:
+    others = _other_version_files(context)
+    for name in context.package.files:
+        if name in context.tables or name in GTFS_FILENAMES or name not in others:
+            continue
+        yield Finding(
+            rule_id="TODS-W109",
+            severity=Severity.WARNING,
+            file=name,
+            message=(
+                f"{name} is a TODS file, but it belongs to a different TODS spec "
+                f"version than {context.spec_version}, which this package is being "
+                "validated against. It was not validated."
+            ),
+            suggestion=(
+                "Re-run with the matching --spec-version, or check the file list "
+                "for the spec version being validated against."
+            ),
+            data={"value": name},
+        )

@@ -205,6 +205,29 @@ Not an error: the column is carried into the merged GTFS as an extension field. 
 
 Spec reference: <https://tods-transit.org/spec/#supplement-files>
 
+### TODS-W109: File belongs to a different TODS spec version
+
+Severity: WARNING.
+
+A file in the package is defined by a TODS spec version other than the one being validated against, so it was not validated. A v1.0.0 file in a package validated at the 2.1.0 default looks like an unknown file otherwise.
+
+Example (`(package root)`):
+
+Before:
+```csv
+run_events.txt
+deadheads.txt
+```
+
+After:
+```csv
+(re-run with --spec-version 1.0.0, or drop deadheads.txt)
+```
+
+Not a misspelled file: deadheads.txt is a real TODS file, defined by v1.0.0 and not by the 2.1.0 spec this package was validated against.
+
+Spec reference: <https://tods-transit.org/spec/#files>
+
 ## Field values (TODS-x2xx)
 
 ### TODS-E201: Required value is missing

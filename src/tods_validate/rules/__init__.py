@@ -224,6 +224,15 @@ EXAMPLES: dict[str, RuleExample] = {
             "Prefix it TODS_ if it should stay TODS-only metadata instead."
         ),
     ),
+    "TODS-W109": RuleExample(
+        file="(package root)",
+        before="run_events.txt\ndeadheads.txt",
+        after="(re-run with --spec-version 1.0.0, or drop deadheads.txt)",
+        note=(
+            "Not a misspelled file: deadheads.txt is a real TODS file, defined by v1.0.0 and "
+            "not by the 2.1.0 spec this package was validated against."
+        ),
+    ),
     "TODS-E201": RuleExample(
         file="run_events.txt",
         before=(

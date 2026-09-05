@@ -14,6 +14,7 @@ RULES = (
     "TODS-E106",
     "TODS-W107",
     "TODS-I108",
+    "TODS-W109",
 )
 
 
@@ -43,6 +44,32 @@ def test_unknown_file_is_info_only() -> None:
     unknown = [f for f in findings if f.rule_id == "TODS-I102"]
     assert [f.file for f in unknown] == ["notes.txt"]
     assert all(f.severity is Severity.INFO for f in unknown)
+
+
+def test_other_version_file_is_recognized_not_unknown() -> None:
+    findings = run_invalid_fixture("TODS-W109")
+    warned = [f for f in findings if f.rule_id == "TODS-W109"]
+    assert [f.file for f in warned] == ["deadheads.txt"]
+    assert all(f.severity is Severity.WARNING for f in warned)
+    # The v1 file must no longer fall through to the unknown-file rule.
+    assert "TODS-I102" not in rule_ids(findings)
+
+
+def test_other_version_file_message_names_the_active_version() -> None:
+    findings = run_invalid_fixture("TODS-W109")
+    warned = [f for f in findings if f.rule_id == "TODS-W109"]
+    assert "2.1.0" in warned[0].message
+    assert warned[0].suggestion is not None
+
+
+def test_a_file_both_versions_define_is_not_a_version_mismatch() -> None:
+    # run_events.txt is defined by 1.0.0 and by 2.1.0. "Every file some other
+    # supported version defines" includes it, so a rule written only from that
+    # set would flag the one file every TODS package is most likely to have.
+    # The active version's inventory has to win, and the fixture ships a valid
+    # 2.1.0 run_events.txt precisely so this can be asserted rather than assumed.
+    findings = run_invalid_fixture("TODS-W109")
+    assert "run_events.txt" not in {f.file for f in findings if f.rule_id == "TODS-W109"}
 
 
 def test_empty_file_reports_unreadable_not_missing_columns() -> None:
