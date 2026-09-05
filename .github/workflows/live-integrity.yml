@@ -23,6 +23,16 @@
 # comparison seven times as often would be paying the wrong cost. The drift job
 # that used to live there is now this workflow.
 #
+# What this could not say, until the step at the bottom, is WHY the site is
+# behind. There are two answers and they want opposite responses: a deploy that
+# ran and failed is a run to open and fix, and a deploy that never ran at all is
+# a trigger that did not fire. From 2026-08-29 to 2026-09-04 the answer was
+# always the second one -- pages.yml had no push trigger, so nothing deployed
+# main when main changed -- and every red run here read as though a deploy had
+# been attempted and lost. pages.yml now deploys on push to main; this workflow
+# now names which of the two situations a reader is in, so the next occurrence
+# cannot hide behind the same message.
+#
 # Runs daily and on demand (Actions > live integrity sentinel > Run workflow).
 name: live integrity sentinel
 
@@ -33,6 +43,7 @@ on:
 
 permissions:
   contents: read
+  deployments: read # read whether a deploy for this commit was ever attempted
 
 concurrency:
   group: live-integrity
@@ -64,3 +75,62 @@ jobs:
             exit 0
           fi
           exit "$check_rc"
+
+      # The comparison above proves the site is behind. This says why, because
+      # "no deploy ran" and "a deploy ran and failed" are different problems and
+      # the report above cannot tell them apart -- it only ever said "publish it
+      # with the Deploy playground workflow", which is the right advice for one
+      # of them and misleading for the other.
+      #
+      # It asks the deployment record rather than the run list, because that is
+      # the only view that covers all three routes: a release deploy runs as a
+      # called workflow inside pypi-publish.yml and leaves no run of its own
+      # under pages.yml, but it still registers a github-pages deployment at the
+      # commit. A run refused by the environment's branch policy -- the failure
+      # #173 found, which renders as a job with no steps and no log -- registers
+      # none, and lands here as "no deploy was requested".
+      #
+      # It never changes the result. The job has already failed; this only
+      # annotates it, and a diagnostic that cannot read the API says so rather
+      # than guessing.
+      - name: Say which failure this is
+        if: failure()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -uo pipefail
+          sha="$(git rev-parse HEAD)"
+          api="repos/${GITHUB_REPOSITORY}/deployments"
+
+          attempted="$(gh api "${api}?environment=github-pages&sha=${sha}&per_page=10" \
+            --jq 'length' 2>/dev/null || true)"
+          if [ -z "${attempted:-}" ]; then
+            echo "::warning::Could not read this repository's deployment record, so this run cannot say whether a deploy of ${sha} was ever attempted."
+            exit 0
+          fi
+
+          if [ "$attempted" = "0" ]; then
+            last="$(gh api "${api}?environment=github-pages&per_page=1" \
+              --jq '.[0] | "\(.sha) on \(.created_at)"' 2>/dev/null || true)"
+            echo "::error::No deploy of ${sha} was ever requested, so the site is not behind because a deploy failed -- it is behind because none ran. The last github-pages deployment was ${last:-unknown}."
+            echo "Check pages.yml before dispatching by hand: it deploys on push to main, so either this commit predates that trigger, its paths filter no longer covers what the deploy uploads, or the run was refused by the github-pages branch policy (see docs/environments/README.md)."
+            exit 0
+          fi
+
+          deployment="$(gh api "${api}?environment=github-pages&sha=${sha}&per_page=1" --jq '.[0].id' 2>/dev/null || true)"
+          state="$(gh api "${api}/${deployment}/statuses?per_page=1" --jq '.[0].state // ""' 2>/dev/null || true)"
+          log_url="$(gh api "${api}/${deployment}/statuses?per_page=1" --jq '.[0].log_url // ""' 2>/dev/null || true)"
+          case "${state:-}" in
+            success)
+              echo "::error::A deploy of ${sha} reported success (${log_url:-no log recorded}) and the site still does not match it. This is not a missing deploy, so read that run before dispatching another: either what it uploaded is not what this repository publishes, or a later deploy of an older tree replaced it."
+              ;;
+            queued | pending | in_progress)
+              echo "::warning::A deploy of ${sha} is still ${state} (${log_url:-no log recorded}); re-run this sentinel once it finishes."
+              ;;
+            "")
+              echo "::error::A deploy of ${sha} was requested but has no status, so it never reported either way. Open it before dispatching another."
+              ;;
+            *)
+              echo "::error::A deploy of ${sha} ended ${state} (${log_url:-no log recorded}). Fix that run rather than dispatching a fresh one -- a deploy that failed for a reason will fail again."
+              ;;
+          esac
