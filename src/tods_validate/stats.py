@@ -47,7 +47,12 @@ class FeedStats:
     error: str | None = None
 
 
-def _event_minutes(start: str, end: str) -> int:
+def event_minutes(start: str, end: str) -> int:
+    """Whole minutes between two GTFS times, or 0 when either will not parse.
+
+    Public because ``pickdiff`` reports the same revenue/non-revenue split
+    between two packages and must use this rule rather than a second one.
+    """
     s, e = parse_time(start), parse_time(end)
     if s is None or e is None or e < s:
         return 0
@@ -69,7 +74,7 @@ def collect_stats(  # noqa: C901 -- pragmatic complexity; ratchet tracked in doc
         for row in run_events.rows:
             runs.add((row.values.get("service_id", ""), row.values.get("run_id", "")))
             trip_id = row.values.get("trip_id", "")
-            minutes = _event_minutes(
+            minutes = event_minutes(
                 row.values.get("start_time", ""), row.values.get("end_time", "")
             )
             if trip_id:
