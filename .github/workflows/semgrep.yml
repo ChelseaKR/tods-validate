@@ -14,9 +14,12 @@ on:
   schedule:
     - cron: "43 6 * * 1" # weekly, Monday 06:43 UTC (staggered after codeql.yml)
 
-# Cancel superseded runs of the same ref (CICD §11c).
+# Cancel superseded runs of the same ref (CICD §11c). The trailing
+# discriminator keeps that from eating a verdict on main: `pr` coalesces a
+# PR's runs as before, while a push groups per commit SHA so one commit's run
+# can never cancel another's. See ci.yml for the full reasoning.
 concurrency:
-  group: semgrep-${{ github.ref }}
+  group: semgrep-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: true
 
 permissions:
