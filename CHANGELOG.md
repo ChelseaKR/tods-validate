@@ -7,6 +7,16 @@ new checks may be added in minor releases.
 
 Added:
 
+- `TODS-I602` (advisory, opt-in): `run_events.txt` writing one `event_type` or
+  `job_type` two or more ways, differing only in capitalization or in the
+  separator between words. `Sign-In` and `sign in` are one event type to a
+  scheduler and two to a consumer matching on the literal value, and the spec
+  asks producers to be consistent while letting them use any values. Advisory
+  rather than an error for that reason, and off until `--enable advisory` or
+  `--enable TODS-I602`. Leading and trailing spaces alone are not a second
+  spelling (that is `TODS-W206`), and a value that is only separators is
+  skipped rather than grouped with every other value that carries no name.
+  [#144](https://github.com/ChelseaKR/tods-validate/issues/144)
 - `TODS-W109` (structure warning): a file defined by a supported TODS spec
   version other than the one being validated against is now reported as
   recognized but belonging to that other version, instead of falling through

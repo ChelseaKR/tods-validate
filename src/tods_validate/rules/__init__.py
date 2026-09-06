@@ -711,6 +711,26 @@ EXAMPLES: dict[str, RuleExample] = {
             "advisory or --enable TODS-I601."
         ),
     ),
+    "TODS-I602": RuleExample(
+        file="run_events.txt",
+        before=(
+            "service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,"
+            "end_time\n"
+            "daily,1,10,Sign-In,s1,06:00:00,s1,06:05:00\n"
+            "daily,1,20,sign in,s1,06:05:00,s1,06:10:00"
+        ),
+        after=(
+            "service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,"
+            "end_time\n"
+            "daily,1,10,Sign-In,s1,06:00:00,s1,06:05:00\n"
+            "daily,1,20,Sign-In,s1,06:05:00,s1,06:10:00"
+        ),
+        note=(
+            "'Sign-In' and 'sign in' are one event type written two ways, and a consumer "
+            "matching the literal value sees two. Advisory check; opt in with --enable "
+            "advisory or --enable TODS-I602."
+        ),
+    ),
 }
 
 

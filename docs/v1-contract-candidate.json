@@ -104,6 +104,7 @@
     ["TODS-W409", "WARNING", "core"],
     ["TODS-I501", "INFO", "coverage"],
     ["TODS-I502", "INFO", "coverage"],
-    ["TODS-I601", "INFO", "advisory"]
+    ["TODS-I601", "INFO", "advisory"],
+    ["TODS-I602", "INFO", "advisory"]
   ]
 }
