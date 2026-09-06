@@ -767,8 +767,16 @@ def batch(
         if failed:
             any_failed = True
         if effective_history is not None:
+            # The same `coverage` that produced this row's checksNotRun goes
+            # into the durable record. The table disclosed the partial run and
+            # the ledger written in the same breath did not, and the ledger is
+            # the one read months later (#186).
             record = build_record(
-                gate.kept, package.source, tool_version=__version__, spec_version=SPEC_VERSION
+                gate.kept,
+                package.source,
+                tool_version=__version__,
+                spec_version=SPEC_VERSION,
+                coverage=coverage,
             )
             append_record(Path(effective_history), record)
 

@@ -84,6 +84,25 @@ Fixed:
   on `doctor` with the same meaning it has on `validate` and `batch`.
   [#185](https://github.com/ChelseaKR/tods-validate/issues/185)
 
+- The run-history ledger stored counts and rule IDs but nothing about which
+  rules ran, so `trend` reported a check that stopped running as an
+  improvement. A rule that did not run contributes nothing to `byRule`, which
+  is indistinguishable from a rule that ran and found nothing: remove a
+  companion GTFS feed between two `batch --history` runs and the table read
+  `Δ errors -1`, no new/worse rules, for a run in which the rule that found
+  the error never executed and the bad `trip_id` was still bad.
+  `cli.batch` already held the coverage manifest -- it put it in the batch row
+  in the same loop iteration -- and now passes it to `build_record` too. The
+  record gains a `coverage` block (rule IDs only, so the counts-and-IDs
+  privacy constraint is untouched), the trend table gains `Checks ran` and
+  `Stopped running` columns, and a Δ that would claim a reduction it cannot
+  support renders `?` instead. A rise is still always reported. Records
+  written before the field load normally and render as unknown rather than as
+  improvements; `load_history` now matches on the schema's major version,
+  which is what the documented additive-compatibility promise always said and
+  the previous exact-string comparison did not implement.
+  [#186](https://github.com/ChelseaKR/tods-validate/issues/186)
+
 Changed:
 
 - The share-card tags and their alternative text cost 1.1 KiB of head on

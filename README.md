@@ -326,8 +326,12 @@ skipped; `--require-complete-run` adds the same opt-in gate it provides on
   .tods-history/` then prints a text-first Markdown table, grouped by feed
   ("agency"), showing each run's counts and any per-rule regression since the
   same feed's previous run — "which agency regressed" answerable straight
-  from CI history. **Privacy:** a history record stores only counts and rule
-  IDs, never finding messages, since messages can carry stop, run, or
+  from CI history. Each record also carries that run's rule-set coverage, so
+  the table states the scope every run had and never reports a rule that
+  stopped running as a fix: when a rule that found something last time did not
+  execute this time, the Δ column reads `?` and names the rule instead of
+  claiming a reduction. **Privacy:** a history record stores only counts and
+  rule IDs, never finding messages, since messages can carry stop, run, or
   employee/vehicle identifiers; see the docstring in `workspace.py`. Set
   `[workspace]` `history-dir` in `tods-validate.toml` to avoid repeating
   `--history` in every job (CLI flag still wins over the config value).
