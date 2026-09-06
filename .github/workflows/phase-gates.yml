@@ -39,8 +39,39 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          python scripts/check_phase_gates.py > gates.md || true
-          if [ -s gates.md ] && grep -qF "Phase gates: attention needed" gates.md; then
+          set -uo pipefail
+          status=0
+          python scripts/check_phase_gates.py > gates.md 2> gates.err || status=$?
+
+          # The checker exits 0 when every recorded gate still holds and 1 when
+          # there is news, writing the report to stdout. An uncaught exception
+          # exits 1 as well -- with nothing on stdout -- so the exit status on
+          # its own cannot tell "a gate moved" from "the checker broke". The
+          # report heading can, and the difference is the whole point of this
+          # job: a crash left gates.md empty, took the else branch, set
+          # news=false and reported success, which is exactly the quiet
+          # tripwire the header above says this design refuses to be. The
+          # checker raises on an empty gate list, an unreadable
+          # docs/phase-gates.json and a malformed one, and every one of those
+          # used to arrive here as a green tick.
+          if grep -qF "Phase gates: attention needed" gates.md; then
+            echo "news=true" >> "$GITHUB_OUTPUT"
+          elif [ "${status}" -ne 0 ]; then
+            {
+              echo "## Phase gates: attention needed"
+              echo
+              echo "- **Not read.** \`scripts/check_phase_gates.py\` exited ${status}"
+              echo "  without writing a report, so no gate was compared on this run."
+              echo "  A gate nobody could read is not a gate that held."
+              echo
+              echo "<details><summary>stderr</summary>"
+              echo
+              echo '```'
+              cat gates.err
+              echo '```'
+              echo
+              echo "</details>"
+            } > gates.md
             echo "news=true" >> "$GITHUB_OUTPUT"
           else
             echo "news=false" >> "$GITHUB_OUTPUT"
@@ -62,5 +93,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
           name: phase-gates-report
-          path: gates.md
+          path: |
+            gates.md
+            gates.err
           if-no-files-found: ignore
