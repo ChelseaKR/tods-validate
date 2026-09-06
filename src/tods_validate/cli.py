@@ -34,6 +34,13 @@ from .init import SHAPES, DestinationNotEmptyError
 from .init import scaffold as scaffold_package
 from .loader import Package, PackageNotFoundError, load_package
 from .merge import merge_feeds
+from .pickdiff import (
+    analyze_pickdiff,
+    anonymize_pickdiff,
+    pickdiff_to_dict,
+    render_pickdiff_markdown,
+    render_pickdiff_text,
+)
 from .policy import EXIT_CLEAN, EXIT_FINDINGS, EXIT_USAGE, GatingPolicy
 from .report import (
     RENDERERS,
@@ -585,6 +592,87 @@ def diff(
 
     gate = policy.apply(result.introduced)
     sys.exit(EXIT_FINDINGS if gate.failed else EXIT_CLEAN)
+
+
+@main.command()
+@click.argument("old", type=click.Path(exists=False))
+@click.argument("new", type=click.Path(exists=False))
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json", "markdown"]),
+    default="text",
+    show_default=True,
+)
+@click.option(
+    "--anonymize",
+    "anonymize_output",
+    is_flag=True,
+    default=False,
+    help=(
+        "Pseudonymize employee and vehicle identifiers in the report, so it can "
+        "be shared. One salt per run, applied to both sides."
+    ),
+)
+@click.option(
+    "--spec-version",
+    "spec_version",
+    default=None,
+    help=f"TODS spec version whose file inventory and primary keys to use. Default {SPEC_VERSION}.",
+)
+@click.option("--encoding", default=None)
+def pickdiff(
+    old: str,
+    new: str,
+    output_format: str,
+    anonymize_output: bool,
+    spec_version: str | None,
+    encoding: str | None,
+) -> None:
+    """Compare two TODS packages by primary key: OLD then NEW.
+
+    Answers "what changed in the operational data", which neither `diff` (which
+    compares findings) nor `drift` (which compares a companion GTFS feed) does.
+    Runs added and removed, rows added, removed and changed with their old and
+    new values, events changed per run, and the revenue/non-revenue minutes
+    delta. No findings are produced and no change is judged correct.
+
+    Rows are matched on the spec's primary key for each file, so reordering a
+    file is not a difference. A duplicate primary key is reported, never merged.
+    A file that could not be read is named as NOT COMPARED, never reported as a
+    file whose rows were all deleted.
+
+    Exits 1 when something changed, 0 when nothing did, and 2 when the
+    comparison could not be completed: a package that will not load, a file
+    inside one that could not be read, or a duplicate primary key whose later
+    rows were matched against nothing. None of those establishes whether the
+    pick changed, and reporting one as a clean diff would count a check that
+    could not run as a check that passed.
+    """
+    effective_spec = spec_version or SPEC_VERSION
+    _check_spec_version(effective_spec)
+    try:
+        old_package = load_package(old, encoding=encoding)
+        new_package = load_package(new, encoding=encoding)
+    except PackageNotFoundError as exc:
+        _fail(str(exc))
+
+    report = analyze_pickdiff(old_package, new_package, spec_version=effective_spec)
+    if anonymize_output:
+        report = anonymize_pickdiff(report)
+    if output_format == "json":
+        click.echo(json.dumps(pickdiff_to_dict(report), indent=2))
+    elif output_format == "markdown":
+        click.echo(render_pickdiff_markdown(report))
+    else:
+        click.echo(render_pickdiff_text(report))
+    # An incomplete comparison is not a clean one. A file that could not be
+    # read, or one holding a duplicate primary key whose later rows were
+    # matched against nothing, leaves the question unanswered, and 0 would
+    # answer it.
+    if report.incomplete:
+        sys.exit(EXIT_USAGE)
+    sys.exit(EXIT_FINDINGS if report.has_changes else EXIT_CLEAN)
 
 
 @main.command()

@@ -7,6 +7,29 @@ new checks may be added in minor releases.
 
 Added:
 
+- `tods-validate pickdiff OLD NEW`: a semantic package diff. `diff` compares
+  two feeds' findings and `drift` compares a companion GTFS feed under one
+  package; neither answers "what changed in the operational data". This
+  compares packages by the spec's own primary key per file and reports runs
+  added and removed, rows added, removed and changed with their old and new
+  values, events changed per run, and the revenue/non-revenue minutes delta,
+  as text, Markdown or JSON. Reordering a file is not a difference. No
+  findings are produced and no change is judged correct. `--anonymize`
+  pseudonymizes employee and vehicle identifiers using the same protected-field
+  set `anonymize` writes packages with, one salt per run applied to both sides
+  so a person who moved between runs stays one token.
+
+  It exits 2, not 0, when the comparison could not be finished: an unreadable
+  file, or a duplicate primary key whose later rows were matched against
+  nothing. An unreadable file has zero rows, so a comparison that trusted the
+  row count would announce every run in the pick as removed — a data-loss
+  report manufactured out of a read error. The minutes totals carry a
+  `partial` flag for the same reason, so a consumer can tell "no minutes
+  moved" from "nobody counted". A file whose spec version declares no primary
+  key (every v1.0.0 file but `runs_pieces.txt`) is named as not compared
+  rather than compared by row position, which would report one inserted row as
+  every later row changing.
+  [#188](https://github.com/ChelseaKR/tods-validate/issues/188)
 - `TODS-I602` (advisory, opt-in): `run_events.txt` writing one `event_type` or
   `job_type` two or more ways, differing only in capitalization or in the
   separator between words. `Sign-In` and `sign in` are one event type to a

@@ -317,6 +317,19 @@ skipped; `--require-complete-run` adds the same opt-in gate it provides on
   unambiguous close match (never applied automatically — a hint to review).
   Exits non-zero if anything broke, so it can gate a GTFS update before it
   reaches production.
+- `tods-validate pickdiff old/ new/` compares two packages by the spec's own
+  primary keys and reports what changed in the operational data, which
+  neither `diff` (findings) nor `drift` (the companion GTFS) does: runs added
+  and removed, rows added, removed and changed with their old and new values,
+  events changed per run, and the revenue/non-revenue minutes delta.
+  Reordering a file is not a difference. It produces no findings and judges no
+  change correct. `--anonymize` pseudonymizes employee and vehicle
+  identifiers, one salt per run applied to both sides, so a report can be
+  shared. It exits 2 rather than 0 when the comparison could not be finished
+  — an unreadable file, or a duplicate primary key whose later rows were
+  matched against nothing — because neither establishes that the pick is
+  unchanged, and an unreadable `run_events.txt` reported as an empty one would
+  announce every run in the pick as removed.
 - `tods-validate batch a/ b/ c/` validates several feeds and prints a roll-up
   table (`--format json` for tooling).
 - `tods-validate batch a/ b/ --history .tods-history/` additionally appends
