@@ -17,6 +17,20 @@ Added:
 
 Fixed:
 
+- `stats` treated any recognized GTFS file in a package as proof of a
+  companion feed, while `validate` used the six files a TODS ID actually
+  resolves against. The two commands disagreed about the same directory: a
+  stray `agency.txt` beside a TODS-only export made `stats` report a companion
+  with `GTFS trips 0`, `GTFS blocks 0` and `Trip coverage None%`, and where
+  `trips_supplement.txt` was present it reported `100.0%` trip coverage for a
+  package with no `trips.txt` anywhere in the tree. `stats` now selects its
+  self-companion with `GTFS_COMPANION_FILENAMES`, matching `runner.py`, and
+  says `GTFS coverage: not measured, no companion GTFS feed was provided`
+  rather than leaving the section out silently. `Trip coverage` renders as
+  `—` when there is no percentage to report, in the single-feed renderer as
+  well as the cross-feed one, so `None%` no longer reaches any output format.
+  [#187](https://github.com/ChelseaKR/tods-validate/issues/187)
+
 - Every page the site publishes advertised a share card with no image on it.
   `web/index.html` and all 45 catalog pages carried `og:title`,
   `og:description` and `og:url` and no `og:image` or `twitter:image`, with
