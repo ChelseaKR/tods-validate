@@ -31,6 +31,7 @@ jobs:
   corpus:
     needs: [verify]
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write # upload the asset to the release
     steps:
@@ -64,6 +65,7 @@ jobs:
   benchmark-feeds:
     needs: [verify]
     runs-on: ubuntu-latest
+    timeout-minutes: 45
     permissions:
       contents: write # upload the assets to the release
     steps:

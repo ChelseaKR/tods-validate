@@ -86,6 +86,7 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     permissions:
       pages: write # publish the built site to GitHub Pages
       id-token: write # OIDC to prove this workflow run produced the artifact
