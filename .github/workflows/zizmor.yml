@@ -18,9 +18,12 @@ on:
       - ".github/workflows/**"
       - "action.yml"
 
-# Cancel superseded runs of the same ref (CICD §11c).
+# Cancel superseded runs of the same ref (CICD §11c). The trailing
+# discriminator keeps that from eating a verdict on main: `pr` coalesces a
+# PR's runs as before, while a push groups per commit SHA so one commit's run
+# can never cancel another's. See ci.yml for the full reasoning.
 concurrency:
-  group: zizmor-${{ github.ref }}
+  group: zizmor-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: true
 
 permissions:

@@ -7,8 +7,17 @@ on:
 
 # Cancel superseded runs of the same ref (CICD §11c): a new push to a PR
 # obsoletes the in-flight run, so spending the remaining minutes is waste.
+#
+# The trailing discriminator is what stops that from eating a verdict on main.
+# Keyed on `github.ref` alone every push to main shares a single group, so a
+# second push cancels the first commit's run and that commit lands on main
+# with no verdict at all. The run reports `cancelled`, which is not a failure,
+# so nothing goes red and nobody is told a commit went unchecked. On a
+# pull_request the ref is already the PR's own merge ref, so `pr` keeps the
+# coalescing this block exists for; on a push the group carries the commit
+# SHA, so two commits can never displace each other's run.
 concurrency:
-  group: ci-${{ github.ref }}
+  group: ci-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: true
 
 permissions:
