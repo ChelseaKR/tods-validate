@@ -1,0 +1,4 @@
+service_id,run_id,event_sequence,job_type,event_type,start_location,start_time,end_location,end_time
+daily,1,10,Operator,Sign-In,s1,06:00:00,s1,06:05:00
+daily,1,20,Operator,Pull-Out,s1,06:05:00,s1,06:20:00
+daily,1,30,Operator,sign in,s1,06:20:00,s1,06:25:00

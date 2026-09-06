@@ -75,8 +75,8 @@ $ tods-validate examples/sample-feed
 tods-validate: examples/sample-feed (TODS v2.1.0)
 
 No problems found.
-Rule-set coverage: 41 of 44 checks ran. Checks skipped: 3 opt-in rule not enabled (use --enable).
-  Not run, opt-in rule not enabled (use --enable) (3 INFO): TODS-I501, TODS-I502, TODS-I601
+Rule-set coverage: 41 of 45 checks ran. Checks skipped: 4 opt-in rule not enabled (use --enable).
+  Not run, opt-in rule not enabled (use --enable) (4 INFO): TODS-I501, TODS-I502, TODS-I601, TODS-I602
 $ echo $?
 0
 ```
@@ -116,13 +116,13 @@ $ tods-validate validate exports/tods
 tods-validate: exports/tods (TODS v2.1.0)
 
 No problems found.
-Rule-set coverage: 27 of 44 checks ran. Checks skipped: 16 no companion GTFS feed was provided; 1 opt-in rule not enabled (use --enable).
+Rule-set coverage: 27 of 45 checks ran. Checks skipped: 16 no companion GTFS feed was provided; 2 opt-in rule not enabled (use --enable).
   Not run, no companion GTFS feed was provided (9 ERROR, 5 WARNING, 2 INFO): TODS-I501, TODS-I502, TODS-E205, TODS-E307, TODS-E308, TODS-E309, TODS-E310, TODS-W315, TODS-W316, TODS-E311, TODS-E312, TODS-W313, TODS-E314, TODS-E405, TODS-W406, TODS-W407
-  Not run, opt-in rule not enabled (use --enable) (1 INFO): TODS-I601
+  Not run, opt-in rule not enabled (use --enable) (2 INFO): TODS-I601, TODS-I602
 ```
 
 A run that skipped nothing says so, rather than staying silent: `Rule-set
-coverage: Every applicable check ran (44 of 44).` Silence would be ambiguous,
+coverage: Every applicable check ran (45 of 45).` Silence would be ambiguous,
 so there is none.
 
 **A skipped check does not change the exit code.** A partial run still exits

@@ -1105,3 +1105,31 @@ daily,1,30,Operator,s1,10:30:00,s1,14:00:00
 Nearly 8 hours pass with no Break event. Advisory check; opt in with --enable advisory or --enable TODS-I601.
 
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
+
+### TODS-I602: One value is spelled more than one way
+
+Severity: INFO. Opt-in: off by default, enable with `--enable advisory` or `--enable TODS-I602`.
+
+run_events.txt writes the same event_type or job_type two or more ways, differing only in capitalization or in the separator between words. The spec lets a producer use any values but asks for them to be consistent, and a consumer that matches on the literal value reads the spellings as unrelated types. Advisory only: two spellings can be two genuinely different values.
+
+Interpretation: advisory: two values count as one value spelled differently when they match after case-folding and removing spaces, hyphens, and underscores
+
+Example (`run_events.txt`):
+
+Before:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,10,Sign-In,s1,06:00:00,s1,06:05:00
+daily,1,20,sign in,s1,06:05:00,s1,06:10:00
+```
+
+After:
+```csv
+service_id,run_id,event_sequence,event_type,start_location,start_time,end_location,end_time
+daily,1,10,Sign-In,s1,06:00:00,s1,06:05:00
+daily,1,20,Sign-In,s1,06:05:00,s1,06:10:00
+```
+
+'Sign-In' and 'sign in' are one event type written two ways, and a consumer matching the literal value sees two. Advisory check; opt in with --enable advisory or --enable TODS-I602.
+
+Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
