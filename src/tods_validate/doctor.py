@@ -7,6 +7,12 @@ run (no companion GTFS, no Java, no gtfs-validator jar) is always labeled
 SKIPPED with a specific reason, never silently dropped, so a report can never
 be misread as "everything passed" when a stage simply did not execute.
 
+The same rule applies one level down, inside the validate stage. It carries the
+run's :class:`RunCoverage`, so a stage marked RAN also states how many of the
+rule set actually ran and names what did not. Without it a TODS-only package --
+16 of 44 checks skipped, 9 of them ERROR-severity -- rendered as "No problems
+found." with nothing to distinguish it from a fully checked feed (#185).
+
 The same rule governs the one document this module reads from another tool.
 gtfs-validator's ``report.json`` is counted only when its shape is fully
 understood; a report that parses as JSON but is shaped some other way is a
@@ -33,7 +39,8 @@ from .findings import Finding, Severity
 from .loader import PackageNotFoundError
 from .merge import merge_feeds
 from .report import render_markdown, render_text, summarize
-from .runner import run
+from .rules import RunCoverage
+from .runner import run_with_coverage
 from .schema import SPEC_VERSION
 from .stats import (
     FeedStats,
@@ -58,6 +65,12 @@ _STAGE_TITLES: dict[str, str] = {
 class ValidatePayload:
     findings: list[Finding]
     source: str
+    # The rule-set coverage manifest for the validate stage. `doctor` marks a
+    # stage that could not run SKIPPED with a reason; without this the stage
+    # that skipped the most -- 16 of 44 checks on a TODS-only package -- was
+    # marked RAN with no qualification, and "No problems found." was the whole
+    # story a reader got (#185).
+    coverage: RunCoverage | None = None
 
 
 @dataclass
@@ -325,15 +338,21 @@ def run_doctor(
     skipped rather than aborting the whole pass, and ``stats`` failing to load
     its own package is recorded as a failed stage instead of raising.
     """
-    package, findings = run(path, gtfs_path, enabled=enabled, encoding=encoding)
+    package, findings, coverage = run_with_coverage(
+        path, gtfs_path, enabled=enabled, encoding=encoding
+    )
     if ignore:
         findings = [f for f in findings if f.rule_id not in ignore]
+        # Same disclosure `validate` makes: a rule whose findings were withheld
+        # by --ignore is reclassified rather than quietly counted as having run
+        # clean.
+        coverage = coverage.with_ignored(ignore)
 
     stages: list[StageResult] = [
         StageResult(
             name="validate",
             status="ran",
-            payload=ValidatePayload(findings=findings, source=package.source),
+            payload=ValidatePayload(findings=findings, source=package.source, coverage=coverage),
         )
     ]
 
@@ -389,7 +408,7 @@ def render_doctor_text(report: DoctorReport) -> str:
         lines.append(f"== {title}: {_marker(stage)} ==")
         payload = stage.payload
         if isinstance(payload, ValidatePayload):
-            lines.append(render_text(payload.findings, payload.source))
+            lines.append(render_text(payload.findings, payload.source, coverage=payload.coverage))
         elif isinstance(payload, MergePayload):
             lines.append(f"Wrote {len(payload.written)} file(s) to a temporary merged GTFS feed.")
         elif isinstance(payload, GtfsValidatorPayload):
@@ -413,7 +432,9 @@ def render_doctor_markdown(report: DoctorReport, *, stamp: bool = False) -> str:
         payload = stage.payload
         body: str | None = None
         if isinstance(payload, ValidatePayload):
-            body = _strip_leading_heading(render_markdown(payload.findings, payload.source))
+            body = _strip_leading_heading(
+                render_markdown(payload.findings, payload.source, coverage=payload.coverage)
+            )
         elif isinstance(payload, MergePayload):
             body = f"Wrote {len(payload.written)} file(s) to a temporary merged GTFS feed."
         elif isinstance(payload, GtfsValidatorPayload):
@@ -455,6 +476,8 @@ def doctor_to_dict(report: DoctorReport) -> dict[str, object]:
             entry["warnings"] = counts[Severity.WARNING]
             entry["infos"] = counts[Severity.INFO]
             entry["findings"] = [f.to_dict() for f in payload.findings]
+            if payload.coverage is not None:
+                entry["coverage"] = payload.coverage.to_dict()
         elif isinstance(payload, MergePayload):
             entry["written"] = payload.written
         elif isinstance(payload, GtfsValidatorPayload):

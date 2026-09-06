@@ -285,9 +285,13 @@ with the reason ("merged-feed GTFS validity NOT checked"), never silently
 treated as a pass. A `report.json` gtfs-validator wrote but this version
 cannot read is labeled FAILED, naming what it could not read, rather than
 counted as zero notices; zero notices out of an unreadable document would
-render exactly like a clean merged feed. `doctor` exits non-zero on validate
-findings at `--fail-on` severity or a gtfs-validator stage that actually
-failed to run, not on one that was honestly skipped.
+render exactly like a clean merged feed. The validate stage carries the same
+`Rule-set coverage:` manifest a bare `tods-validate` run prints, in all three
+formats, so a stage marked RAN also states how much of the rule set ran.
+`doctor` exits non-zero on validate findings at `--fail-on` severity or a
+gtfs-validator stage that actually failed to run, not on one that was honestly
+skipped; `--require-complete-run` adds the same opt-in gate it provides on
+`validate` and `batch`.
 
 ## Other subcommands
 

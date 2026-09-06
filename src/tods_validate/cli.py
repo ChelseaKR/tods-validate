@@ -1107,6 +1107,15 @@ def merge(path: str, gtfs_path: str | None, output_path: str, manifest: bool) ->
     default=None,
     help="Exit non-zero if validate findings reach this severity.  [default: error]",
 )
+@click.option(
+    "--require-complete-run",
+    is_flag=True,
+    help=(
+        "Also fail when a check could not run because an input was missing, such as "
+        "a companion GTFS feed that was not given. Skips you asked for (opt-in rules "
+        "left off, --spec-version scoping) still exit 0."
+    ),
+)
 def doctor(
     path: str,
     gtfs_path: str | None,
@@ -1115,6 +1124,7 @@ def doctor(
     encoding: str | None,
     stamp: bool,
     fail_on: str | None,
+    require_complete_run: bool,
 ) -> None:
     """Run validate, merge, gtfs-validator, and stats as one pass on PATH.
 
@@ -1153,7 +1163,20 @@ def doctor(
     validator_stage = report.stage("gtfs-validator")
     if validator_stage is not None and validator_stage.status == "failed":
         failed = True
-    sys.exit(EXIT_FINDINGS if failed else EXIT_CLEAN)
+
+    # Same contract as validate and batch: a skipped check does not change the
+    # exit code by itself, and --require-complete-run is how a pipeline opts in
+    # to gating on one. doctor is the command that composes the whole pipeline,
+    # so it was the one place the flag could not be reached (#185).
+    coverage = validate_payload.coverage if isinstance(validate_payload, ValidatePayload) else None
+    incomplete = coverage.unrequested_skips if (require_complete_run and coverage) else ()
+    if incomplete:
+        click.echo(
+            f"tods-validate: --require-complete-run: {len(incomplete)} check(s) could not "
+            f"run because an input was missing: {', '.join(o.id for o in incomplete)}.",
+            err=True,
+        )
+    sys.exit(EXIT_FINDINGS if failed or incomplete else EXIT_CLEAN)
 
 
 @main.command(name="rules")

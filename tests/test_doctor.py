@@ -18,6 +18,8 @@ from tods_validate.doctor import (
     _NoticeCounts,
     _read_gtfs_validator_notices,
     _run_gtfs_validator_stage,
+    render_doctor_text,
+    run_doctor,
 )
 
 E201 = str(FIXTURES / "invalid" / "TODS-E201")
@@ -107,6 +109,86 @@ def test_doctor_valid_feed_alone_no_gtfs_flag() -> None:
     result = invoke("doctor", str(VALID_TODS))
     assert result.exit_code == 0, result.output
     assert "== Merge: RAN ==" in result.output
+
+
+# ---------------------------------------------------------------------------
+# Rule-set coverage inside the validate stage (#185)
+#
+# `doctor` honored the "a stage that could not run says so" contract at the
+# stage level and dropped it at the rule level, inside the stage that matters
+# most. On a TODS-only package the validate stage was marked RAN, printed "No
+# problems found." and said nothing about the 16 reference checks -- 9 of them
+# ERROR-severity -- that never executed. The gtfs-validator stage beside it was
+# honestly marked SKIPPED; a reader had no way to tell those apart.
+
+
+def test_doctor_text_discloses_the_checks_that_did_not_run() -> None:
+    result = invoke("doctor", str(VALID_TODS))
+    assert "== Validate: RAN ==" in result.output
+    assert "No problems found." in result.output
+    assert "Rule-set coverage:" in result.output
+    # Named, not just counted: the reference rules that need a companion feed.
+    assert "no companion GTFS feed was provided" in result.output
+    assert "TODS-E307" in result.output
+
+
+def test_doctor_markdown_discloses_the_checks_that_did_not_run() -> None:
+    result = invoke("doctor", str(VALID_TODS), "--format", "markdown")
+    assert "Rule-set coverage:" in result.output
+    assert "TODS-E307" in result.output
+
+
+def test_doctor_json_carries_coverage_on_the_validate_stage() -> None:
+    payload = json.loads(invoke("doctor", str(VALID_TODS), "--format", "json").output)
+    stage = next(s for s in payload["stages"] if s["name"] == "validate")
+    assert stage["status"] == "ran"
+    coverage = stage["coverage"]
+    assert coverage["total"] == coverage["ran"] + coverage["skipped"]
+    assert coverage["skipped"] > 0
+    skipped_ids = {rid for ids in coverage["skippedByReason"].values() for rid in ids}
+    assert "TODS-E307" in skipped_ids
+
+    # And it agrees with `validate --format json` on the same directory: one
+    # number, produced once, not two surfaces disagreeing about the same run.
+    from_validate = json.loads(invoke(str(VALID_TODS), "--format", "json").output)["coverage"]
+    assert coverage["total"] == from_validate["total"]
+    assert coverage["ran"] == from_validate["ran"]
+    assert coverage["skipped"] == from_validate["skipped"]
+
+
+def test_doctor_states_a_complete_run_when_nothing_was_skipped() -> None:
+    # The CLI has no --enable, so the opt-in rules are always a requested skip
+    # there; drive run_doctor directly to reach a genuinely complete run and
+    # confirm the disclosure is a scope statement rather than a warning that
+    # only appears when something is wrong.
+    report = run_doctor(
+        VALID_TODS,
+        VALID_GTFS,
+        run_gtfs_validator=False,
+        enabled=frozenset({"coverage", "advisory"}),
+    )
+    text = render_doctor_text(report)
+    assert "Every applicable check ran" in text
+    assert "Checks skipped" not in text
+
+
+def test_doctor_require_complete_run_fails_a_partial_pass() -> None:
+    # The composing command was the one command that could not be gated on a
+    # complete run: the flag existed on validate and batch only.
+    without = invoke("doctor", str(VALID_TODS))
+    assert without.exit_code == 0  # a skip alone does not fail a pass by default
+
+    with_flag = invoke("doctor", str(VALID_TODS), "--require-complete-run")
+    assert with_flag.exit_code == 1
+    assert "16 check(s) could not run because an input was missing" in with_flag.output
+    assert "TODS-E307" in with_flag.output
+
+    # Requested skips alone must not trip it: with a companion feed the only
+    # remaining skips are opt-in rules the caller chose to leave off.
+    complete = invoke(
+        "doctor", str(VALID_TODS), "--gtfs", str(VALID_GTFS), "--require-complete-run"
+    )
+    assert complete.exit_code == 0, complete.output
 
 
 # ---------------------------------------------------------------------------

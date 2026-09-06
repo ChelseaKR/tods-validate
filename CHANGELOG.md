@@ -57,6 +57,19 @@ Fixed:
   resolved to one that does not exist and the check passed while reaching
   nothing.
 
+- `doctor` printed `No problems found.` for its validate stage with no rule-set
+  coverage behind it. It called the coverage-less `run` wrapper while
+  `validate`, `diff` and `batch` all went through `run_with_coverage`, so on a
+  TODS-only package the stage that skipped 16 of 44 checks -- 9 of them
+  ERROR-severity -- was labeled `RAN` with no qualification, directly beside a
+  `gtfs-validator` stage honestly labeled `SKIPPED`. A reader had no way to
+  tell those apart. The validate stage now carries the run's `RunCoverage`:
+  text and Markdown print the same `Rule-set coverage:` scope line every other
+  format prints, `--format json` gains a `coverage` object on that stage
+  matching `validate --format json`, and `--require-complete-run` is available
+  on `doctor` with the same meaning it has on `validate` and `batch`.
+  [#185](https://github.com/ChelseaKR/tods-validate/issues/185)
+
 Changed:
 
 - The share-card tags and their alternative text cost 1.1 KiB of head on
