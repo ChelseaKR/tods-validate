@@ -1133,3 +1133,15 @@ daily,1,20,Sign-In,s1,06:05:00,s1,06:10:00
 'Sign-In' and 'sign in' are one event type written two ways, and a consumer matching the literal value sees two. Advisory check; opt in with --enable advisory or --enable TODS-I602.
 
 Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
+
+## Operational feasibility (opt-in, not spec-derived) (OPS-x0xx)
+
+### OPS-W001: A movement in this run is too far to be made in the time allowed
+
+Severity: WARNING. Needs a companion GTFS feed. Opt-in: off by default, enable with `--enable feasibility` or `--enable OPS-W001`.
+
+A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgement the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID.
+
+Interpretation: straight-line: distance is great-circle between stop coordinates, which understates road distance, so the implied speed reported is a lower bound on the speed actually required
+
+Spec reference: <https://github.com/ChelseaKR/tods-validate/blob/main/docs/adr/0008-operational-feasibility-namespace.md>

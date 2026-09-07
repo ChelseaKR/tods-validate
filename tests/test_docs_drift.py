@@ -87,7 +87,15 @@ def test_the_prose_that_counts_the_published_pages_counts_them_right() -> None:
     # pass on any stray number in the file, which is how a count check goes
     # green while the count it names is wrong.
     phrases = {
-        _A11Y_STATEMENT: (f"{count} published pages", f"The {count} pages"),
+        # Both anchors are *live* claims about what is published now. The
+        # second used to be `f"The {count} pages"`, which sits in the "What
+        # the last check found" paragraph -- a historical account of an audit
+        # run on one day against a specific number of pages. Pinning it to the
+        # live count meant every rule added rewrote that history to describe a
+        # page count the audit never saw, and this gate demanded the rewrite.
+        # That sentence now carries no count, and this anchors the table row
+        # instead, which is a claim about the present and is meant to move.
+        _A11Y_STATEMENT: (f"{count} published pages", f"All {count} come from"),
         _GAPS: (f"the {count} rule-catalog pages",),
     }
     for path, expected in phrases.items():

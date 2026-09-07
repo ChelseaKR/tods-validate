@@ -38,6 +38,7 @@ from __future__ import annotations
 
 import tomllib
 from dataclasses import dataclass, replace
+from math import isfinite
 from pathlib import Path
 
 from .findings import Severity
@@ -54,6 +55,7 @@ _ALLOWED_KEYS = {
     "profile",
     "extends",
     "workspace",
+    "max-implied-speed-kph",
     # "severity" is a table (dict), not a list/string, so it is parsed by its
     # own helper (_severity_table) rather than the generic _str_list/_opt_str
     # machinery below. It only needs to be here so the unknown-key check does
@@ -89,6 +91,10 @@ class Config:
     fail_on: str | None = None
     enable: tuple[str, ...] = ()
     max_findings: int | None = None
+    # Implied-speed ceiling in km/h for the opt-in OPS-W001 feasibility check.
+    # None means the rule's own default applies; see rules.__init__'s
+    # DEFAULT_MAX_IMPLIED_SPEED_KPH for why that default is set high.
+    max_implied_speed_kph: float | None = None
     encoding: str | None = None
     spec_version: str | None = None
     profile: str | None = None
@@ -217,6 +223,8 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
         raise ConfigError(f"{where}: 'max-findings' must be a non-negative integer.")
     max_findings = raw_max if isinstance(raw_max, int) else None
 
+    max_implied_speed_kph = _max_implied_speed(data.get("max-implied-speed-kph"), where)
+
     history_dir = _workspace_history_dir(data.get("workspace"), where)
     severity_remap, severity_acknowledged = _severity_table(data, where)
 
@@ -225,6 +233,7 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
         fail_on=fail_on,
         enable=_str_list("enable"),
         max_findings=max_findings,
+        max_implied_speed_kph=max_implied_speed_kph,
         encoding=encoding,
         spec_version=spec_version,
         profile=profile,
@@ -233,6 +242,35 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
         severity_remap=severity_remap,
         severity_acknowledged=severity_acknowledged,
     )
+
+
+def _max_implied_speed(raw: object, where: str) -> float | None:
+    """Parse ``max-implied-speed-kph``, or raise ConfigError.
+
+    Rejected rather than clamped: a ceiling of zero or below would make every
+    measurable pair a finding, and a non-finite one would make none of them a
+    finding, and in both cases the run would still exit as though the check had
+    been applied. An impossible threshold is a mistake in the config file, so it
+    is reported as one (exit 2) instead of being quietly repaired into a
+    different check than the one the operator asked for.
+
+    ``bool`` is excluded explicitly because it is a subclass of ``int`` in
+    Python, so ``max-implied-speed-kph = true`` would otherwise be accepted as
+    a ceiling of 1 km/h.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        raise ConfigError(
+            f"{where}: 'max-implied-speed-kph' must be a positive number of km/h, not {raw!r}."
+        )
+    value = float(raw)
+    if not isfinite(value) or value <= 0:
+        raise ConfigError(
+            f"{where}: 'max-implied-speed-kph' must be a positive, finite number of km/h, "
+            f"not {raw!r}."
+        )
+    return value
 
 
 def _workspace_history_dir(raw: object, where: str) -> str | None:
@@ -272,6 +310,11 @@ def _merge(base: Config, override: Config) -> Config:
         enable=tuple(dict.fromkeys(base.enable + override.enable)),
         max_findings=(
             override.max_findings if override.max_findings is not None else base.max_findings
+        ),
+        max_implied_speed_kph=(
+            override.max_implied_speed_kph
+            if override.max_implied_speed_kph is not None
+            else base.max_implied_speed_kph
         ),
         encoding=override.encoding or base.encoding,
         spec_version=override.spec_version or base.spec_version,

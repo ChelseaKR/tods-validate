@@ -75,8 +75,8 @@ $ tods-validate examples/sample-feed
 tods-validate: examples/sample-feed (TODS v2.1.0)
 
 No problems found.
-Rule-set coverage: 41 of 45 checks ran. Checks skipped: 4 opt-in rule not enabled (use --enable).
-  Not run, opt-in rule not enabled (use --enable) (4 INFO): TODS-I501, TODS-I502, TODS-I601, TODS-I602
+Rule-set coverage: 41 of 46 checks ran. Checks skipped: 5 opt-in rule not enabled (use --enable).
+  Not run, opt-in rule not enabled (use --enable) (1 WARNING, 4 INFO): TODS-I501, TODS-I502, TODS-I601, TODS-I602, OPS-W001
 $ echo $?
 0
 ```
@@ -105,7 +105,7 @@ you pass `--fail-on warning`.
 ## Rule-set coverage
 
 Not every check applies to every run. A feed validated without a companion
-GTFS feed cannot resolve a `trip_id`, so the 16 rules that read GTFS files do
+GTFS feed cannot resolve a `trip_id`, so the 17 rules that read GTFS files do
 not run; opt-in rules stay off until `--enable` turns them on; `--ignore`
 withholds a rule's findings; `--spec-version` narrows the catalog.
 
@@ -116,8 +116,8 @@ $ tods-validate validate exports/tods
 tods-validate: exports/tods (TODS v2.1.0)
 
 No problems found.
-Rule-set coverage: 27 of 45 checks ran. Checks skipped: 16 no companion GTFS feed was provided; 2 opt-in rule not enabled (use --enable).
-  Not run, no companion GTFS feed was provided (9 ERROR, 5 WARNING, 2 INFO): TODS-I501, TODS-I502, TODS-E205, TODS-E307, TODS-E308, TODS-E309, TODS-E310, TODS-W315, TODS-W316, TODS-E311, TODS-E312, TODS-W313, TODS-E314, TODS-E405, TODS-W406, TODS-W407
+Rule-set coverage: 27 of 46 checks ran. Checks skipped: 17 no companion GTFS feed was provided; 2 opt-in rule not enabled (use --enable).
+  Not run, no companion GTFS feed was provided (9 ERROR, 6 WARNING, 2 INFO): TODS-I501, TODS-I502, OPS-W001, TODS-E205, TODS-E307, TODS-E308, TODS-E309, TODS-E310, TODS-W315, TODS-W316, TODS-E311, TODS-E312, TODS-W313, TODS-E314, TODS-E405, TODS-W406, TODS-W407
   Not run, opt-in rule not enabled (use --enable) (2 INFO): TODS-I601, TODS-I602
 ```
 
@@ -412,7 +412,7 @@ jobs:
 The action runs `--format github`, so the annotations it leaves on the pull
 request include the checks that did not run and why (see
 [Rule-set coverage](#rule-set-coverage)). Leaving `gtfs`
-out is the case worth knowing about: the 16 checks that read GTFS files cannot
+out is the case worth knowing about: the 17 checks that read GTFS files cannot
 run, 9 of them ERROR-severity, and the job still passes. Add
 `require-complete-run: "true"` to fail it instead.
 

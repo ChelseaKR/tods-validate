@@ -125,14 +125,42 @@ def _head_metadata(*, title: str, description: str, canonical: str) -> str:
     )
 
 
+# Rule-ID bands, keyed by the ID pattern each one publishes under. Keyed by the
+# pattern rather than by a bare digit because there is now more than one
+# namespace: "TODS-x4xx" and "OPS-x0xx" are both bands, and only the first is
+# identified by a digit alone.
 _BANDS = {
-    "1": "Package and file structure",
-    "2": "Field values",
-    "3": "References between files",
-    "4": "Semantic checks",
-    "5": "Coverage (opt-in, informational)",
-    "6": "Advisory (opt-in)",
+    "TODS-x1xx": "Package and file structure",
+    "TODS-x2xx": "Field values",
+    "TODS-x3xx": "References between files",
+    "TODS-x4xx": "Semantic checks",
+    "TODS-x5xx": "Coverage (opt-in, informational)",
+    "TODS-x6xx": "Advisory (opt-in)",
+    "OPS-x0xx": "Operational feasibility (opt-in, not spec-derived)",
 }
+
+
+def _band_of(rule: Rule) -> str:
+    """The ``_BANDS`` key a rule publishes under.
+
+    Raises rather than returning a default. The previous grouping keyed off a
+    single digit and simply skipped any rule that did not match a known band,
+    so a rule in a new namespace was dropped from docs/rules.md and from the
+    published catalog index without any error -- the generator produced a
+    complete-looking catalog that was missing a rule, and `--check` compared
+    that catalog against itself and passed. A KeyError here is the whole point:
+    the catalog is what SARIF ``helpUri`` and editor hovers link into, so a rule
+    it cannot place must stop the build rather than vanish from it.
+    """
+    namespace, code = rule.id.split("-", 1)
+    key = f"{namespace}-x{code[1]}xx"
+    if key not in _BANDS:
+        raise KeyError(
+            f"{rule.id} falls in no documented band ({key!r}); add it to _BANDS in "
+            f"{__file__} before the rule ships, or the rule catalog will omit it silently"
+        )
+    return key
+
 
 # Every colour here is stated for both schemes and checked against WCAG 2.1 AA.
 # The previous stylesheet declared `color-scheme: light dark` and then set no
@@ -214,11 +242,12 @@ def generate() -> str:
         "",
     ]
     rules = sorted(all_rules(), key=lambda r: r.id.split("-")[1][1:])
+    banded = {r.id: _band_of(r) for r in rules}
     for band, heading in _BANDS.items():
-        lines.append(f"## {heading} (TODS-x{band}xx)")
+        lines.append(f"## {heading} ({band})")
         lines.append("")
         for r in rules:
-            if r.id.split("-")[1][1] != band:
+            if banded[r.id] != band:
                 continue
             severity = Severity[r.severity.name].name
             needs = " Needs a companion GTFS feed." if r.needs_gtfs else ""
@@ -310,8 +339,9 @@ def _index_page_html(rules: list[Rule]) -> str:
     """The web/rules/ catalog: every rule grouped by band, linking to its page."""
     esc = html.escape
     sections = []
+    banded = {r.id: _band_of(r) for r in rules}
     for band, heading in _BANDS.items():
-        band_rules = [r for r in rules if r.id.split("-")[1][1] == band]
+        band_rules = [r for r in rules if banded[r.id] == band]
         if not band_rules:
             continue
         items = []
@@ -324,7 +354,7 @@ def _index_page_html(rules: list[Rule]) -> str:
                 f'<span class="badge">{esc(severity)}</span></li>'
             )
         sections.append(
-            f"    <h2>{esc(heading)} (TODS-x{esc(band)}xx)</h2>\n"
+            f"    <h2>{esc(heading)} ({esc(band)})</h2>\n"
             '    <ul class="rule-list">\n' + "\n".join(items) + "\n    </ul>\n"
         )
     body = "\n".join(sections)

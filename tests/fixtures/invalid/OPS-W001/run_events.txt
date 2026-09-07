@@ -1,0 +1,4 @@
+service_id,run_id,event_sequence,piece_id,block_id,job_type,event_type,trip_id,start_location,start_time,start_mid_trip,end_location,end_time,end_mid_trip
+daily,10000,10,,,Operator,Operator,,downtown,13:00:00,,downtown,14:00:00,
+daily,10000,20,,,Operator,Deadhead,,downtown,14:00:00,,outpost,14:05:00,
+daily,10000,30,,,Operator,Operator,,outpost,14:05:00,,outpost,15:00:00,

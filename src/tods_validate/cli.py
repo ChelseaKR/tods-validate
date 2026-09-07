@@ -392,6 +392,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
             encoding=effective_encoding,
             severity_remap=severity_remap,
             spec_version=effective_spec,
+            max_implied_speed_kph=config.max_implied_speed_kph,
         )
         gate = policy.apply(found)
         if gate.suppressed_ignored:

@@ -156,3 +156,50 @@ def test_trend_renders_table_after_two_batch_runs(tmp_path: Path) -> None:
     assert result.exit_code == 0
     assert "# Run history trend" in result.output
     assert "|" in result.output
+
+
+# ---------------------------------------------------------------------------
+# max-implied-speed-kph: the OPS-W001 ceiling (ADR 0008)
+#
+# The ceiling is a stated judgement that every finding quotes, so an
+# unusable value must stop the run rather than be repaired into a different
+# check than the operator asked for.
+# ---------------------------------------------------------------------------
+
+
+def _speed_config(tmp_path: Path, value: str) -> Config:
+    path = tmp_path / "tods-validate.toml"
+    path.write_text(f"max-implied-speed-kph = {value}\n", encoding="utf-8")
+    return load_config(path)
+
+
+def test_max_implied_speed_accepts_a_positive_number(tmp_path: Path) -> None:
+    assert _speed_config(tmp_path, "85").max_implied_speed_kph == 85.0
+    assert _speed_config(tmp_path, "85.5").max_implied_speed_kph == 85.5
+
+
+def test_max_implied_speed_defaults_to_unset(tmp_path: Path) -> None:
+    """Unset means the rule's own documented default, not a second copy of it."""
+    path = tmp_path / "tods-validate.toml"
+    path.write_text("fail-on = 'error'\n", encoding="utf-8")
+    assert load_config(path).max_implied_speed_kph is None
+
+
+@pytest.mark.parametrize("value", ["0", "-1", "-0.5", "nan", "inf"])
+def test_max_implied_speed_rejects_an_impossible_ceiling(tmp_path: Path, value: str) -> None:
+    # `nan`/`inf` are spelled as TOML floats here, which is how they would
+    # reach the parser from a real file.
+    literal = value if value not in {"nan", "inf"} else value
+    with pytest.raises(ConfigError, match="max-implied-speed-kph"):
+        _speed_config(tmp_path, literal)
+
+
+def test_max_implied_speed_rejects_a_boolean(tmp_path: Path) -> None:
+    """`true` is an int in Python and would otherwise mean a 1 km/h ceiling."""
+    with pytest.raises(ConfigError, match="max-implied-speed-kph"):
+        _speed_config(tmp_path, "true")
+
+
+def test_max_implied_speed_rejects_a_string(tmp_path: Path) -> None:
+    with pytest.raises(ConfigError, match="max-implied-speed-kph"):
+        _speed_config(tmp_path, "'fast'")

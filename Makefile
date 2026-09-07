@@ -285,8 +285,8 @@ a11y:
 # which in a repository whose premise is cited findings read as a claim that the
 # spec citations findings carry had been checked. They had not, by this target or
 # any other under this name. Those citations are checked elsewhere:
-# tests/test_registry.py asserts every rule's spec_section is a URL under the TODS
-# specification, and `make docs-check` regenerates docs/rules.md from the registry
+# tests/test_registry.py asserts every TODS- rule's spec_section is a URL under the
+# TODS specification, and that no rule outside that namespace carries one, and `make docs-check` regenerates docs/rules.md from the registry
 # and fails on any drift.
 citation-cff:
 	uvx cffconvert --validate -i CITATION.cff

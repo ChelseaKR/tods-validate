@@ -11,6 +11,7 @@ from click.testing import CliRunner
 from conftest import VALID_TODS
 from tods_validate.cli import main
 from tods_validate.findings import Finding, Severity
+from tods_validate.rules import all_rules
 from tods_validate.runner import run_with_coverage
 from tods_validate.workspace import (
     HISTORY_SCHEMA_VERSION,
@@ -385,4 +386,10 @@ def test_privacy_coverage_stores_rule_ids_only(tmp_path: Path) -> None:
         rid for group in payload["coverage"]["skippedByReason"].values() for rid in group
     ]
     assert ids
-    assert all(rid.startswith("TODS-") for rid in ids)
+    # Every stored value is a registered rule ID and nothing else. This used to
+    # assert the "TODS-" prefix, which was a proxy for the same claim back when
+    # that was the only namespace; comparing against the registry states the
+    # privacy property directly, and does not have to be revisited each time a
+    # namespace is added. It is also strictly stronger: a stray string that
+    # merely began with "TODS-" would have passed the old form.
+    assert set(ids) <= {r.id for r in all_rules()}
