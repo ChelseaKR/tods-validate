@@ -1,0 +1,3 @@
+stop_id,stop_name,stop_lat,stop_lon
+downtown,Downtown Transit Center,34.050000,-118.250000
+outpost,Outpost Loop,34.320000,-118.250000

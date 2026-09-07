@@ -7,6 +7,40 @@ new checks may be added in minor releases.
 
 Added:
 
+- `OPS-W001`, an opt-in check for whether a pick can actually be worked. It
+  resolves each movement's endpoints to coordinates in the companion GTFS
+  (after supplements), divides the great-circle distance by the time allowed,
+  and reports a movement whose implied speed exceeds a configured ceiling
+  (`max-implied-speed-kph`, default 120 km/h straight-line). Two kinds of
+  movement are checked: the one declared inside a single event, and the gap
+  between two consecutive events.
+
+  `TODS-W409` already argues that "an operator is one person who cannot
+  teleport", but it compares location *identifiers* for equality. An operator
+  who finishes downtown at 14:00, declares a correct five-minute deadhead, and
+  starts a run thirty kilometres away at 14:05 satisfies W409 and every other
+  rule, and cannot exist. That is the case this catches.
+
+  It is the first rule outside the `TODS-` namespace, and that is deliberate.
+  A `TODS-` ID cites the section of the spec it enforces, and the spec says
+  nothing about travel time, so issuing this judgement under a `TODS-` ID would
+  have made an opinion indistinguishable from a conformance failure.
+  `tests/test_registry.py` now enforces both halves of that promise: every
+  `TODS-` rule cites the spec, and no other rule does. See
+  [ADR 0008](docs/adr/0008-operational-feasibility-namespace.md).
+
+  A movement whose endpoint has no usable coordinate is reported as
+  **unmeasurable**, never as feasible. The coverage manifest gained a
+  per-rule `measurement` block carrying the measured and unmeasurable counts
+  with the reason, and every report format states it, because "ran, found
+  nothing" and "ran, could not look" are different results. Running the
+  project's own valid fixture now says `14 of 20 movements measured;
+  6 unmeasurable` — its events start and end at a garage, which is not a GTFS
+  stop.
+
+  The check is off by default in its own `feasibility` category, so the
+  `strict` and `ingest-ready` profiles and every default run are unchanged.
+
 - `tods-validate pickdiff OLD NEW`: a semantic package diff. `diff` compares
   two feeds' findings and `drift` compares a companion GTFS feed under one
   package; neither answers "what changed in the operational data". This
@@ -49,6 +83,19 @@ Added:
   inventory. [#143](https://github.com/ChelseaKR/tods-validate/issues/143)
 
 Fixed:
+
+- `scripts/generate_rules_doc.py` grouped rules into catalog bands by a single
+  digit and silently skipped any rule that matched no band. A rule in a new
+  namespace would have been dropped from `docs/rules.md` and from the 47
+  published catalog pages with no error, and `--check` would have compared the
+  incomplete catalog against itself and passed. It now raises on a rule it
+  cannot place.
+
+- The accessibility statement's "what the last check found" paragraph was
+  pinned by a test to the *live* published-page count, so every rule added
+  rewrote a historical account of one audit to describe a page count that audit
+  never saw. The sentence no longer carries a count; the gate anchors the
+  table row, which is a claim about the present.
 
 - `stats` treated any recognized GTFS file in a package as proof of a
   companion feed, while `validate` used the six files a TODS ID actually
@@ -177,7 +224,6 @@ Also here: a companion GTFS file that parsed but did not read in full no
 longer counts as a clean read, the branch ruleset is applied and committed as
 an export of what is enforced, and PyPI publishing is scoped to a `pypi`
 environment restricted to version tags.
-
 
 Changed:
 

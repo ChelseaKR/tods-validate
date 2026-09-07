@@ -99,6 +99,7 @@ max-complexity = 10
 "src/tods_validate/rules/references.py" = ["S101"]
 "src/tods_validate/rules/semantics.py" = ["S101"]
 "src/tods_validate/rules/coverage.py" = ["S101"]
+"src/tods_validate/rules/feasibility.py" = ["S101"]
 
 [tool.mypy]
 strict = true

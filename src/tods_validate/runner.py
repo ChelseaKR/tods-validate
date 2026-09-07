@@ -12,7 +12,12 @@ from pathlib import Path
 from .findings import Finding, Severity
 from .gtfs_companion import build_companion
 from .loader import Package, load_package
-from .rules import RunCoverage, ValidationContext, validate
+from .rules import (
+    DEFAULT_MAX_IMPLIED_SPEED_KPH,
+    RunCoverage,
+    ValidationContext,
+    validate,
+)
 from .schema import GTFS_COMPANION_FILENAMES, SPEC_VERSION
 
 # Root rule IDs and the rule IDs whose findings on that same row are downstream
@@ -61,6 +66,7 @@ def run_with_coverage(
     encoding: str | None = None,
     severity_remap: Mapping[str, str] | None = None,
     spec_version: str = SPEC_VERSION,
+    max_implied_speed_kph: float | None = None,
 ) -> tuple[Package, list[Finding], RunCoverage]:
     """Load and validate the TODS package at ``path``.
 
@@ -82,6 +88,9 @@ def run_with_coverage(
     table for how it is populated and disclosed. ``spec_version`` selects the
     TODS spec version to validate against (schema.SUPPORTED_SPEC_VERSIONS);
     see docs/spec-versions.md for what changes between versions.
+    ``max_implied_speed_kph`` overrides the OPS-W001 ceiling; None leaves the
+    rule's own documented default in force rather than substituting one here,
+    so there is a single place that number is written down.
     """
     package = load_package(path, encoding=encoding)
     gtfs = None
@@ -94,7 +103,17 @@ def run_with_coverage(
         gtfs = build_companion(package, package, source=package.source)
         gtfs_source = "package"
     context = ValidationContext(
-        package=package, gtfs=gtfs, gtfs_source=gtfs_source, spec_version=spec_version
+        package=package,
+        gtfs=gtfs,
+        gtfs_source=gtfs_source,
+        spec_version=spec_version,
+        # The constant, not a second copy of the number: None here means "the
+        # documented default", and there is exactly one place that is written.
+        max_implied_speed_kph=(
+            DEFAULT_MAX_IMPLIED_SPEED_KPH
+            if max_implied_speed_kph is None
+            else max_implied_speed_kph
+        ),
     )
     findings, coverage = validate(context, enabled)
     findings = _apply_severity_remap(findings, severity_remap or {})

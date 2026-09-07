@@ -1,4 +1,8 @@
 {
+  "invalid/OPS-W001": [
+    "OPS-W001",
+    "TODS-W302"
+  ],
   "invalid/TODS-E103": [
     "TODS-E103"
   ],

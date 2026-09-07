@@ -21,6 +21,7 @@ from tods_validate.doctor import (
     render_doctor_text,
     run_doctor,
 )
+from tods_validate.rules import CATEGORIES
 
 E201 = str(FIXTURES / "invalid" / "TODS-E201")
 
@@ -165,7 +166,11 @@ def test_doctor_states_a_complete_run_when_nothing_was_skipped() -> None:
         VALID_TODS,
         VALID_GTFS,
         run_gtfs_validator=False,
-        enabled=frozenset({"coverage", "advisory"}),
+        # Every opt-in category, not a hand-listed pair: this test's whole
+        # claim is "nothing was skipped", and a category added later would
+        # otherwise turn that into "nothing was skipped except the part I
+        # forgot to name" while the assertion still read as a complete run.
+        enabled=frozenset(CATEGORIES),
     )
     text = render_doctor_text(report)
     assert "Every applicable check ran" in text
@@ -180,7 +185,7 @@ def test_doctor_require_complete_run_fails_a_partial_pass() -> None:
 
     with_flag = invoke("doctor", str(VALID_TODS), "--require-complete-run")
     assert with_flag.exit_code == 1
-    assert "16 check(s) could not run because an input was missing" in with_flag.output
+    assert "17 check(s) could not run because an input was missing" in with_flag.output
     assert "TODS-E307" in with_flag.output
 
     # Requested skips alone must not trip it: with a companion feed the only

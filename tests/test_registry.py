@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from tods_validate.findings import Severity
-from tods_validate.rules import all_rules
+from tods_validate.rules import OPERATIONAL_NAMESPACE, SPEC_NAMESPACE, all_rules
 
 FIXTURES = Path(__file__).parent / "fixtures" / "invalid"
 
@@ -15,16 +15,41 @@ def test_ids_are_unique() -> None:
     assert len(ids) == len(set(ids))
 
 
+_NAMESPACES = {SPEC_NAMESPACE.rstrip("-"), OPERATIONAL_NAMESPACE.rstrip("-")}
+_SPEC_URL_PREFIX = "https://tods-transit.org/spec/"
+
+
 def test_id_letter_matches_severity() -> None:
     for r in all_rules():
         prefix, code = r.id.split("-")
-        assert prefix == "TODS"
+        assert prefix in _NAMESPACES, r.id
         assert code[0] == _SEVERITY_LETTERS[r.severity], r.id
 
 
-def test_every_rule_cites_the_spec() -> None:
+def test_every_tods_rule_cites_the_spec() -> None:
+    """The citation promise: a TODS- ID means the spec says so."""
     for r in all_rules():
-        assert r.spec_section.startswith("https://tods-transit.org/spec/"), r.id
+        if r.id.startswith(SPEC_NAMESPACE):
+            assert r.spec_section.startswith(_SPEC_URL_PREFIX), r.id
+
+
+def test_no_non_tods_rule_cites_the_spec() -> None:
+    """The other half of the promise, and the half that can rot silently.
+
+    A rule outside the TODS- namespace is there precisely because the spec does
+    not entail it. If such a rule were allowed to carry a spec URL, its findings
+    would read in every report and every SARIF ``helpUri`` as though the
+    standard required them -- which is the exact misrepresentation the separate
+    namespace exists to prevent. Asserting only the first half would let that
+    through, because a spec-citing OPS- rule passes it vacuously.
+    """
+    for r in all_rules():
+        if not r.id.startswith(SPEC_NAMESPACE):
+            assert not r.spec_section.startswith(_SPEC_URL_PREFIX), (
+                f"{r.id} is outside the {SPEC_NAMESPACE} namespace but cites the TODS spec; "
+                "cite the ADR that decided it instead"
+            )
+            assert r.spec_section.startswith("https://"), r.id
 
 
 def test_every_rule_has_a_dedicated_broken_fixture() -> None:

@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import date, timedelta
+from math import isfinite
 
 from .loader import BLOCKING_PROBLEM_CODES, FeedFile, Package
 from .schema import GTFS_PRIMARY_KEYS
@@ -33,6 +34,32 @@ def parse_gtfs_date(value: str) -> date | None:
         return date(int(value[0:4]), int(value[4:6]), int(value[6:8]))
     except ValueError:
         return None
+
+
+def parse_coordinate(lat: str, lon: str) -> tuple[float, float] | None:
+    """Parse a GTFS ``stop_lat``/``stop_lon`` pair, or None if unusable.
+
+    None is returned for a blank, non-numeric, non-finite or out-of-range
+    value. That "or None" is the point: every caller has to decide what to do
+    about a stop whose position is unknown, and none of them can quietly
+    substitute ``0.0``. Null Island is a real coordinate off the coast of
+    Ghana, so a blank field coerced to zero does not fail loudly -- it
+    produces a distance of several thousand kilometres to anywhere, which
+    reads as a finding about the feed rather than a gap in it.
+
+    ``float()`` also accepts ``"nan"`` and ``"inf"``; both are rejected here,
+    because a NaN latitude makes every downstream comparison false and would
+    silently classify a pair as feasible.
+    """
+    try:
+        latitude, longitude = float(lat), float(lon)
+    except ValueError:
+        return None
+    if not (isfinite(latitude) and isfinite(longitude)):
+        return None
+    if not (-90.0 <= latitude <= 90.0 and -180.0 <= longitude <= 180.0):
+        return None
+    return (latitude, longitude)
 
 
 def merge_supplement(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CONFORMANCE-GAPS.md#code-quality
@@ -80,6 +107,15 @@ class CompanionGTFS:
     trip_service: dict[str, str] = field(default_factory=dict)
     trip_block: dict[str, str] = field(default_factory=dict)
     stop_ids: set[str] = field(default_factory=set)
+    # (latitude, longitude) per stop_id, from stops.txt after supplements.
+    # Only populated for stops whose stop_lat/stop_lon both parse as floats
+    # inside the WGS84 range: a stop whose coordinate is blank, malformed or
+    # out of range is absent here rather than present with a guessed value,
+    # so a check that needs geography can report the pair as unmeasurable
+    # instead of measuring a fabricated position. A stop deleted by a
+    # supplement never reaches this map at all, because merge_supplement has
+    # already dropped it.
+    stop_coords: dict[str, tuple[float, float]] = field(default_factory=dict)
     route_ids: set[str] = field(default_factory=set)
     service_ids: set[str] = field(default_factory=set)
     block_services: dict[str, set[str]] = field(default_factory=dict)
@@ -203,6 +239,22 @@ def _resolve_base(
     return base
 
 
+def _stop_coordinates(
+    stops: dict[tuple[str, ...], dict[str, str]],
+) -> dict[str, tuple[float, float]]:
+    """Usable (lat, lon) per stop_id. Stops without one are simply absent.
+
+    Absent rather than present-with-a-default, so a caller that needs geography
+    has to notice it does not have any. See ``parse_coordinate``.
+    """
+    coordinates: dict[str, tuple[float, float]] = {}
+    for (stop_id,), row in stops.items():
+        point = parse_coordinate(row.get("stop_lat", ""), row.get("stop_lon", ""))
+        if point is not None:
+            coordinates[stop_id] = point
+    return coordinates
+
+
 def build_companion(gtfs: Package | None, tods: Package, source: str) -> CompanionGTFS:
     """Build the supplemented GTFS view.
 
@@ -252,7 +304,9 @@ def build_companion(gtfs: Package | None, tods: Package, source: str) -> Compani
         companion.trip_first_departure[trip_id] = ordered[0][3]
         companion.trip_last_arrival[trip_id] = ordered[-1][2]
 
-    companion.stop_ids = {key[0] for key in effective("stops.txt")}
+    stops = effective("stops.txt")
+    companion.stop_ids = {key[0] for key in stops}
+    companion.stop_coords = _stop_coordinates(stops)
     companion.route_ids = {key[0] for key in effective("routes.txt")}
 
     calendar = effective("calendar.txt")

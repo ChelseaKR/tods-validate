@@ -187,6 +187,10 @@ def _coverage_lines(coverage: RunCoverage | None, indent: str = "") -> list[str]
     return [
         f"Rule-set coverage: {coverage.scope_line()}",
         *(f"{indent}{line}" for line in coverage.skipped_detail_lines()),
+        # A rule that ran but could not read part of its input belongs here for
+        # the same reason a skipped rule does: both produce a report with
+        # nothing in it, and only one of them means the feed is fine.
+        *(f"{indent}{line}" for line in coverage.measurement_lines()),
     ]
 
 

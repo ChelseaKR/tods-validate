@@ -2,12 +2,19 @@
 
 Rules are data plus a small check function, not a plugin framework. Each rule
 has a stable ID, a severity, a spec citation, and a check that yields
-findings. IDs keep the historical TODS- prefix and are grouped in bands:
+findings. Most IDs keep the historical TODS- prefix and are grouped in bands:
 
 - TODS-x1xx: package and file structure
 - TODS-x2xx: field values within one file
 - TODS-x3xx: references between files (including the companion GTFS feed)
 - TODS-x4xx: semantic checks across rows
+- TODS-x5xx / TODS-x6xx: opt-in coverage and advisory checks
+
+A TODS- ID means the spec says so: every one of them cites the section it
+enforces. Checks that encode a judgement the spec does not make live in a
+second namespace instead, so that promise stays true:
+
+- OPS-x0xx: operational feasibility, cited to an ADR rather than to the spec
 
 The letter encodes severity (E error, W warning, I info). IDs are never
 reused or renumbered once released.
@@ -25,6 +32,22 @@ from ..gtfs_companion import CompanionGTFS
 from ..loader import Package
 from ..schema import GTFS_PRIMARY_KEYS, SPEC_VERSION, TableSpec, tables_for_version
 
+# Default implied-speed ceiling for OPS-W001, in km/h, straight-line.
+#
+# This is a judgement, and it is set deliberately high. The distance model is
+# great-circle, which always *understates* the real distance between two
+# points on a road network, so the implied speed it computes always
+# understates the speed actually required. A ceiling low enough to be
+# "realistic" against road distance would therefore fire on pairs that are
+# genuinely workable. 120 km/h straight-line is chosen so that a flagged pair
+# is one no ground vehicle could work regardless of the route it took --
+# the check reports what is impossible, not what is merely tight, and an
+# agency that wants the tighter reading sets `max-implied-speed-kph` itself.
+#
+# Every finding quotes the ceiling in force, so this number is never silently
+# load-bearing; see ADR 0008.
+DEFAULT_MAX_IMPLIED_SPEED_KPH = 120.0
+
 
 @dataclass
 class ValidationContext:
@@ -35,6 +58,16 @@ class ValidationContext:
     gtfs_source: str | None = None
     # Which TODS spec version to validate against (schema.SUPPORTED_SPEC_VERSIONS).
     spec_version: str = SPEC_VERSION
+    # The implied-speed ceiling, in km/h, above which a consecutive pair of
+    # assignments is reported as not workable (OPS-W001). A stated judgement,
+    # not a fact: it is quoted in every finding and configurable via
+    # `max-implied-speed-kph`. See config.py and ADR 0008.
+    max_implied_speed_kph: float = DEFAULT_MAX_IMPLIED_SPEED_KPH
+    # Filled in by rules that can say how much of their input they could read,
+    # keyed by rule ID; validate() folds each entry into that rule's
+    # RuleOutcome. A plain dict rather than a return value because a check is
+    # an Iterator[Finding] and cannot return anything alongside its findings.
+    measurements: dict[str, Measurement] = field(default_factory=dict)
 
     @property
     def tables(self) -> dict[str, TableSpec]:
@@ -83,7 +116,24 @@ GTFS_CALENDARS = ("calendar.txt", "calendar_dates.txt")
 # spec and run by default. "coverage" and "advisory" rules are opt-in (see
 # default_enabled) because they surface judgement calls, not spec violations,
 # and would be noise in a default CI gate.
-CATEGORIES = ("core", "coverage", "advisory", "experimental")
+#
+# "feasibility" is opt-in for a different reason, and is deliberately not
+# folded into "advisory": its rules are not spec-derived at all. They evaluate
+# a physical constraint against a threshold the operator states, so they are
+# the one band whose findings are not entailed by the TODS spec. Keeping them
+# in their own category is what lets `--enable advisory` stay a claim about
+# spec interpretation, and is the coverage-manifest band ADR 0008 promises.
+CATEGORIES = ("core", "coverage", "advisory", "experimental", "feasibility")
+
+# Rule-ID namespaces. "TODS-" carries the project's citation promise: every
+# TODS- rule cites a section of the spec it enforces (tests/test_registry.py
+# holds both halves of this). A rule that encodes a judgement the spec does
+# not make must NOT take a TODS- ID, however useful it is, because a consumer
+# reading a TODS- finding is entitled to read it as "the spec says so".
+# "OPS-" is that second namespace: operational checks, cited to a project ADR
+# rather than to the spec. See ADR 0008.
+SPEC_NAMESPACE = "TODS-"
+OPERATIONAL_NAMESPACE = "OPS-"
 
 
 @dataclass(frozen=True)
@@ -857,6 +907,65 @@ UNREQUESTED_SKIP_STATUSES = frozenset({STATUS_SKIPPED_NEEDS_GTFS, STATUS_SKIPPED
 
 
 @dataclass(frozen=True)
+class Measurement:
+    """How much of what a rule set out to examine it could actually examine.
+
+    ``status == "ran"`` is a claim about the rule, not about the data: a rule
+    can run end to end and still have been unable to look at most of what it
+    was pointed at, because the input it needed was missing row by row rather
+    than file by file. A travel-feasibility check whose companion feed gives
+    coordinates for two stops out of forty runs perfectly and answers almost
+    nothing, and without this the report would present that as a clean pass.
+
+    ``unmeasurable`` is therefore never folded into ``measured``, and never
+    counted as a unit that passed. The two numbers are reported side by side
+    so a reader can see the denominator the verdict actually rests on.
+    """
+
+    # Units the rule examined and reached a verdict on.
+    measured: int
+    # Units the rule could not reach a verdict on, for want of an input.
+    unmeasurable: int
+    # What one unit is, singular and lowercase, e.g. "consecutive event pair".
+    unit: str
+    # Why units were unmeasurable. Required whenever unmeasurable is non-zero
+    # (enforced in __post_init__): an undisclosed gap is the failure this
+    # record exists to prevent.
+    reason: str | None = None
+
+    def __post_init__(self) -> None:
+        if self.measured < 0 or self.unmeasurable < 0:
+            raise ValueError("measurement counts cannot be negative")
+        if self.unmeasurable and not self.reason:
+            raise ValueError(
+                "a measurement reporting unmeasurable units must say why; an "
+                "undisclosed gap reads as a clean result"
+            )
+
+    @property
+    def total(self) -> int:
+        return self.measured + self.unmeasurable
+
+    def summary(self) -> str:
+        """One line stating the denominator, in the report's own voice."""
+        unit = self.unit if self.total == 1 else f"{self.unit}s"
+        if not self.unmeasurable:
+            return f"{self.measured} {unit} measured."
+        return (
+            f"{self.measured} of {self.total} {unit} measured; "
+            f"{self.unmeasurable} unmeasurable ({self.reason})."
+        )
+
+    def to_dict(self) -> dict[str, object]:
+        return {
+            "measured": self.measured,
+            "unmeasurable": self.unmeasurable,
+            "unit": self.unit,
+            "reason": self.reason,
+        }
+
+
+@dataclass(frozen=True)
 class RuleOutcome:
     """Whether one rule ran during a validation, and why not if it did not."""
 
@@ -864,6 +973,10 @@ class RuleOutcome:
     severity: Severity
     category: str
     status: str
+    # Set by rules that can report how much of their input they could read;
+    # None for rules that either did not run or examine the package as a
+    # whole rather than unit by unit. See Measurement.
+    measurement: Measurement | None = None
 
     @property
     def ran(self) -> bool:
@@ -949,10 +1062,31 @@ class RunCoverage:
                     "severity": o.severity.name,
                     "category": o.category,
                     "status": o.status,
+                    **(
+                        {"measurement": o.measurement.to_dict()}
+                        if o.measurement is not None
+                        else {}
+                    ),
                 }
                 for o in self.outcomes
             ],
         }
+
+    def measurement_lines(self) -> list[str]:
+        """One line per rule that reported a partial measurement. Never silent.
+
+        Only rules with something unmeasurable are listed. A rule that measured
+        everything it was pointed at has nothing to qualify, and listing it
+        would bury the ones that do -- but a rule that could not measure some
+        of its input must say so wherever the coverage manifest is rendered,
+        because "ran, no findings" and "ran, could not look" are the two
+        results this manifest exists to keep apart.
+        """
+        return [
+            f"{o.id}: {o.measurement.summary()}"
+            for o in self.outcomes
+            if o.measurement is not None and o.measurement.unmeasurable
+        ]
 
     def summary_line(self) -> str | None:
         """One line disclosing skipped checks, or None when everything ran."""
@@ -1109,11 +1243,20 @@ def validate(
     outcomes: list[RuleOutcome] = []
     for r in REGISTRY:
         status = _rule_status(r, context, enabled)
-        outcomes.append(
-            RuleOutcome(id=r.id, severity=r.severity, category=r.category, status=status)
-        )
         if status == STATUS_RAN:
+            # Drained before the measurement is read: a check is a generator,
+            # so nothing in its body has executed yet and context.measurements
+            # would still be empty at this point.
             findings.extend(r.check(context))
+        outcomes.append(
+            RuleOutcome(
+                id=r.id,
+                severity=r.severity,
+                category=r.category,
+                status=status,
+                measurement=context.measurements.get(r.id) if status == STATUS_RAN else None,
+            )
+        )
     findings.sort(key=lambda f: (f.file or "", f.row or 0, f.rule_id))
     return findings, RunCoverage(tuple(outcomes))
 
@@ -1123,13 +1266,17 @@ def all_rules() -> Iterable[Rule]:
 
 
 # Importing the rule modules populates the registry.
-from . import coverage, fields, references, semantics, structure  # noqa: E402,F401
+from . import coverage, feasibility, fields, references, semantics, structure  # noqa: E402,F401
 
 __all__ = [
     "ALL_CHECKS_RAN",
+    "DEFAULT_MAX_IMPLIED_SPEED_KPH",
     "EXAMPLES",
+    "OPERATIONAL_NAMESPACE",
     "REGISTRY",
+    "SPEC_NAMESPACE",
     "UNREQUESTED_SKIP_STATUSES",
+    "Measurement",
     "Rule",
     "RuleOutcome",
     "RunCoverage",
