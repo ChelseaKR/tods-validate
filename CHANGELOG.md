@@ -84,6 +84,42 @@ Added:
 
 Fixed:
 
+- A `workflow_dispatch` of `pypi-publish.yml` uploaded to PyPI with its
+  release checks skipped, and reported success. `publish` carries no trigger
+  condition, so both of the workflow's triggers reach it — but `verify` was
+  called with an empty `tag` outside a release event, which disables the two
+  checks in `verify.yml` gated on `inputs.tag != ''` (tag/`pyproject.toml`/
+  `CITATION.cff`/`CHANGELOG.md` version consistency, and that the tag is an
+  annotated tag whose SSH signature verifies against the committed
+  `allowed_signers`), and `verify-published` — the job that re-downloads what
+  landed on PyPI and checks its provenance — carried
+  `if: github.event_name == 'release'`.
+
+  Measured on run `31966563243` (2026-08-16, dispatched from `main`): the
+  `verify / verify` job reports "Version consistency (REL-03)" and "Tag is
+  annotated and signed (REL-08)" as **skipped**, `publish` as **success**, and
+  `verify-published` as **skipped**. A skipped job does not fail a run, so the
+  run concluded `success`. `docs/CONFORMANCE-GAPS.md` described the gating as
+  restricting those checks to a real release, "never for `workflow_dispatch`
+  smoke-runs" — but a dispatch was never a smoke-run, because nothing stopped
+  it publishing. That sentence is corrected there.
+
+  `workflow_dispatch` now takes a **required** `tag` input, which flows to
+  `verify`, so the dispatch path enforces the same version-consistency and
+  signed-tag checks the release path does; and `verify-published` no longer
+  carries a trigger condition, so what actually reached PyPI is re-read on
+  every path that can publish. `deploy-playground` is deliberately unchanged
+  and stays release-only: redeploying the site is a separate publication
+  decision from uploading a wheel.
+
+  `tests/test_publish_verification_parity.py` pins it structurally — it walks
+  the `needs:` closure rather than matching a job name, refuses an empty
+  literal in any branch of the tag expression, requires every `inputs.*` the
+  expression reads to be declared `required`, and asserts the set of triggers
+  that reach the upload is a subset of the set that reach the read-back. Its
+  trigger analysis raises on an `if:` shape it does not recognise rather than
+  reading an unparsed condition as unrestricted.
+
 - `scripts/generate_rules_doc.py` grouped rules into catalog bands by a single
   digit and silently skipped any rule that matched no band. A rule in a new
   namespace would have been dropped from `docs/rules.md` and from the 47
