@@ -230,10 +230,20 @@ def test_the_post_publish_check_covers_every_trigger_that_can_publish() -> None:
 
 
 def test_a_dispatch_cannot_publish_without_naming_a_tag() -> None:
-    dispatch = _triggers().get("workflow_dispatch")
-    if dispatch is None:
+    # Membership, not `is None`. `workflow_dispatch:` with nothing under it
+    # parses to None, which is a declared trigger that declares no inputs --
+    # exactly the state this test exists to refuse. The first version of it
+    # skipped on that value, reporting "workflow_dispatch is not a trigger of
+    # this workflow" over a file where it plainly is: this module's own subject
+    # matter, one level in.
+    triggers = _triggers()
+    if "workflow_dispatch" not in triggers:
         pytest.skip("workflow_dispatch is not a trigger of this workflow")
-    assert isinstance(dispatch, dict)
+    dispatch = triggers["workflow_dispatch"]
+    assert isinstance(dispatch, dict), (
+        "workflow_dispatch declares nothing, so a dispatch names no tag -- and "
+        "`publish` carries no trigger condition, so it uploads anyway."
+    )
     assert dispatch.get("inputs"), (
         "workflow_dispatch takes no inputs, so a dispatch names no tag -- and "
         "`publish` carries no trigger condition, so it uploads anyway."
