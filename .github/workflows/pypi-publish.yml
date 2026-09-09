@@ -31,11 +31,33 @@ name: Publish to PyPI
 # this workflow publishes, so its deploy is sequenced after the wheel is
 # confirmed on PyPI rather than triggered by the release event it used to
 # race (and lose, on v0.8.0 and v0.9.0 -- see pages.yml).
+#
+# BOTH TRIGGERS PUBLISH, SO BOTH TRIGGERS MUST NAME A TAG.
+# `workflow_dispatch` used to take no inputs, and `verify` was called with an
+# empty `tag` on that path. docs/CONFORMANCE-GAPS.md described that as gating
+# the release checks so "they only run for a real release event, never for
+# `workflow_dispatch` smoke-runs" -- but `publish` carries no trigger
+# condition, so a dispatch was never a smoke-run: it uploaded to PyPI. Run
+# 31966563243 (2026-08-16) is the proof, and it is not a hypothetical: its
+# `verify / verify` job reports steps 12 and 13 -- "Version consistency
+# (REL-03)" and "Tag is annotated and signed (REL-08)" -- as `skipped`, its
+# `publish` job as `success`, its `verify-published` job as `skipped`, and the
+# run itself as `success`. A PyPI upload cannot be undone.
+#
+# The tag input is `required` for that reason. It flows to `verify`, so the
+# dispatch path enforces the same version-consistency and signed-tag checks
+# the release path does, and to `verify-published`, so what actually landed on
+# PyPI is re-checked on both paths rather than on one of them.
 
 on:
   release:
     types: [published]
   workflow_dispatch:
+    inputs:
+      tag:
+        description: "Signed release tag to publish (vX.Y.Z). A dispatch publishes to PyPI; PyPI uploads cannot be withdrawn."
+        required: true
+        type: string
 
 # Least-privilege default; the publish job escalates only what it needs.
 permissions:
@@ -50,7 +72,13 @@ jobs:
   verify:
     uses: ./.github/workflows/verify.yml
     with:
-      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || '' }}
+      # `with:` on a reusable-workflow call may only read `github`, `inputs`,
+      # `vars` and `needs`, so the tag is resolved inline here rather than in a
+      # workflow-level `env:`. Both arms are non-empty by construction: a
+      # release event always carries `tag_name`, and `inputs.tag` is `required`
+      # on the dispatch path. An empty value would silently disable the two
+      # release checks in verify.yml, which is the defect this replaced.
+      tag: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
 
   publish:
     needs: [verify]
@@ -125,16 +153,22 @@ jobs:
   verify-published:
     # Re-fetch what actually landed on PyPI and check its attestation, rather
     # than trusting that `publish` exiting 0 means the right bits are public
-    # (REL-16). Only meaningful for a real release, not workflow_dispatch.
+    # (REL-16).
+    #
+    # This used to carry `if: github.event_name == 'release'`, on the premise
+    # that a dispatch was a smoke-run. `publish` has no such condition, so the
+    # dispatch path uploaded to PyPI and then skipped the only step that reads
+    # back what was uploaded -- and a run whose remaining job is skipped
+    # concludes `success`. It now runs on every path that can publish, which is
+    # every path this workflow has.
     needs: [publish]
-    if: github.event_name == 'release'
     runs-on: ubuntu-latest
     timeout-minutes: 30
     permissions:
       contents: read
     env:
       GH_TOKEN: ${{ github.token }}
-      TAG: ${{ github.event.release.tag_name }}
+      TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
     steps:
       - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
         with:
