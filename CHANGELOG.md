@@ -183,6 +183,40 @@ Fixed:
   the previous exact-string comparison did not implement.
   [#186](https://github.com/ChelseaKR/tods-validate/issues/186)
 
+- The Node dependency audit is clean again: `npm audit` went from 7 HIGH
+  findings to 0, and `make npm-audit` from failing on two unwaived advisories
+  to passing. Two roots, one remedy. `extract-zip` has no patched release --
+  both GHSA-jmr9-qjv8-65gv and GHSA-7pqw-9j4j-h8q3 cover every version ever
+  published -- and it reached this repository only because
+  `@puppeteer/browsers` 2.x used it to unpack a Chrome download;
+  `@puppeteer/browsers` 3.x replaced it with `modern-tar`. `js-yaml`
+  (GHSA-2883-xcg3-v3hh) arrived under `cosmiconfig`, which puppeteer 24 used
+  to look for a `.puppeteerrc`; puppeteer 25 uses `lilconfig`, which parses no
+  YAML. `package.json` therefore overrides `pa11y` to 10.0.0 and `puppeteer`
+  to 25.10.0, the versions those two projects ship together, and both packages
+  leave the tree along with 71 others -- 162 dev dependencies become 95.
+
+  What npm offered instead was `pa11y-ci` 4.1.1 -> 3.1.0, a major *downgrade*
+  that would take the WCAG 2.1 AA gate backwards to fix a package the shipped
+  artifact never loads. The narrower alternative -- overriding
+  `@puppeteer/browsers` alone and leaving puppeteer at 24 -- crosses an exact
+  pin (`"@puppeteer/browsers": "2.13.2"`) into an ESM-only package that
+  puppeteer 24's CommonJS build reaches through `require`, and so raises the
+  toolchain's effective Node floor from the `>= 18` puppeteer-core 24 declares
+  to the `>= 22.12.0` the new package needs, with no warning from npm. It is
+  not known to break: that `require` succeeds on Node 22.12 and above, and
+  `computeExecutablePath` out of 3.x has been measured returning a correct
+  path under puppeteer-core 24. The objection is narrower and it is about
+  evidence. The accessibility job loads puppeteer on every commit, so a green
+  run would prove the ESM package *loads*; the code that override exists to
+  replace would still never run, because every workflow installs with
+  `npm ci --ignore-scripts` and sets `PUPPETEER_EXECUTABLE_PATH`, so the
+  download and unpack `@puppeteer/browsers` owns is skipped. Pinning puppeteer
+  25 removes the forced combination instead of resting on it.
+
+  WVR-001 now matches nothing, and `make npm-audit` says so in its own output;
+  it is left in place, unexpired, for the maintainer to retire.
+
 Changed:
 
 - The share-card tags and their alternative text cost 1.1 KiB of head on
