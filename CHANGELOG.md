@@ -201,10 +201,18 @@ Fixed:
   artifact never loads. The narrower alternative -- overriding
   `@puppeteer/browsers` alone and leaving puppeteer at 24 -- crosses an exact
   pin (`"@puppeteer/browsers": "2.13.2"`) into an ESM-only package that
-  puppeteer 24's CommonJS build reaches through `require`, on a code path no
-  gate here exercises: every workflow installs with `npm ci --ignore-scripts`
-  and sets `PUPPETEER_EXECUTABLE_PATH`, which makes puppeteer skip the
-  download entirely. It would have looked green and been untested.
+  puppeteer 24's CommonJS build reaches through `require`, and so raises the
+  toolchain's effective Node floor from the `>= 18` puppeteer-core 24 declares
+  to the `>= 22.12.0` the new package needs, with no warning from npm. It is
+  not known to break: that `require` succeeds on Node 22.12 and above, and
+  `computeExecutablePath` out of 3.x has been measured returning a correct
+  path under puppeteer-core 24. The objection is narrower and it is about
+  evidence. The accessibility job loads puppeteer on every commit, so a green
+  run would prove the ESM package *loads*; the code that override exists to
+  replace would still never run, because every workflow installs with
+  `npm ci --ignore-scripts` and sets `PUPPETEER_EXECUTABLE_PATH`, so the
+  download and unpack `@puppeteer/browsers` owns is skipped. Pinning puppeteer
+  25 removes the forced combination instead of resting on it.
 
   WVR-001 now matches nothing, and `make npm-audit` says so in its own output;
   it is left in place, unexpired, for the maintainer to retire.
