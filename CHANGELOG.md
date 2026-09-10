@@ -217,6 +217,29 @@ Fixed:
   WVR-001 now matches nothing, and `make npm-audit` says so in its own output;
   it is left in place, unexpired, for the maintainer to retire.
 
+- Five comments describing the published site stated a page count, and all
+  five were wrong. The site is the playground, its README, the share card,
+  the rule catalog index and one page per rule: 46 rule pages and 50 tracked
+  files under `web/` today. `pages.yml` said "43 per-rule pages -- 47 files"
+  and "all 47 published files", `live-integrity.yml` "44 per-rule reference
+  pages ... those 46 files", `check-deployed-tree.sh` "today is 46 files ...
+  44 per-rule reference pages", `run-a11y.sh` "44 pages deployed", and two
+  comments in `tests/test_generate_rules_doc.py` "44 pages".
+
+  Nothing was unenforced. Every assertion is derived — the stylesheet check
+  compares `len(pages)` with `len(all_rules()) + 1`, the deployment sentinel
+  walks `git ls-files web`, and the two documents that state the count to a
+  reader, `docs/a11y/STATEMENT.md` and `docs/CONFORMANCE-GAPS.md`, are gated
+  against the generator by `test_the_prose_that_counts_the_published_pages_counts_them_right`
+  and are correct. The five that were wrong are exactly the five nobody
+  gated, which is the more useful half of the measurement.
+
+  They now describe the shape rather than a number. A sixth gate was not
+  added on purpose: the count is already checked where it is a published
+  claim, and requiring five more edits every time a rule lands would make
+  adding a rule a documentation exercise. No behaviour, output or gate
+  changes here.
+
 Changed:
 
 - The share-card tags and their alternative text cost 1.1 KiB of head on

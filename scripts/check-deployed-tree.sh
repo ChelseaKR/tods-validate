@@ -2,10 +2,14 @@
 # Fail when any published file is not the file this repository publishes.
 #
 # check-deployed-playground.sh compares one file: web/index.html. pages.yml
-# uploads the whole `web` directory, which today is 46 files: the playground,
-# its README, the rule index, and 44 per-rule reference pages. So 45 of the 46
-# published files had nothing looking at them at all, and the one that did was
-# looked at once a week.
+# uploads the whole `web` directory: the playground, its README, the share card,
+# the rule index, and one reference page per registered rule. So every published
+# file but one had nothing looking at it at all, and the one that did was looked
+# at once a week.
+#
+# No count is written here. It moves with every rule added, and the comparison
+# set below is `git ls-files web`, so a literal would only ever be a second,
+# staler copy of a number this script already derives.
 #
 # That is not a theoretical hole. On 2026-08-29 every one of the 46 differed
 # from the deployment: #157 gave all 45 pages a canonical URL, a description and

@@ -1,8 +1,9 @@
 # Does every published page say what this repository says, or only the front one?
 #
 # pages.yml uploads the whole `web` directory: the playground, its README, the
-# rule index, and 44 per-rule reference pages. Until now exactly one of those 46
-# files was ever compared with the deployment, and only once a week.
+# share card, the rule index, and one reference page per registered rule. Until
+# now exactly one of those files was ever compared with the deployment, and only
+# once a week.
 #
 # On 2026-08-29 all 46 differed. #157 gave every page a canonical URL, a
 # description and a title; the last successful deploy was 2026-08-22; and the
