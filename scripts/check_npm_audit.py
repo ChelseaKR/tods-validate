@@ -419,6 +419,22 @@ def run_npm_audit(prefix: Path) -> tuple[dict[str, Any] | None, str]:
     return report, ""
 
 
+def coverage_line(audited: list[str], projects: list[str]) -> str:
+    """The two numbers, always both.
+
+    `audited` counts the projects whose report this run actually adjudicated;
+    `projects` counts the ones it found. They differ exactly when an audit
+    could not be run or read, and that is the case where a single number lies:
+    "no unwaived HIGH/CRITICAL advisories" over a project nobody managed to
+    audit is the absence of a measurement printed as a clean result.
+    """
+
+    return (
+        f"npm audit: adjudicated {len(audited)} of {len(projects)} npm project(s) "
+        f"[{', '.join(audited) or 'none'}]"
+    )
+
+
 def _recorded_report(path: Path) -> tuple[dict[str, Any] | None, str]:
     """Read a recorded `npm audit --json` report, mirroring run_npm_audit's shape."""
 
@@ -529,14 +545,7 @@ def main(argv: list[str] | None = None) -> int:
     for line in accepted:
         print(f"npm audit: {line}")
 
-    # Both numbers, always. `audited` counts the projects whose report this run
-    # actually adjudicated; `projects` counts the ones it found. A gate that
-    # printed only "no unwaived advisories" could not tell a clean repository
-    # from one where every audit failed to run.
-    coverage = (
-        f"npm audit: adjudicated {len(audited)} of {len(projects)} npm project(s) "
-        f"[{', '.join(audited) or 'none'}]"
-    )
+    coverage = coverage_line(audited, projects)
     if failures:
         print(coverage, file=sys.stderr)
         print("npm audit gate failed:", file=sys.stderr)

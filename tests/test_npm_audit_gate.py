@@ -491,3 +491,44 @@ def test_the_committed_registry_names_only_projects_that_exist() -> None:
         gate.npm_projects(ROOT),
     )
     assert problems == []
+
+
+def test_the_coverage_line_counts_projects_adjudicated_not_projects_found() -> None:
+    """The two numbers have to be able to disagree, or one of them is decoration.
+
+    A run that found two projects and got a report out of one has examined
+    half of what it named. Printing `2 of 2` there is this portfolio's own
+    defect -- a failed read published as a measurement -- inside the line
+    written to prevent it.
+    """
+
+    gate = _gate()
+    both = [ROOT_PROJECT, EXTENSION_PROJECT]
+    assert gate.coverage_line(both, both) == (
+        "npm audit: adjudicated 2 of 2 npm project(s) [., editor/vscode]"
+    )
+    assert gate.coverage_line([ROOT_PROJECT], both) == (
+        "npm audit: adjudicated 1 of 2 npm project(s) [.]"
+    )
+    assert gate.coverage_line([], both) == "npm audit: adjudicated 0 of 2 npm project(s) [none]"
+
+
+def test_a_project_whose_audit_cannot_be_read_is_not_counted_as_examined(
+    tmp_path: Path,
+) -> None:
+    """Both directions, because a reader that examines nothing satisfies one."""
+
+    gate = _gate()
+    both = [ROOT_PROJECT, EXTENSION_PROJECT]
+
+    report = tmp_path / "audit.json"
+    report.write_text(json.dumps(_clean_report()), encoding="utf-8")
+    failures, _, _, audited = gate._audit_projects(both, {}, tmp_path, report)
+    assert failures == []
+    assert audited == both
+
+    missing = tmp_path / "nowhere.json"
+    failures, _, _, audited = gate._audit_projects(both, {}, tmp_path, missing)
+    assert audited == []
+    assert len(failures) == 2
+    assert all("nowhere.json" in failure for failure in failures)
