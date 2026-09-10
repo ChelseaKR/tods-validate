@@ -1,6 +1,6 @@
 # Runbook: publish the VS Code extension
 
-Last verified: 2026-08-27
+Last verified: 2026-09-10
 Recheck cadence: whenever `editor/vscode/package.json` or
 `.github/workflows/vscode-extension.yml` changes, and before any attempt to
 publish.
@@ -28,11 +28,19 @@ a repository can hold or an automated pass can create:
   Contributor Agreement signed**, which is a legal acceptance by a named human.
 
 Everything else is done. CI builds the VSIX on every change to
-`editor/vscode/**`, type-checks it, audits its dependencies at `--audit-level=high`,
-and verifies the packaged archive actually contains `extension/LICENSE.txt`
-and `extension/out/extension.js` before uploading it as an artifact. The
-manifest already carries `publisher`, `license`, `repository`, `homepage`,
-`bugs`, `keywords`, `categories`, and an `engines.vscode` floor.
+`editor/vscode/**`, type-checks it, and verifies the packaged archive actually
+contains `extension/LICENSE.txt` and `extension/out/extension.js` before
+uploading it as an artifact. The manifest already carries `publisher`,
+`license`, `repository`, `homepage`, `bugs`, `keywords`, `categories`, and an
+`engines.vscode` floor.
+
+The extension's dependencies are audited by `make npm-audit` in the `audit` job
+of `ci.yml`, not by the packaging workflow. That is deliberate: the packaging
+workflow only runs when `editor/vscode/**` changes, and a new advisory arrives
+against a lockfile nobody has touched. On 2026-09-10 that job had last run
+green four days earlier while `GHSA-2883-xcg3-v3hh` was live in the committed
+lock. `make npm-audit` walks every `package-lock.json` in the repository, runs
+on every pull request, and adjudicates findings against `waivers.yml`.
 
 ## When you are ready
 
@@ -75,4 +83,4 @@ npx ovsx publish tods-validate-*.vsix --pat "$OPEN_VSX_TOKEN"
   worked once, scoped to an environment, and with the same trusted-publisher
   reasoning `pypi-publish.yml` documents.
 
-<!-- doc-currency: sha256=42f6be8d1d50 -->
+<!-- doc-currency: sha256=0226c4eeceec -->
