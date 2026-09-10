@@ -1,0 +1,7 @@
+{
+  "name": "example text validator",
+  "strategy": "regex",
+  "pattern": "\\b(TODS-[EWI][0-9]{3})\\b",
+  "no_findings_pattern": "(?m)^(no (issues|findings|errors) found|OK)$",
+  "source": "combined"
+}
