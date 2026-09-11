@@ -9,15 +9,32 @@ one that was actually reviewed.
 
 This gate keeps the severity floor where it is and adjudicates advisory by
 advisory against waivers.yml instead. An advisory passes only when a
-non-expired waiver names that exact advisory id, that exact package, and that
-exact severity. Everything else fails:
+non-expired waiver names that exact advisory id, that exact package, that
+exact severity, and the npm project it was reported in. Everything else fails:
 
   * an advisory with no waiver (a new finding still breaks the build);
   * a waived advisory id reported against a different package;
   * a waived advisory whose severity has since been escalated;
+  * a waived advisory reported in a different npm project;
   * a waiver that has expired, or is missing a required field;
   * an `npm audit` report this gate cannot parse, or a count of HIGH/CRITICAL
     findings that the parsed advisories do not account for.
+
+Every npm project in the repository is audited, not just the one at the root.
+`npm audit` reads the lockfile in its working directory and nothing else, so a
+gate that runs it once at the root reports on one dependency tree and says
+nothing about any other. This repository has two -- the accessibility toolchain
+at the root and the VS Code extension under `editor/vscode/` -- and on
+2026-09-10 the second carried a live HIGH advisory (GHSA-2883-xcg3-v3hh in
+js-yaml) that this gate could not see. The extension had its own
+`npm audit --audit-level=high` step in `.github/workflows/vscode-extension.yml`,
+but that workflow is path-filtered to `editor/vscode/**`: it runs when the
+lockfile changes, and an advisory is published against a lockfile that has not.
+
+The project list is discovered by walking the tree for lockfiles rather than
+being written down, so adding a third npm project puts it under the gate
+without anyone remembering to. A walk that finds nothing is a broken reader,
+not a repository with no dependencies, and fails.
 
 Run it via `make npm-audit`. `--audit-json` reads a recorded report instead of
 invoking npm, which is how tests/test_npm_audit_gate.py proves the waiver is
@@ -58,6 +75,38 @@ REQUIRED_FIELDS = (
     "advisory",
     "package",
     "severity",
+)
+
+# The npm project a waiver applies to, as a repository-relative POSIX path.
+# `tree` is optional because every waiver written before this gate audited more
+# than one project meant the root, and defaulting keeps that meaning rather
+# than silently widening it to every project: a waiver whose prose argues about
+# the accessibility toolchain must not accept the same advisory in the VS Code
+# extension's dependency tree. A waiver naming a directory that holds no
+# lockfile is a problem, so a waiver does not outlive the project it describes.
+ROOT_TREE = "."
+WAIVER_TREE_FIELD = "tree"
+
+# Directories the lockfile walk never descends into. `node_modules` is the one
+# that matters -- an installed tree contains hundreds of `package-lock.json`
+# files belonging to dependencies, none of which is a project of this
+# repository -- and the rest are build, cache and worktree output that can hold
+# a copy of a real one.
+_PRUNED_DIRECTORIES = frozenset(
+    {
+        ".git",
+        ".mypy_cache",
+        ".pytest_cache",
+        ".ruff_cache",
+        ".venv",
+        ".worktrees",
+        "build",
+        "dist",
+        "htmlcov",
+        "mutants",
+        "node_modules",
+        "sbom-env",
+    }
 )
 
 # `  - key: value` opens a waiver; `    key: value` adds a field to it; a line
@@ -111,53 +160,94 @@ def _parse_date(value: str) -> date | None:
         return None
 
 
+def npm_projects(root: Path) -> list[str]:
+    """Every npm project in the tree, as repository-relative POSIX paths.
+
+    A project is a directory holding a `package-lock.json`, because that is the
+    file `npm audit` reads: a `package.json` with no lock has no resolved
+    versions to adjudicate, and npm refuses to audit it. Discovered rather than
+    listed so a project added later is audited without an edit here, and sorted
+    with the root first so the output is stable.
+
+    The walk prunes `node_modules`, which is the difference between two
+    projects and several hundred. A tree with no lockfile at all returns the
+    empty list, and the caller fails on it -- see the note in `main`.
+    """
+
+    projects: list[str] = []
+    for lockfile in root.rglob("package-lock.json"):
+        relative = lockfile.relative_to(root)
+        if any(part in _PRUNED_DIRECTORIES for part in relative.parts[:-1]):
+            continue
+        directory = relative.parent.as_posix()
+        projects.append(ROOT_TREE if directory == "" else directory)
+    return sorted(set(projects), key=lambda path: (path != ROOT_TREE, path))
+
+
 def npm_audit_waivers(
-    text: str, repo: str, today: date
-) -> tuple[dict[str, dict[str, str]], list[str]]:
-    """Return usable npm-audit waivers keyed by advisory id, plus any problems.
+    text: str, repo: str, today: date, projects: list[str] | None = None
+) -> tuple[dict[tuple[str, str], dict[str, str]], list[str]]:
+    """Usable npm-audit waivers keyed by (npm project, advisory id), and problems.
 
     A waiver that fails validation is not returned, so a malformed or expired
     entry cannot accept anything: the gate fails closed on both counts.
+
+    `projects` is the list `npm_projects` found. When it is given, a waiver
+    naming a directory that is not one of them is a problem rather than a
+    waiver that quietly matches nothing -- a renamed or deleted npm project
+    should surface the stale waiver, not hide it.
     """
 
     problems: list[str] = []
-    usable: dict[str, dict[str, str]] = {}
+    usable: dict[tuple[str, str], dict[str, str]] = {}
     for waiver in parse_waivers(text):
         if waiver.get("kind") != "npm-audit":
             continue
         waiver_id = waiver.get("id") or "<missing id>"
-        missing = [field for field in REQUIRED_FIELDS if not waiver.get(field)]
-        if missing:
-            problems.append(f"{waiver_id}: missing required field(s): {', '.join(missing)}")
+        problem = _waiver_problem(waiver, repo, today, projects)
+        if problem is not None:
+            problems.append(f"{waiver_id}: {problem}")
             continue
-        if waiver["repo"] != repo:
-            problems.append(f"{waiver_id}: repo is {waiver['repo']}, not {repo}")
+        key = (waiver.get(WAIVER_TREE_FIELD) or ROOT_TREE, waiver["advisory"].upper())
+        if key in usable:
+            problems.append(f"{waiver_id}: duplicate waiver for {key[1]} in {key[0]}")
             continue
-        granted = _parse_date(waiver["granted"])
-        expires = _parse_date(waiver["expires"])
-        if granted is None or expires is None:
-            problems.append(f"{waiver_id}: granted and expires must be ISO dates")
-            continue
-        if expires < granted:
-            problems.append(f"{waiver_id}: expiry precedes granted date")
-            continue
-        if expires < today:
-            problems.append(
-                f"{waiver_id}: expired on {waiver['expires']}; re-review the advisory "
-                f"or let the gate block"
-            )
-            continue
-        if waiver["severity"] not in BLOCKING:
-            problems.append(
-                f"{waiver_id}: severity {waiver['severity']!r} is not one this gate blocks on"
-            )
-            continue
-        advisory = waiver["advisory"].upper()
-        if advisory in usable:
-            problems.append(f"{waiver_id}: duplicate waiver for {advisory}")
-            continue
-        usable[advisory] = waiver
+        usable[key] = waiver
     return usable, problems
+
+
+def _waiver_problem(
+    waiver: dict[str, str], repo: str, today: date, projects: list[str] | None
+) -> str | None:
+    """Why this npm-audit waiver cannot be used, or None if it can.
+
+    Every branch returns a reason rather than raising, so a registry with two
+    broken entries reports both -- a gate that stopped at the first one would
+    have to be run once per problem.
+    """
+
+    missing = [field for field in REQUIRED_FIELDS if not waiver.get(field)]
+    if missing:
+        return f"missing required field(s): {', '.join(missing)}"
+    if waiver["repo"] != repo:
+        return f"repo is {waiver['repo']}, not {repo}"
+    granted = _parse_date(waiver["granted"])
+    expires = _parse_date(waiver["expires"])
+    if granted is None or expires is None:
+        return "granted and expires must be ISO dates"
+    if expires < granted:
+        return "expiry precedes granted date"
+    if expires < today:
+        return f"expired on {waiver['expires']}; re-review the advisory or let the gate block"
+    if waiver["severity"] not in BLOCKING:
+        return f"severity {waiver['severity']!r} is not one this gate blocks on"
+    tree = waiver.get(WAIVER_TREE_FIELD) or ROOT_TREE
+    if projects is not None and tree not in projects:
+        return (
+            f"{WAIVER_TREE_FIELD} is {tree!r}, which is not an npm project in this "
+            f"repository ({', '.join(projects)})"
+        )
+    return None
 
 
 def advisory_id(via: dict[str, Any]) -> str:
@@ -231,13 +321,22 @@ def blocking_total(report: dict[str, Any]) -> int | None:
 
 
 def adjudicate(
-    report: dict[str, Any], waivers: dict[str, dict[str, str]]
-) -> tuple[list[str], list[str]]:
-    """Return (failures, accepted) for one audit report."""
+    report: dict[str, Any],
+    waivers: dict[tuple[str, str], dict[str, str]],
+    tree: str = ROOT_TREE,
+) -> tuple[list[str], list[str], set[tuple[str, str]]]:
+    """Return (failures, accepted, matched waiver keys) for one audit report.
+
+    `matched` comes back to the caller rather than being consumed here, because
+    "this waiver matched nothing" is a statement about every project's report
+    together: a waiver scoped to one project matches nothing in the others by
+    construction, and reporting that per project would say a live waiver is
+    retirable once per npm project in the repository.
+    """
 
     failures: list[str] = []
     accepted: list[str] = []
-    matched: set[str] = set()
+    matched: set[tuple[str, str]] = set()
 
     advisories = report_advisories(report)
     blocking = [item for item in advisories if item["severity"] in BLOCKING]
@@ -265,14 +364,14 @@ def adjudicate(
         )
 
     for item in blocking:
-        waiver = waivers.get(item["id"])
+        waiver = waivers.get((tree, item["id"]))
         if waiver is None:
             failures.append(
                 f"{item['id']} ({item['severity']}) in {item['package']}: no waiver. "
                 f"{item['via'].get('title', 'no title')}"
             )
             continue
-        matched.add(item["id"])
+        matched.add((tree, item["id"]))
         if waiver["package"] != item["package"]:
             failures.append(
                 f"{item['id']}: waiver {waiver['id']} covers package {waiver['package']}, "
@@ -290,14 +389,7 @@ def adjudicate(
             f"{waiver['id']}, expires {waiver['expires']}"
         )
 
-    for advisory, waiver in sorted(waivers.items()):
-        if advisory not in matched:
-            print(
-                f"note: waiver {waiver['id']} for {advisory} matched nothing in this report; "
-                f"it can be retired",
-                file=sys.stderr,
-            )
-    return failures, accepted
+    return failures, accepted, matched
 
 
 def run_npm_audit(prefix: Path) -> tuple[dict[str, Any] | None, str]:
@@ -327,6 +419,70 @@ def run_npm_audit(prefix: Path) -> tuple[dict[str, Any] | None, str]:
     return report, ""
 
 
+def coverage_line(audited: list[str], projects: list[str]) -> str:
+    """The two numbers, always both.
+
+    `audited` counts the projects whose report this run actually adjudicated;
+    `projects` counts the ones it found. They differ exactly when an audit
+    could not be run or read, and that is the case where a single number lies:
+    "no unwaived HIGH/CRITICAL advisories" over a project nobody managed to
+    audit is the absence of a measurement printed as a clean result.
+    """
+
+    return (
+        f"npm audit: adjudicated {len(audited)} of {len(projects)} npm project(s) "
+        f"[{', '.join(audited) or 'none'}]"
+    )
+
+
+def _recorded_report(path: Path) -> tuple[dict[str, Any] | None, str]:
+    """Read a recorded `npm audit --json` report, mirroring run_npm_audit's shape."""
+
+    try:
+        report = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        return None, f"could not read {path}: {exc}"
+    if not isinstance(report, dict):
+        return None, f"{path} does not hold an npm audit report object"
+    return report, ""
+
+
+def _audit_projects(
+    projects: list[str],
+    waivers: dict[tuple[str, str], dict[str, str]],
+    root: Path,
+    audit_json: Path | None,
+) -> tuple[list[str], list[str], set[tuple[str, str]], list[str]]:
+    """Adjudicate every project, returning (failures, accepted, matched, audited).
+
+    `audited` is deliberately a separate list from `projects`: a project whose
+    audit could not be read is a failure *and* is absent from the coverage
+    count, so the run cannot report having examined something it did not.
+    """
+
+    failures: list[str] = []
+    accepted: list[str] = []
+    matched: set[tuple[str, str]] = set()
+    audited: list[str] = []
+
+    for tree in projects:
+        if audit_json is not None:
+            report, error = _recorded_report(audit_json)
+        else:
+            report, error = run_npm_audit(root / tree)
+        if report is None:
+            failures.append(f"{tree}: {error}")
+            continue
+
+        tree_failures, tree_accepted, tree_matched = adjudicate(report, waivers, tree)
+        failures.extend(f"{tree}: {failure}" for failure in tree_failures)
+        accepted.extend(f"{tree}: {line}" for line in tree_accepted)
+        matched |= tree_matched
+        audited.append(tree)
+
+    return failures, accepted, matched, audited
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -337,6 +493,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     parser.add_argument("--waivers", type=Path, default=WAIVERS_PATH)
     parser.add_argument("--repo", default="tods-validate")
+    parser.add_argument("--root", type=Path, default=ROOT)
     parser.add_argument(
         "--today",
         default=None,
@@ -352,39 +509,58 @@ def main(argv: list[str] | None = None) -> int:
     if not args.waivers.exists():
         print(f"waiver registry not found: {args.waivers}", file=sys.stderr)
         return 1
+
+    # `--audit-json` supplies one recorded report, which stands for the root
+    # project; discovery is only meaningful when npm is actually being run.
+    projects = [ROOT_TREE] if args.audit_json is not None else npm_projects(args.root)
+    if not projects:
+        # Not "this repository has no npm dependencies": this file lives beside
+        # a package-lock.json that has been committed since the accessibility
+        # gate was written, so an empty walk is a reader that stopped working.
+        print(
+            f"found no npm project (no package-lock.json) under {args.root}; refusing to "
+            "report a clean audit over nothing",
+            file=sys.stderr,
+        )
+        return 1
+
     waivers, waiver_problems = npm_audit_waivers(
-        args.waivers.read_text(encoding="utf-8"), args.repo, today
+        args.waivers.read_text(encoding="utf-8"), args.repo, today, projects
     )
 
-    if args.audit_json is not None:
-        try:
-            report = json.loads(args.audit_json.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
-            print(f"could not read {args.audit_json}: {exc}", file=sys.stderr)
-            return 1
-    else:
-        report, error = run_npm_audit(ROOT)
-        if report is None:
-            print(error, file=sys.stderr)
-            return 1
+    failures, accepted, matched, audited = _audit_projects(
+        projects, waivers, args.root, args.audit_json
+    )
+    failures = list(waiver_problems) + failures
 
-    failures, accepted = adjudicate(report, waivers)
-    failures = waiver_problems + failures
+    for key, waiver in sorted(waivers.items()):
+        if key not in matched:
+            tree, advisory = key
+            print(
+                f"note: waiver {waiver['id']} for {advisory} matched nothing in {tree}; "
+                f"it can be retired",
+                file=sys.stderr,
+            )
 
     for line in accepted:
         print(f"npm audit: {line}")
+
+    coverage = coverage_line(audited, projects)
     if failures:
+        print(coverage, file=sys.stderr)
         print("npm audit gate failed:", file=sys.stderr)
         for failure in failures:
             print(f"- {failure}", file=sys.stderr)
         print(
             "\nA HIGH or CRITICAL advisory blocks merge. Fix it, or record a dated,"
             "\nnarrowly scoped waiver in waivers.yml naming the advisory id, the"
-            "\npackage, the severity, an owner, and an expiry.",
+            "\npackage, the severity, an owner, an expiry, and -- for a project"
+            "\nother than the repository root -- the `tree` it applies to.",
             file=sys.stderr,
         )
         return 1
 
+    print(coverage)
     print(f"npm audit: no unwaived HIGH/CRITICAL advisories ({len(accepted)} waived)")
     return 0
 

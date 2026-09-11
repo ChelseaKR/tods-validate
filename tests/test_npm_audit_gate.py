@@ -7,6 +7,13 @@ no exception at all, so these pin what it will *not* accept: a different
 advisory, the same advisory on a different package, the same advisory at a
 higher severity, and an expired or malformed waiver all still fail the gate.
 
+The second half of the module pins *what the gate looks at*, which is a
+separate question from what it accepts. `npm audit` reads the lockfile in its
+working directory, so a gate that ran it once at the repository root reported
+on one dependency tree and was silent about `editor/vscode/`, where a HIGH
+advisory sat unseen. The tests here hold the project walk to the lockfiles
+this repository actually commits, so narrowing it back to the root fails.
+
 The reports here are recorded `npm audit --json` shapes, so none of this needs
 a network call or an installed node_modules tree.
 """
@@ -15,6 +22,8 @@ from __future__ import annotations
 
 import importlib.util
 import json
+import shutil
+import subprocess
 import sys
 from datetime import date, timedelta
 from pathlib import Path
@@ -29,6 +38,13 @@ WAIVERS = ROOT / "waivers.yml"
 
 WAIVED_ADVISORY = "GHSA-jmr9-qjv8-65gv"
 WAIVED_PACKAGE = "extract-zip"
+
+# The two npm projects this repository commits today. Named rather than
+# derived, because the failure this module exists to prevent is the walk
+# quietly returning fewer than there are, and a derived expectation would
+# shrink with it.
+ROOT_PROJECT = "."
+EXTENSION_PROJECT = "editor/vscode"
 
 
 def _gate() -> ModuleType:
@@ -183,8 +199,10 @@ def test_the_committed_registry_is_well_formed() -> None:
         WAIVERS.read_text(encoding="utf-8"), "tods-validate", date.today()
     )
     assert problems == []
-    assert set(waivers) == {WAIVED_ADVISORY.upper()}
-    waiver = waivers[WAIVED_ADVISORY.upper()]
+    # Keyed by (npm project, advisory): the same advisory in two dependency
+    # trees is two decisions, and one waiver must not answer for both.
+    assert set(waivers) == {(ROOT_PROJECT, WAIVED_ADVISORY.upper())}
+    waiver = waivers[(ROOT_PROJECT, WAIVED_ADVISORY.upper())]
     assert waiver["package"] == WAIVED_PACKAGE
     assert waiver["severity"] == "high"
     # The record has to carry the facts the acceptance rests on, not just an id.
@@ -283,3 +301,234 @@ def test_blocking_total_separates_unreadable_from_zero() -> None:
     assert gate.blocking_total(_report(_advisory(WAIVED_ADVISORY, WAIVED_PACKAGE))) == 2
     assert gate.blocking_total({"metadata": {"vulnerabilities": {"high": 1}}}) is None
     assert gate.blocking_total({}) is None
+
+
+# ---------------------------------------------------------------------------
+# Which dependency trees the gate reads.
+#
+# `npm audit` reads the lockfile in its working directory and nothing else, so
+# running it once at the repository root is a report about one project. This
+# repository commits two, and on 2026-09-10 the second one carried a live HIGH
+# advisory (GHSA-2883-xcg3-v3hh in js-yaml, through @vscode/vsce) that this
+# gate could not see. Its own audit lived in a workflow path-filtered to
+# `editor/vscode/**`, which runs when the lockfile changes and not when an
+# advisory is published against a lockfile that has not.
+# ---------------------------------------------------------------------------
+
+
+def _tracked_lockfile_projects() -> set[str]:
+    """The npm projects git says this repository commits.
+
+    An oracle independent of the walk under test: `git ls-files` knows nothing
+    about the prune list, so a walk that lost a directory disagrees with it.
+    """
+
+    git = shutil.which("git")
+    assert git is not None, "git is needed to cross-check the project walk"
+    listing = subprocess.run(  # noqa: S603 - fixed argv, resolved binary, no shell
+        [git, "-C", str(ROOT), "ls-files", "--", "*package-lock.json"],
+        capture_output=True,
+        text=True,
+        check=True,
+    )
+    projects = set()
+    for line in listing.stdout.splitlines():
+        if not line.strip():
+            continue
+        parent = Path(line).parent.as_posix()
+        projects.add(parent if parent != "." else ROOT_PROJECT)
+    return projects
+
+
+def test_the_walk_finds_every_npm_project_this_repository_commits() -> None:
+    """The floor. A walk that stopped matching returns [] and fails here."""
+
+    gate = _gate()
+    found = gate.npm_projects(ROOT)
+
+    tracked = _tracked_lockfile_projects()
+    assert tracked, "git found no committed package-lock.json; this oracle is broken"
+    assert tracked <= set(found), (
+        f"committed npm project(s) the gate does not audit: {sorted(tracked - set(found))}"
+    )
+
+    # Named as well as derived: the extension tree is the one this widening was
+    # for, and a rename that took it out of both the walk and the oracle at
+    # once would leave the subset check above green.
+    assert ROOT_PROJECT in found
+    assert EXTENSION_PROJECT in found
+    assert found[0] == ROOT_PROJECT, "the root project is reported first"
+
+
+def test_the_walk_ignores_lockfiles_belonging_to_installed_dependencies(
+    tmp_path: Path,
+) -> None:
+    """`node_modules` is the difference between two projects and hundreds."""
+
+    gate = _gate()
+    (tmp_path / "package-lock.json").write_text("{}", encoding="utf-8")
+    for pruned in ("node_modules/some-dep", "dist", ".venv/lib"):
+        nested = tmp_path / pruned
+        nested.mkdir(parents=True)
+        (nested / "package-lock.json").write_text("{}", encoding="utf-8")
+    real = tmp_path / "editor" / "vscode"
+    real.mkdir(parents=True)
+    (real / "package-lock.json").write_text("{}", encoding="utf-8")
+
+    assert gate.npm_projects(tmp_path) == [ROOT_PROJECT, "editor/vscode"]
+
+
+def test_a_tree_with_no_lockfile_fails_instead_of_reporting_a_clean_audit(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    """An empty walk is a broken reader, not a repository without dependencies.
+
+    This is the vacuity case for the widening itself: adjudicating zero
+    projects finds zero advisories, which prints exactly like a clean run.
+    """
+
+    gate = _gate()
+    assert (
+        gate.main(["--root", str(tmp_path), "--waivers", str(WAIVERS), "--repo", "tods-validate"])
+        == 1
+    )
+    assert "refusing to report a clean audit over nothing" in capsys.readouterr().err
+
+
+def test_the_run_says_how_many_projects_it_adjudicated(
+    tmp_path: Path, capsys: pytest.CaptureFixture
+) -> None:
+    """Both numbers on the line, so a covered project cannot be dropped quietly."""
+
+    assert _run(tmp_path, _clean_report()) == 0
+    assert "adjudicated 1 of 1 npm project(s) [.]" in capsys.readouterr().out
+
+
+# ---------------------------------------------------------------------------
+# A waiver is scoped to the project it was written about.
+# ---------------------------------------------------------------------------
+
+
+def _scoped_registry(tmp_path: Path, tree: str | None) -> Path:
+    """The committed registry with WVR-001 re-scoped to `tree` (or left at root)."""
+
+    text = WAIVERS.read_text(encoding="utf-8")
+    if tree is not None:
+        text = text.replace("    kind: npm-audit\n", f"    kind: npm-audit\n    tree: {tree}\n", 1)
+    path = tmp_path / "waivers.yml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def test_a_root_waiver_does_not_accept_the_same_advisory_in_another_project(
+    tmp_path: Path,
+) -> None:
+    """The reason `tree` exists.
+
+    WVR-001's justification is entirely about the accessibility toolchain --
+    "five levels down from pa11y-ci", "the npm devDependencies set". None of
+    that is a statement about the VS Code extension's dependency tree, so the
+    same advisory arriving there is an unreviewed finding.
+    """
+
+    gate = _gate()
+    waivers, problems = gate.npm_audit_waivers(
+        WAIVERS.read_text(encoding="utf-8"), "tods-validate", date.today()
+    )
+    assert problems == []
+    report = _report(_advisory(WAIVED_ADVISORY, WAIVED_PACKAGE))
+
+    at_root = gate.adjudicate(report, waivers, ROOT_PROJECT)
+    assert at_root[0] == []
+    assert at_root[1], "the waiver accepts the advisory in the project it names"
+
+    elsewhere = gate.adjudicate(report, waivers, EXTENSION_PROJECT)
+    assert elsewhere[1] == []
+    assert any("no waiver" in failure for failure in elsewhere[0])
+
+
+def test_a_waiver_can_be_scoped_to_a_project_other_than_the_root(tmp_path: Path) -> None:
+    """And the scoping is not one-way: a `tree:` entry accepts in that tree."""
+
+    gate = _gate()
+    registry = _scoped_registry(tmp_path, EXTENSION_PROJECT)
+    waivers, problems = gate.npm_audit_waivers(
+        registry.read_text(encoding="utf-8"), "tods-validate", date.today()
+    )
+    assert problems == []
+    assert set(waivers) == {(EXTENSION_PROJECT, WAIVED_ADVISORY.upper())}
+
+    report = _report(_advisory(WAIVED_ADVISORY, WAIVED_PACKAGE))
+    assert gate.adjudicate(report, waivers, EXTENSION_PROJECT)[0] == []
+    assert gate.adjudicate(report, waivers, ROOT_PROJECT)[1] == []
+
+
+def test_a_waiver_naming_a_directory_that_is_not_an_npm_project_is_a_problem(
+    tmp_path: Path,
+) -> None:
+    """A waiver must not outlive the project whose lockfile it describes."""
+
+    gate = _gate()
+    registry = _scoped_registry(tmp_path, "editor/atom")
+    waivers, problems = gate.npm_audit_waivers(
+        registry.read_text(encoding="utf-8"),
+        "tods-validate",
+        date.today(),
+        [ROOT_PROJECT, EXTENSION_PROJECT],
+    )
+    assert waivers == {}
+    assert any("editor/atom" in problem for problem in problems)
+
+
+def test_the_committed_registry_names_only_projects_that_exist() -> None:
+    """Run the tree validation against the real repository, not a fixture."""
+
+    gate = _gate()
+    _, problems = gate.npm_audit_waivers(
+        WAIVERS.read_text(encoding="utf-8"),
+        "tods-validate",
+        date.today(),
+        gate.npm_projects(ROOT),
+    )
+    assert problems == []
+
+
+def test_the_coverage_line_counts_projects_adjudicated_not_projects_found() -> None:
+    """The two numbers have to be able to disagree, or one of them is decoration.
+
+    A run that found two projects and got a report out of one has examined
+    half of what it named. Printing `2 of 2` there is this portfolio's own
+    defect -- a failed read published as a measurement -- inside the line
+    written to prevent it.
+    """
+
+    gate = _gate()
+    both = [ROOT_PROJECT, EXTENSION_PROJECT]
+    assert gate.coverage_line(both, both) == (
+        "npm audit: adjudicated 2 of 2 npm project(s) [., editor/vscode]"
+    )
+    assert gate.coverage_line([ROOT_PROJECT], both) == (
+        "npm audit: adjudicated 1 of 2 npm project(s) [.]"
+    )
+    assert gate.coverage_line([], both) == "npm audit: adjudicated 0 of 2 npm project(s) [none]"
+
+
+def test_a_project_whose_audit_cannot_be_read_is_not_counted_as_examined(
+    tmp_path: Path,
+) -> None:
+    """Both directions, because a reader that examines nothing satisfies one."""
+
+    gate = _gate()
+    both = [ROOT_PROJECT, EXTENSION_PROJECT]
+
+    report = tmp_path / "audit.json"
+    report.write_text(json.dumps(_clean_report()), encoding="utf-8")
+    failures, _, _, audited = gate._audit_projects(both, {}, tmp_path, report)
+    assert failures == []
+    assert audited == both
+
+    missing = tmp_path / "nowhere.json"
+    failures, _, _, audited = gate._audit_projects(both, {}, tmp_path, missing)
+    assert audited == []
+    assert len(failures) == 2
+    assert all("nowhere.json" in failure for failure in failures)

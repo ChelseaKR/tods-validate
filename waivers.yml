@@ -2,10 +2,21 @@
 #
 # Every entry is dated, owned, and expiring. An entry accepts exactly one
 # finding: `kind: npm-audit` waivers are matched by scripts/check_npm_audit.py
-# against the advisory id, the package, and the severity, all three. A new
-# advisory, the same advisory on a different package, or the same advisory
-# escalated to a higher severity is not covered by any entry here and fails
-# the gate. `kind: playground-version-pin` waivers are matched by
+# against the advisory id, the package, the severity, and the npm project the
+# advisory was reported in, all four. A new advisory, the same advisory on a
+# different package, the same advisory escalated to a higher severity, or the
+# same advisory in a different npm project is not covered by any entry here
+# and fails the gate.
+#
+# The npm project is the optional `tree:` field, a repository-relative path
+# defaulting to `.` (the root). It exists because the gate audits every
+# `package-lock.json` in the repository, and the prose in a waiver is an
+# argument about one dependency tree: WVR-001 below reasons about a package
+# five levels down from pa11y-ci in the accessibility toolchain, which says
+# nothing about the same advisory arriving under `editor/vscode/`. A `tree:`
+# naming a directory that holds no lockfile is a gate failure, so a waiver
+# cannot outlive the project it describes. `kind: playground-version-pin`
+# waivers are matched by
 # tests/test_playground.py against the playground's pinned version and
 # pyproject.toml's project version, both. An expired or malformed entry
 # accepts nothing.
