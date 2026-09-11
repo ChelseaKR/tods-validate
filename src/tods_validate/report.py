@@ -22,6 +22,12 @@ from typing import cast
 from . import __version__
 from .findings import Finding, Severity
 from .loader import Package
+from .local_policy import (
+    AGENCY_POLICY_NOTE,
+    DECISION_RECORD,
+    LOCAL_CATEGORY,
+    LOCAL_RULES_BY_ID,
+)
 from .rules import REGISTRY, RunCoverage
 from .run_events import _Event, events_by_run, parse_events
 from .schema import SPEC_VERSION
@@ -191,6 +197,9 @@ def _coverage_lines(coverage: RunCoverage | None, indent: str = "") -> list[str]
         # the same reason a skipped rule does: both produce a report with
         # nothing in it, and only one of them means the feed is fine.
         *(f"{indent}{line}" for line in coverage.measurement_lines()),
+        # The agency's own rules, when a [policy] table set any. Empty
+        # otherwise, so a report without a policy is unchanged.
+        *(f"{indent}{line}" for line in coverage.local_lines()),
     ]
 
 
@@ -567,6 +576,8 @@ def render_github(
     if coverage is not None:
         for detail in coverage.skipped_detail_lines():
             lines.append(f"::notice title=Checks that did not run::{_escape_annotation(detail)}")
+        for line in coverage.local_lines():
+            lines.append(f"::notice title=Local policy::{_escape_annotation(line)}")
     for line in _disclosure_lines(findings):
         lines.append(f"::notice::{_escape_annotation(line.strip())}")
     return "\n".join(lines)
@@ -605,6 +616,16 @@ def _sarif_descriptor(rule_id: str, level: str) -> dict[str, object]:
             "severity": rule.severity.name,
             "specSection": rule.spec_section,
         }
+    elif rule_id in LOCAL_RULES_BY_ID:
+        # A LOCAL- rule is not registered, and has no page under web/rules/:
+        # its help is the decision record, and its description says whose rule
+        # it is, because a code-scanning dashboard shows this text on its own.
+        local = LOCAL_RULES_BY_ID[rule_id]
+        descriptor["name"] = local.title
+        descriptor["shortDescription"] = {"text": local.title}
+        descriptor["fullDescription"] = {"text": f"{local.description} {AGENCY_POLICY_NOTE}"}
+        descriptor["helpUri"] = DECISION_RECORD
+        descriptor["properties"] = {"category": LOCAL_CATEGORY, "policyKey": local.key}
     return descriptor
 
 

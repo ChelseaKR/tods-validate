@@ -46,6 +46,7 @@ from .fix import fix_package
 from .init import SHAPES, DestinationNotEmptyError
 from .init import scaffold as scaffold_package
 from .loader import Package, PackageNotFoundError, load_package
+from .local_policy import LOCAL_NAMESPACE, LOCAL_RULES_BY_ID, as_rule
 from .merge import merge_feeds
 from .pickdiff import (
     analyze_pickdiff,
@@ -67,7 +68,7 @@ from .report import (
     render_text,
     summarize,
 )
-from .rules import CATEGORIES, RunCoverage, all_rules, render_rule_detail
+from .rules import CATEGORIES, Rule, RunCoverage, all_rules, render_rule_detail
 from .runner import run_with_coverage
 from .schema import SPEC_VERSION, SUPPORTED_SPEC_VERSIONS
 from .stats import (
@@ -111,6 +112,12 @@ def _resolve_config(config_path: str | None) -> Config:
 def _check_rule_ids(ignore: tuple[str, ...]) -> None:
     known = {r.id for r in all_rules()}
     unknown = sorted(set(ignore) - known)
+    local = [rule_id for rule_id in unknown if rule_id.startswith(LOCAL_NAMESPACE)]
+    if local:
+        _fail(
+            f"cannot ignore {', '.join(local)}: a LOCAL- rule is the agency's own [policy] "
+            "setting. Remove the setting from the [policy] table instead."
+        )
     if unknown:
         _fail(
             f"unknown rule ID(s) in ignore list: {', '.join(unknown)}. "
@@ -121,6 +128,12 @@ def _check_rule_ids(ignore: tuple[str, ...]) -> None:
 def _check_enable(enable: tuple[str, ...]) -> None:
     known = {r.id for r in all_rules()} | set(CATEGORIES)
     unknown = sorted(set(enable) - known)
+    local = [token for token in unknown if token.startswith(LOCAL_NAMESPACE)]
+    if local:
+        _fail(
+            f"cannot --enable {', '.join(local)}: a LOCAL- rule runs when its [policy] "
+            "setting is present in tods-validate.toml, not through --enable."
+        )
     if unknown:
         _fail(
             f"unknown --enable token(s): {', '.join(unknown)}. Use a rule ID or a "
@@ -406,6 +419,7 @@ def validate(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/CON
             severity_remap=severity_remap,
             spec_version=effective_spec,
             max_implied_speed_kph=config.max_implied_speed_kph,
+            local_policy=config.local_policy,
         )
         gate = policy.apply(found)
         if gate.suppressed_ignored:
@@ -1298,34 +1312,59 @@ def doctor(
     show_default=True,
     help="Plain listing, or JSON for tooling.",
 )
-def rules_command(output_format: str) -> None:
-    """List every rule with its severity and description."""
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Configuration file whose [policy] table's LOCAL- rules are listed after the "
+        "registry. Without this option, a tods-validate.toml in the current directory "
+        "is used if present."
+    ),
+)
+def rules_command(output_format: str, config_path: str | None) -> None:
+    """List every rule with its severity and description.
+
+    LOCAL- rules follow, only when a config file sets them, with the limit and
+    severity that file gives them. They are an agency's own, so a build with no
+    [policy] table lists exactly what it always has.
+    """
     rules = sorted(all_rules(), key=lambda r: r.id.split("-")[1][1:])
+    policy = _resolve_config(config_path).local_policy
+    local = (
+        [(limit, as_rule(limit.rule, limit.severity)) for limit in policy.limits] if policy else []
+    )
     if output_format == "json":
-        payload = [
-            {
-                "id": r.id,
-                "severity": r.severity.name,
-                "title": r.title,
-                "description": r.description,
-                "specSection": r.spec_section,
-                "needsGtfs": r.needs_gtfs,
-                # Which companion GTFS files the rule reads. Each inner list is
-                # a set of alternatives; the rule is skipped
-                # ("skipped:needs_gtfs_table") unless every group is satisfied.
-                "gtfsTables": [list(group) for group in r.gtfs_tables],
-                "category": r.category,
-                "defaultEnabled": r.default_enabled,
-                "interpretation": r.interpretation,
-            }
-            for r in rules
-        ]
+        payload = [_rule_json(r) for r in rules]
+        payload += [{**_rule_json(r), "policySetting": limit.setting} for limit, r in local]
         click.echo(json.dumps(payload, indent=2))
         return
     for r in rules:
         needs = " (needs companion GTFS)" if r.needs_gtfs else ""
         optin = "" if r.default_enabled else f" (opt-in: --enable {r.category})"
         click.echo(f"{r.id}  {r.severity.name:7}  {r.title}{needs}{optin}")
+    for limit, r in local:
+        click.echo(f"{r.id}  {r.severity.name:7}  {r.title} (agency policy: {limit.setting})")
+
+
+def _rule_json(r: Rule) -> dict[str, object]:
+    """One rule's entry in ``rules --format json``. Key order is part of the output."""
+    return {
+        "id": r.id,
+        "severity": r.severity.name,
+        "title": r.title,
+        "description": r.description,
+        "specSection": r.spec_section,
+        "needsGtfs": r.needs_gtfs,
+        # Which companion GTFS files the rule reads. Each inner list is
+        # a set of alternatives; the rule is skipped
+        # ("skipped:needs_gtfs_table") unless every group is satisfied.
+        "gtfsTables": [list(group) for group in r.gtfs_tables],
+        "category": r.category,
+        "defaultEnabled": r.default_enabled,
+        "interpretation": r.interpretation,
+    }
 
 
 @main.command(name="explain")
@@ -1348,6 +1387,10 @@ def explain(rule_id: str, output_format: str) -> None:
     """
     known = {r.id: r for r in all_rules()}
     rule_def = known.get(rule_id)
+    if rule_def is None and rule_id in LOCAL_RULES_BY_ID:
+        # A LOCAL- rule is not registered, and explaining one needs no config:
+        # its definition is fixed, and only the limit is the agency's.
+        rule_def = as_rule(LOCAL_RULES_BY_ID[rule_id])
     if rule_def is None:
         _fail(
             f"unknown rule ID {rule_id!r}. Run `tods-validate rules` or see "

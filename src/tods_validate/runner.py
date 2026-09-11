@@ -12,6 +12,8 @@ from pathlib import Path
 from .findings import Finding, Severity
 from .gtfs_companion import build_companion
 from .loader import Package, load_package
+from .local_policy import LocalPolicy
+from .local_policy import evaluate as evaluate_local_policy
 from .rules import (
     DEFAULT_MAX_IMPLIED_SPEED_KPH,
     RunCoverage,
@@ -67,6 +69,7 @@ def run_with_coverage(
     severity_remap: Mapping[str, str] | None = None,
     spec_version: str = SPEC_VERSION,
     max_implied_speed_kph: float | None = None,
+    local_policy: LocalPolicy | None = None,
 ) -> tuple[Package, list[Finding], RunCoverage]:
     """Load and validate the TODS package at ``path``.
 
@@ -90,7 +93,9 @@ def run_with_coverage(
     see docs/spec-versions.md for what changes between versions.
     ``max_implied_speed_kph`` overrides the OPS-W001 ceiling; None leaves the
     rule's own documented default in force rather than substituting one here,
-    so there is a single place that number is written down.
+    so there is a single place that number is written down. ``local_policy``
+    is the agency's parsed ``[policy]`` table; its LOCAL- rules run after the
+    registry, and with None (the default) nothing here reaches them at all.
     """
     package = load_package(path, encoding=encoding)
     gtfs = None
@@ -116,6 +121,14 @@ def run_with_coverage(
         ),
     )
     findings, coverage = validate(context, enabled)
+    if local_policy is not None:
+        local_findings, local_outcomes = evaluate_local_policy(context, local_policy)
+        # Same key validate() sorts by, and sort() is stable, so every registry
+        # finding keeps its place relative to every other.
+        findings = sorted(
+            [*findings, *local_findings], key=lambda f: (f.file or "", f.row or 0, f.rule_id)
+        )
+        coverage = replace(coverage, local=local_outcomes)
     findings = _apply_severity_remap(findings, severity_remap or {})
     return package, _link_causality(findings), coverage
 

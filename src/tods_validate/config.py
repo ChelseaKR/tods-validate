@@ -25,6 +25,16 @@ The ``[workspace]`` table configures the run-history ledger (see
 and where ``trend`` reads them from, so CI does not need to repeat
 ``--history`` on every invocation.
 
+The optional ``[policy]`` table declares the agency's own operational limits,
+evaluated as ``LOCAL-P0xx`` findings (see ``local_policy.py`` and ADR 0009):
+
+    [policy]
+    max-spread-minutes = 780
+    min-break-minutes = { limit = 30, severity = "error" }
+    break-event-types = ["Break", "Meal"]
+
+With no ``[policy]`` table nothing about a run changes.
+
 The optional ``[severity]`` table remaps individual rules to a different
 severity than the spec declares (a rule ID key, mapped to a severity string,
 or an inline table with ``level`` and ``acknowledged``). Every remapped
@@ -42,6 +52,19 @@ from math import isfinite
 from pathlib import Path
 
 from .findings import Severity
+from .local_policy import (
+    BREAK_TYPES_KEY,
+    DEFAULT_SEVERITY,
+    KIND_FLAG,
+    KIND_MINUTES,
+    LOCAL_NAMESPACE,
+    LOCAL_RULES,
+    LOCAL_RULES_BY_ID,
+    LOCAL_RULES_BY_KEY,
+    LocalPolicy,
+    LocalRule,
+    PolicyLimit,
+)
 
 DEFAULT_FILENAME = "tods-validate.toml"
 
@@ -61,6 +84,8 @@ _ALLOWED_KEYS = {
     # machinery below. It only needs to be here so the unknown-key check does
     # not reject it.
     "severity",
+    # "policy" is a table too, parsed by _policy_table.
+    "policy",
 }
 _WORKSPACE_KEYS = {"history-dir"}
 _FAIL_ON_VALUES = {"error", "warning"}
@@ -108,6 +133,10 @@ class Config:
     # Required (and enforced at parse time) when the remap downgrades a rule
     # the spec declares ERROR to a lower severity.
     severity_acknowledged: frozenset[str] = frozenset()
+    # The agency's own operational limits from a `[policy]` table, evaluated
+    # as LOCAL- rules (local_policy.py, ADR 0009). None when the file has no
+    # [policy] table, and then no run is affected in any way.
+    local_policy: LocalPolicy | None = None
 
 
 def _severity_table(  # noqa: C901 - validates several user-facing config shapes
@@ -138,6 +167,12 @@ def _severity_table(  # noqa: C901 - validates several user-facing config shapes
 
     for rule_id, value in raw.items():
         if rule_id not in known:
+            if rule_id.startswith(LOCAL_NAMESPACE):
+                raise ConfigError(
+                    f"{where}: [severity] cannot remap {rule_id!r}. A LOCAL- rule takes its "
+                    "severity from its own [policy] setting, e.g. "
+                    'max-spread-minutes = { limit = 780, severity = "error" }.'
+                )
             raise ConfigError(
                 f"{where}: [severity] has unknown rule ID {rule_id!r}. "
                 "See docs/rules.md for the rule catalog."
@@ -227,6 +262,7 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
 
     history_dir = _workspace_history_dir(data.get("workspace"), where)
     severity_remap, severity_acknowledged = _severity_table(data, where)
+    local_policy = _policy_table(data.get("policy"), where)
 
     return Config(
         ignore=_str_list("ignore"),
@@ -241,7 +277,165 @@ def _parse_data(data: dict[str, object], where: str) -> Config:
         source=where,
         severity_remap=severity_remap,
         severity_acknowledged=severity_acknowledged,
+        local_policy=local_policy,
     )
+
+
+_LOCAL_ORDER = {rule.id: index for index, rule in enumerate(LOCAL_RULES)}
+
+
+def _policy_severity(raw: object, where: str) -> Severity:
+    if not isinstance(raw, str) or raw.lower() not in _SEVERITY_VALUES:
+        raise ConfigError(
+            f"{where}: severity must be one of {', '.join(sorted(_SEVERITY_VALUES))}; got {raw!r}."
+        )
+    return Severity[raw.upper()]
+
+
+def _policy_limit(rule: LocalRule, raw: object, where: str) -> PolicyLimit | None:
+    """One ``[policy]`` limit, or None for a flag set to false. Raises ConfigError.
+
+    A limit is refused rather than clamped for the reason
+    ``max-implied-speed-kph`` is: a limit of zero or less would make every unit
+    a finding, or none of them, and the run would still exit as though the
+    agency's rule had been applied.
+    """
+    at = f"{where}: [policy] {rule.key!r}"
+    severity = DEFAULT_SEVERITY
+    value_key = "required" if rule.kind == KIND_FLAG else "limit"
+    if isinstance(raw, dict):
+        extra = set(raw) - {value_key, "severity"}
+        if extra:
+            raise ConfigError(
+                f"{at} has unknown key(s): {', '.join(sorted(extra))}. "
+                f"Allowed keys are: {value_key}, severity."
+            )
+        if value_key not in raw:
+            raise ConfigError(f"{at} is a table with no {value_key!r}.")
+        severity = _policy_severity(raw.get("severity", DEFAULT_SEVERITY.name), at)
+        raw = raw[value_key]
+    if rule.kind == KIND_FLAG:
+        if not isinstance(raw, bool):
+            raise ConfigError(f"{at} must be true or false, not {raw!r}.")
+        return PolicyLimit(rule, 1, severity) if raw else None
+    unit = "minutes" if rule.kind == KIND_MINUTES else "days"
+    # bool is a subclass of int, so `= true` would otherwise read as 1.
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw <= 0:
+        raise ConfigError(f"{at} must be a whole number of {unit} greater than zero, not {raw!r}.")
+    return PolicyLimit(rule, raw, severity)
+
+
+def _break_event_types(raw: object, where: str) -> frozenset[str]:
+    at = f"{where}: [policy] {BREAK_TYPES_KEY!r}"
+    if not isinstance(raw, list) or not all(isinstance(item, str) for item in raw):
+        raise ConfigError(f'{at} must be a list of event_type values, e.g. ["Break", "Meal"].')
+    cleaned = [item.strip() for item in raw]
+    if any(not item for item in cleaned):
+        raise ConfigError(
+            f"{at} has a blank entry. List the event_type values your export uses for breaks."
+        )
+    return frozenset(cleaned)
+
+
+def _policy_table(raw: object, where: str) -> LocalPolicy | None:
+    """Parse the optional ``[policy]`` table (ADR 0009), or raise ConfigError.
+
+    Each setting is checked on its own here. The checks that relate settings
+    to each other run once every ``extends`` layer has been merged, in
+    :func:`_check_policy`, because an inheriting file may set a limit whose
+    break vocabulary its parent declares.
+    """
+    if raw is None:
+        return None
+    if not isinstance(raw, dict):
+        raise ConfigError(f"{where}: 'policy' must be a table, e.g. [policy].")
+    allowed = sorted({*LOCAL_RULES_BY_KEY, BREAK_TYPES_KEY})
+    limits: list[PolicyLimit] = []
+    switched_off: set[str] = set()
+    break_types: frozenset[str] | None = None
+    for key, value in raw.items():
+        if key == BREAK_TYPES_KEY:
+            break_types = _break_event_types(value, where)
+            continue
+        rule = LOCAL_RULES_BY_KEY.get(key)
+        if rule is None:
+            kebab = key.replace("_", "-")
+            hint = f" Did you mean {kebab!r}?" if kebab in allowed else ""
+            raise ConfigError(
+                f"{where}: [policy] has unknown setting {key!r}.{hint} "
+                f"Allowed settings are: {', '.join(allowed)}."
+            )
+        limit = _policy_limit(rule, value, where)
+        if limit is None:
+            switched_off.add(rule.id)
+        else:
+            limits.append(limit)
+    if not limits and break_types is None and not switched_off:
+        return None
+    return LocalPolicy(
+        limits=tuple(sorted(limits, key=lambda limit: _LOCAL_ORDER[limit.rule.id])),
+        break_event_types=break_types,
+        switched_off=frozenset(switched_off),
+    )
+
+
+def _merge_policy(base: LocalPolicy | None, override: LocalPolicy | None) -> LocalPolicy | None:
+    """Layer one ``[policy]`` table over another, setting by setting.
+
+    A flag set to false in the overriding file switches off the one it
+    inherits; a limit replaces the inherited limit, severity included.
+    """
+    if override is None:
+        return base
+    if base is None:
+        return override
+    merged = {limit.rule.id: limit for limit in base.limits}
+    for rule_id in override.switched_off:
+        merged.pop(rule_id, None)
+    merged.update({limit.rule.id: limit for limit in override.limits})
+    return LocalPolicy(
+        limits=tuple(sorted(merged.values(), key=lambda limit: _LOCAL_ORDER[limit.rule.id])),
+        break_event_types=(
+            override.break_event_types
+            if override.break_event_types is not None
+            else base.break_event_types
+        ),
+        switched_off=base.switched_off | override.switched_off,
+    )
+
+
+def _check_policy(policy: LocalPolicy | None, where: str) -> LocalPolicy | None:
+    """The checks that relate one ``[policy]`` setting to another, after merging.
+
+    Breaks are declared, never guessed (ADR 0009 section 4): the spec lets a
+    producer name event types freely, so a rule that has to tell a break from
+    work refuses to load without the agency saying which is which. And a break
+    vocabulary no rule reads is refused as well, because a setting that does
+    nothing is a setting someone believes is doing something.
+    """
+    if policy is None:
+        return None
+    run_key = LOCAL_RULES_BY_ID["LOCAL-P001"].key
+    break_key = LOCAL_RULES_BY_ID["LOCAL-P003"].key
+    configured = {limit.rule.key for limit in policy.limits}
+    if break_key in configured and not policy.break_event_types:
+        raise ConfigError(
+            f"{where}: [policy] {break_key!r} needs a non-empty {BREAK_TYPES_KEY!r}. The TODS "
+            "spec lets a producer name event types freely, so the policy has to say which "
+            'ones are breaks, e.g. break-event-types = ["Break"].'
+        )
+    if run_key in configured and policy.break_event_types is None:
+        raise ConfigError(
+            f"{where}: [policy] {run_key!r} needs {BREAK_TYPES_KEY!r}, so that the policy says "
+            "which events are breaks and are left out of worked time. Write "
+            "break-event-types = [] if none of your event types is a break."
+        )
+    if policy.break_event_types is not None and not configured & {run_key, break_key}:
+        raise ConfigError(
+            f"{where}: [policy] {BREAK_TYPES_KEY!r} is read only by {run_key!r} and "
+            f"{break_key!r}, and neither is set, so it would do nothing."
+        )
+    return policy if policy.limits else None
 
 
 def _max_implied_speed(raw: object, where: str) -> float | None:
@@ -323,6 +517,7 @@ def _merge(base: Config, override: Config) -> Config:
         source=override.source or base.source,
         severity_remap=tuple(severity_map.items()),
         severity_acknowledged=severity_acknowledged,
+        local_policy=_merge_policy(base.local_policy, override.local_policy),
     )
 
 
@@ -373,4 +568,5 @@ def load_config(explicit: Path | None, start_dir: Path | None = None) -> Config:
             path = candidate
     if path is None:
         return Config()
-    return _load_file(path, set())
+    config = _load_file(path, set())
+    return replace(config, local_policy=_check_policy(config.local_policy, str(path)))
