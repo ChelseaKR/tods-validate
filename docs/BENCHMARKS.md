@@ -132,7 +132,7 @@ ceilings, recorded in `perf/bundle-baseline.json`.
 | Surface | Measured | Budget |
 | --- | --- | --- |
 | `web/index.html` | 11,513 | 12,288 |
-| Whole published `web/` tree | 222,928 | 262,144 |
+| Whole published `web/` tree | 222,967 | 262,144 |
 | Published page count | 48 | 60 |
 | HTML report at 10,000 findings | 2,348,762 | 3,145,728 |
 

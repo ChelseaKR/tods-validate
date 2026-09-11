@@ -1144,4 +1144,4 @@ A movement the run requires -- either inside one event, or in the gap between tw
 
 Interpretation: straight-line: distance is great-circle between stop coordinates, which understates road distance, so the implied speed reported is a lower bound on the speed actually required
 
-Spec reference: <https://github.com/ChelseaKR/tods-validate/blob/main/docs/adr/0008-operational-feasibility-namespace.md>
+Not a TODS specification requirement. Decision record: <https://github.com/ChelseaKR/tods-validate/blob/main/docs/adr/0008-operational-feasibility-namespace.md>

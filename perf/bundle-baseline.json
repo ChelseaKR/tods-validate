@@ -1,5 +1,5 @@
 {
-  "measuredAt": "2026-09-07",
+  "measuredAt": "2026-09-10",
   "note": "Byte budgets for the HTML this project ships, closing the bundle half of the performance gap in docs/CONFORMANCE-GAPS.md. Bytes are exact, so these are absolute ceilings with deliberate headroom rather than ratios against a noisy measurement. Raising one is a decision: say why here, in the same commit. Measured by scripts/check_bundle_budget.py, regenerated with its --update flag; tests/test_bundle_budget.py runs the same comparison inside make test and holds the measured block, the rationale figures and the docs/BENCHMARKS.md table to a live measurement, so a stale number here fails rather than sitting quietly under its ceiling.",
   "limits": {
     "playgroundPageBytes": 12288,
@@ -9,7 +9,7 @@
   },
   "measured": {
     "playgroundPageBytes": 11513,
-    "publishedSiteBytes": 222928,
+    "publishedSiteBytes": 222967,
     "publishedPageCount": 48,
     "reportBytesAt10kFindings": 2348762
   },

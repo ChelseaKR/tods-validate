@@ -135,6 +135,11 @@ CATEGORIES = ("core", "coverage", "advisory", "experimental", "feasibility")
 SPEC_NAMESPACE = "TODS-"
 OPERATIONAL_NAMESPACE = "OPS-"
 
+# What a renderer prints beside a citation that is not the TODS specification.
+# One string, so `explain`, editor hovers, docs/rules.md and the published rule
+# pages cannot word it four different ways. See cites_spec().
+NOT_A_SPEC_REQUIREMENT = "Not a TODS specification requirement."
+
 
 @dataclass(frozen=True)
 class Rule:
@@ -827,6 +832,19 @@ def render_example_text(example: RuleExample) -> list[str]:
     return lines
 
 
+def cites_spec(rule_def: Rule) -> bool:
+    """Whether ``rule_def``'s citation is a section of the TODS specification.
+
+    Only TODS- rules cite the spec, and tests/test_registry.py enforces both
+    directions of that. Every renderer that labels a citation asks this rather
+    than calling every citation "the spec": an OPS- rule's citation is the ADR
+    that decided it, and printing "TODS specification" beside that link tells a
+    feed producer the standard requires something it does not say. That is the
+    misrepresentation the separate namespace exists to prevent (ADR 0008).
+    """
+    return rule_def.id.startswith(SPEC_NAMESPACE)
+
+
 def render_rule_detail(rule_def: Rule, fmt: str = "text") -> str:
     """Full rule detail — id, severity, title, description, spec citation,
     interpretation note, and a worked example — as plain text or Markdown.
@@ -845,7 +863,10 @@ def render_rule_detail(rule_def: Rule, fmt: str = "text") -> str:
         ]
         if rule_def.interpretation:
             lines += ["", f"_Interpretation:_ {rule_def.interpretation}"]
-        lines += ["", f"[TODS specification]({rule_def.spec_section})"]
+        if cites_spec(rule_def):
+            lines += ["", f"[TODS specification]({rule_def.spec_section})"]
+        else:
+            lines += ["", f"{NOT_A_SPEC_REQUIREMENT} [Decision record]({rule_def.spec_section})"]
         if example is not None:
             lines += ["", *render_example_markdown(example)]
         return "\n".join(lines)
@@ -857,7 +878,10 @@ def render_rule_detail(rule_def: Rule, fmt: str = "text") -> str:
     ]
     if rule_def.interpretation:
         lines += ["", f"Interpretation: {rule_def.interpretation}"]
-    lines += ["", f"Spec: {rule_def.spec_section}"]
+    if cites_spec(rule_def):
+        lines += ["", f"Spec: {rule_def.spec_section}"]
+    else:
+        lines += ["", f"{NOT_A_SPEC_REQUIREMENT} Decision record: {rule_def.spec_section}"]
     if example is not None:
         lines += ["", *render_example_text(example)]
     return "\n".join(lines)
@@ -1272,6 +1296,7 @@ __all__ = [
     "ALL_CHECKS_RAN",
     "DEFAULT_MAX_IMPLIED_SPEED_KPH",
     "EXAMPLES",
+    "NOT_A_SPEC_REQUIREMENT",
     "OPERATIONAL_NAMESPACE",
     "REGISTRY",
     "SPEC_NAMESPACE",
@@ -1283,6 +1308,7 @@ __all__ = [
     "RuleExample",
     "ValidationContext",
     "all_rules",
+    "cites_spec",
     "example_for",
     "render_example_markdown",
     "render_example_text",

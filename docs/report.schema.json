@@ -44,7 +44,7 @@
         "type": "object",
         "required": ["rule_id", "severity", "file", "row", "field", "location", "data", "message", "suggestion", "caused_by", "fingerprint", "severity_original"],
         "properties": {
-          "rule_id": { "type": "string", "pattern": "^TODS-[EWI][0-9]{3}$" },
+          "rule_id": { "type": "string", "pattern": "^(TODS|OPS)-[EWI][0-9]{3}$" },
           "severity": { "enum": ["ERROR", "WARNING", "INFO"] },
           "file": { "type": ["string", "null"] },
           "row": {
@@ -115,6 +115,20 @@
                   "skipped:ignored",
                   "skipped:spec_version"
                 ]
+              },
+              "measurement": {
+                "type": "object",
+                "description": "How much of its input a rule that ran was able to examine. Present only on a rule that ran and reported one. Units counted as unmeasurable were not examined: they are never added to 'measured' and must never be read as having passed, and a non-zero count always carries its reason.",
+                "required": ["measured", "unmeasurable", "unit", "reason"],
+                "properties": {
+                  "measured": { "type": "integer", "minimum": 0 },
+                  "unmeasurable": { "type": "integer", "minimum": 0 },
+                  "unit": { "type": "string", "minLength": 1 },
+                  "reason": { "type": ["string", "null"] }
+                },
+                "if": { "properties": { "unmeasurable": { "exclusiveMinimum": 0 } } },
+                "then": { "properties": { "reason": { "type": "string", "minLength": 1 } } },
+                "additionalProperties": false
               }
             },
             "additionalProperties": false

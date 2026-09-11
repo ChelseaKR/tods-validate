@@ -119,6 +119,28 @@ Fixed:
   somewhere it says nothing about. A `tree:` naming a directory with no
   lockfile fails the gate, so a waiver cannot outlive the project it describes.
 
+- The JSON report schema refused every report in which `OPS-W001` ran.
+  `docs/report.schema.json` still admitted only `TODS-` rule IDs and did not
+  describe the per-rule `measurement` block, so a report from
+  `--enable feasibility` over any feed whose companion GTFS has a `stops.txt`
+  failed validation against the schema this project publishes for it, whether
+  or not the rule found anything. Neither shape has been released. The schema
+  now admits `OPS-` IDs and describes `measurement`, including the rule that a
+  non-zero unmeasurable count carries its reason. Suggestions stay `TODS-`
+  only, because every suggestion generator belongs to a `TODS-` rule.
+
+  The two tests that met this schema with a real report both ran with every
+  opt-in category off, which is where new report content arrives first. Each
+  rule's fixture is now validated with every opt-in category on: 47 reports,
+  where there were 2. Run against the unmodified schema, that test failed on
+  exactly the six fixtures that carry a `stops.txt`.
+
+- `explain`, editor hovers, `docs/rules.md` and the published rule page all
+  labelled `OPS-W001`'s citation, which is ADR 0008, as the TODS specification
+  (`Spec:`, `[TODS specification]`, `Spec reference:`). A rule outside the
+  `TODS-` namespace now reads "Not a TODS specification requirement. Decision
+  record:" before its link. Every `TODS-` rule renders exactly as it did.
+
 - `scripts/generate_rules_doc.py` grouped rules into catalog bands by a single
   digit and silently skipped any rule that matched no band. A rule in a new
   namespace would have been dropped from `docs/rules.md` and from the 47
