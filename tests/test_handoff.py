@@ -24,6 +24,7 @@ from tods_validate.handoff import (
     REJECT,
     SIGNATURE_NAMESPACE,
     HandoffSettings,
+    _input_differences,  # noqa: PLC2701 - the guard below is private
     build_record,
     render_record,
     sign_record,
@@ -352,3 +353,147 @@ def test_verify_on_the_command_line_checks_a_requested_signature_first(tmp_path:
     )
     assert bad.exit_code == 2
     assert "signature does not verify" in bad.output
+
+
+# --- a record that cannot be trusted is refused, and says why -------------------------
+#
+# Every test below is a way verification can be asked to check something it
+# cannot. Each one has to name the problem: silently returning "verified" for
+# a record nobody could read is the one outcome that must never happen.
+
+
+@pytest.mark.parametrize(
+    ("edit", "match"),
+    [
+        ({"severityRemap": []}, "severityRemap must be an object"),
+        ({"enable": "coverage"}, "severityRemap must be an object"),
+        ({"ignore": "TODS-W206"}, "ignore must be a list"),
+        ({"failOn": "sometimes"}, "failOn 'sometimes' is not one of"),
+    ],
+)
+def test_settings_that_cannot_be_read_are_refused(edit: dict[str, object], match: str) -> None:
+    settings = dict(INGEST_READY.to_dict())
+    settings.update(edit)
+    with pytest.raises(ValueError, match=match):
+        HandoffSettings.from_dict(settings)
+
+
+def test_a_record_with_unreadable_settings_cannot_be_checked(tmp_path: Path) -> None:
+    _, record, out = _create(tmp_path, str(VALID_TODS), "--gtfs", str(VALID_GTFS))
+    settings = record["settings"]
+    assert isinstance(settings, dict)
+    settings["failOn"] = "sometimes"
+    out.write_text(render_record(record), encoding="utf-8")
+    result = verify_record(out, VALID_TODS, VALID_GTFS)
+    assert result.exit_code == 2
+    assert "its settings cannot be read" in result.lines[0]
+
+
+@pytest.mark.parametrize(
+    ("record", "match"),
+    [
+        ([], "it is not a JSON object"),
+        ({"handoffVersion": "1.0.0"}, "it has no 'inputs'"),
+        (
+            {
+                "handoffVersion": "1.0.0",
+                "inputs": {},
+                "settings": {},
+                "decision": "accept",
+                "decisionBasis": {},
+                "tool": {},
+            },
+            "its inputs do not name a package",
+        ),
+        (
+            {
+                "handoffVersion": "1.0.0",
+                "inputs": {"package": {}},
+                "settings": [],
+                "decision": "accept",
+                "decisionBasis": {},
+                "tool": {},
+            },
+            "its settings are not an object",
+        ),
+    ],
+)
+def test_a_record_of_the_wrong_shape_cannot_be_checked(
+    tmp_path: Path, record: object, match: str
+) -> None:
+    out = tmp_path / "handoff.json"
+    out.write_text(json.dumps(record), encoding="utf-8")
+    result = verify_record(out, VALID_TODS, VALID_GTFS)
+    assert result.exit_code == 2
+    assert match in result.lines[0]
+
+
+def test_a_record_whose_file_list_is_not_a_list_is_refused(tmp_path: Path) -> None:
+    _, record, out = _create(tmp_path, str(VALID_TODS), "--gtfs", str(VALID_GTFS))
+    inputs = record["inputs"]
+    assert isinstance(inputs, dict)
+    inputs["package"] = {"files": "run_events.txt"}
+    out.write_text(render_record(record), encoding="utf-8")
+    result = verify_record(out, VALID_TODS, VALID_GTFS)
+    assert result.exit_code == 2
+    assert "package: the record's file list cannot be read" in result.lines
+
+
+def test_verifying_against_a_feed_that_is_not_there_says_so(tmp_path: Path) -> None:
+    _, _, out = _create(tmp_path, str(VALID_TODS), "--gtfs", str(VALID_GTFS))
+    result = verify_record(out, tmp_path / "no-such-feed", VALID_GTFS)
+    assert result.exit_code == 2
+    assert "is not a directory or a .zip file" in result.lines[0]
+
+
+def test_ignored_rules_are_disclosed_in_the_records_coverage(tmp_path: Path) -> None:
+    config = tmp_path / "tods-validate.toml"
+    config.write_text('ignore = ["TODS-E307"]\n', encoding="utf-8")
+    feed = FIXTURES / "invalid" / "TODS-E307"
+    record = build_record(
+        feed, None, HandoffSettings.from_dict({**INGEST_READY.to_dict(), "ignore": ["TODS-E307"]})
+    )
+    coverage = record["coverage"]
+    assert isinstance(coverage, dict)
+    assert "TODS-E307" in coverage["skippedByReason"]["skipped:ignored"]
+    assert "TODS-E307" not in record["decisionBasis"]["blockingRules"]
+
+
+def test_a_missing_signature_is_named_rather_than_passed_over(tmp_path: Path) -> None:
+    _, _, out = _create(tmp_path, str(VALID_TODS), "--gtfs", str(VALID_GTFS))
+    signers = tmp_path / "signers"
+    signers.write_text("tester ssh-ed25519 AAAA\n", encoding="utf-8")
+    refused = verify_signature(out, signers, "tester")
+    assert refused is not None
+    assert "there is no signature at" in refused
+
+
+def test_without_ssh_keygen_signing_says_what_is_missing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr("tods_validate.handoff.shutil.which", lambda _name: None)
+    _, _, out = _create(tmp_path, str(VALID_TODS), "--gtfs", str(VALID_GTFS))
+    with pytest.raises(RuntimeError, match="ssh-keygen was not found on PATH"):
+        sign_record(out, tmp_path / "key")
+
+
+@needs_ssh_keygen
+def test_signing_with_an_unusable_key_raises_rather_than_writing_a_signature(
+    tmp_path: Path,
+) -> None:
+    _, _, out = _create(tmp_path, str(VALID_TODS), "--gtfs", str(VALID_GTFS))
+    not_a_key = tmp_path / "not-a-key"
+    not_a_key.write_text("hello\n", encoding="utf-8")
+    with pytest.raises(RuntimeError):
+        sign_record(out, not_a_key)
+    assert not (tmp_path / "handoff.json.sig").exists()
+
+
+def test_inputs_that_are_not_an_object_are_refused_by_the_comparison_itself() -> None:
+    # _shape_problem already refuses this shape, so verify_record never reaches
+    # the guard below. It is tested directly rather than left as a line nobody
+    # has ever run: the two readers are separate, and the day one changes, the
+    # other must still refuse rather than raise.
+    assert _input_differences({"inputs": "not an object"}, VALID_TODS, None) == [
+        "the record's inputs cannot be read"
+    ]

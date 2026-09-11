@@ -132,7 +132,9 @@ def decide(
     if bool(blocking) != gate.failed:
         # Two readings of one gate. If they ever disagree, a record would say
         # one thing and the exit code another, so refuse rather than pick one.
-        raise RuntimeError("handoff decision and gating policy disagree about the findings")
+        raise RuntimeError(  # pragma: no cover - an invariant, and both readings share a source
+            "handoff decision and gating policy disagree about the findings"
+        )
     not_run = sorted(outcome.id for outcome in coverage.unrequested_skips)
     decision = REJECT if blocking or not_run else ACCEPT
     return decision, {"blockingRules": blocking, "checksNotRun": not_run}

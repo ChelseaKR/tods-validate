@@ -218,6 +218,15 @@ in the same file. They run as `LOCAL-` rules, only when the table sets them, and
 every finding they produce says it is agency policy rather than the TODS
 specification. See [docs/local-policy.md](docs/local-policy.md).
 
+A downstream system deciding whether to import a feed can take the answer as a
+file it can check: `tods-validate handoff exports/tods --gtfs exports/gtfs
+--profile ingest-ready --out handoff.json` writes a record carrying the SHA-256
+of every file, the settings the decision was made under, what did and did not
+run, and the decision itself. `tods-validate handoff verify handoff.json
+exports/tods --gtfs exports/gtfs` re-hashes the files and recomputes the
+decision, so the receiver checks the record rather than trusting it. See
+[docs/handoff.md](docs/handoff.md).
+
 Some checks are off by default because they surface judgement calls rather than
 spec violations. Turn them on with `--enable coverage` (which GTFS trips have no
 run event; which blocks have no vehicle) or `--enable advisory` (e.g. long runs
