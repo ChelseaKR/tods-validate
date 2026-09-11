@@ -621,3 +621,240 @@ def test_the_evaluator_is_the_only_way_local_rules_run() -> None:
     rule = local_policy_module.as_rule(LOCAL_RULES[0])
     with pytest.raises(RuntimeError, match="evaluated by tods_validate.local_policy.evaluate"):
         rule.check(None)  # type: ignore[arg-type]
+
+
+# --- unmeasurable is a result, not a pass ---------------------------------------
+#
+# Each of these is a path on which a check could look clean because it looked at
+# nothing. The assertion in every one is the measurement, not the absence of a
+# finding: an empty finding list is what all of them would produce if the
+# refusal were deleted.
+
+
+def _gtfs(tmp_path: Path, **files: str | None) -> Path:
+    """The valid companion GTFS, copied, with ``files`` replaced (None deletes one)."""
+    dest = tmp_path / "gtfs"
+    shutil.copytree(VALID_GTFS, dest)
+    for name, content in files.items():
+        path = dest / name.replace("__", ".")
+        if content is None:
+            path.unlink()
+        else:
+            path.write_text(content, encoding="utf-8")
+    return dest
+
+
+def _measured(coverage: RunCoverage, rule_id: str) -> tuple[int, int, str]:
+    measurement = _outcome(coverage, rule_id).measurement
+    assert measurement is not None
+    return measurement.measured, measurement.unmeasurable, measurement.reason or ""
+
+
+REQUIRE = "[policy]\nrequire-vehicle-assignment-for-revenue-events = true\n"
+ONE_REVENUE_EVENT = RUN_EVENTS_HEADER + (
+    "daily,1,10,,,Operator,Operator,101,stop-1,10:00:00,,stop-3,10:50:00,\n"
+)
+
+
+def test_an_unreadable_run_events_file_is_named_and_counts_nothing(tmp_path: Path) -> None:
+    tods = _package(tmp_path, run_events__txt="")
+    _, coverage = _run(tmp_path, "[policy]\nmax-spread-minutes = 600\n", tods=tods)
+    assert _measured(coverage, "LOCAL-P004") == (0, 0, "run_events.txt could not be read")
+
+
+def test_a_run_with_an_untimed_event_is_unmeasurable_for_worked_time(tmp_path: Path) -> None:
+    tods = _package(
+        tmp_path,
+        run_events__txt=RUN_EVENTS_HEADER
+        + "daily,1,10,,,Operator,Work,,garage,08:00:00,,garage,10:00:00,\n"
+        + "daily,1,20,,,Operator,Work,,garage,11:00:00,,garage,10:30:00,\n",
+    )
+    body = "[policy]\nmax-run-minutes = 1\nbreak-event-types = []\n"
+    findings, coverage = _run(tmp_path, body, tods=tods)
+    assert _local(findings) == []
+    assert _measured(coverage, "LOCAL-P001") == (
+        0,
+        1,
+        "an event in the run ends before it starts (see TODS-E401)",
+    )
+
+
+def test_a_piece_with_an_untimed_event_is_unmeasurable(tmp_path: Path) -> None:
+    tods = _package(
+        tmp_path,
+        run_events__txt=RUN_EVENTS_HEADER
+        + "daily,1,10,p1,,Operator,Work,,garage,08:00:00,,garage,23:00:00,\n"
+        + "daily,1,20,p1,,Operator,Work,,garage,noon,,garage,23:30:00,\n",
+    )
+    findings, coverage = _run(tmp_path, "[policy]\nmax-piece-minutes = 1\n", tods=tods)
+    assert _local(findings) == []
+    assert _measured(coverage, "LOCAL-P002")[:2] == (0, 1)
+
+
+@pytest.mark.parametrize(
+    ("row", "reason"),
+    [
+        (
+            "daily,1,10,,,Operator,Break,,garage,11:00:00,,garage,,\n",
+            "a break has no readable start_time or end_time",
+        ),
+        (
+            "daily,1,10,,,Operator,Break,,garage,11:00:00,,garage,10:50:00,\n",
+            "a break ends before it starts (see TODS-E401)",
+        ),
+    ],
+)
+def test_a_break_that_cannot_be_timed_is_unmeasurable(
+    tmp_path: Path, row: str, reason: str
+) -> None:
+    tods = _package(tmp_path, run_events__txt=RUN_EVENTS_HEADER + row)
+    body = '[policy]\nmin-break-minutes = 600\nbreak-event-types = ["Break"]\n'
+    findings, coverage = _run(tmp_path, body, tods=tods)
+    assert _local(findings) == []
+    assert _measured(coverage, "LOCAL-P003") == (0, 1, reason)
+
+
+@pytest.mark.parametrize(
+    ("setting", "rule_id", "missing", "reason"),
+    [
+        (
+            '[policy]\nmin-break-minutes = 30\nbreak-event-types = ["Break"]\n',
+            "LOCAL-P003",
+            "run_events.txt",
+            "the package has no run_events.txt",
+        ),
+        (
+            "[policy]\nmax-consecutive-days-per-employee = 6\n",
+            "LOCAL-P005",
+            "employee_run_dates.txt",
+            "the package has no employee_run_dates.txt",
+        ),
+    ],
+)
+def test_an_absent_input_file_is_said_rather_than_counted_as_zero(
+    tmp_path: Path, setting: str, rule_id: str, missing: str, reason: str
+) -> None:
+    tods = _package(tmp_path)
+    (tods / missing).unlink()
+    _, coverage = _run(tmp_path, setting, tods=tods)
+    assert _measured(coverage, rule_id) == (0, 0, reason)
+
+
+@pytest.mark.parametrize(
+    ("name", "setting", "rule_id"),
+    [
+        (
+            "run_events.txt",
+            '[policy]\nmin-break-minutes = 30\nbreak-event-types = ["Break"]\n',
+            "LOCAL-P003",
+        ),
+        (
+            "employee_run_dates.txt",
+            "[policy]\nmax-consecutive-days-per-employee = 6\n",
+            "LOCAL-P005",
+        ),
+        ("vehicle_assignments.txt", REQUIRE, "LOCAL-P006"),
+    ],
+)
+def test_a_file_not_read_in_full_leaves_every_unit_it_feeds_unmeasurable(
+    tmp_path: Path, name: str, setting: str, rule_id: str
+) -> None:
+    original = (VALID_TODS / name).read_text(encoding="utf-8")
+    # One value more than this file's own header declares. A fixed "ragged"
+    # row is ragged only for a file of a different width: the first draft of
+    # this test appended a four-value row to the two four-column files, which
+    # read in full, and the test failed for a reason that had nothing to do
+    # with the check. The premise is asserted, so it cannot go blank again.
+    width = len(original.splitlines()[0].split(","))
+    tods = _package(
+        tmp_path, **{name.replace(".", "__"): original + ",".join(["x"] * (width + 1)) + "\n"}
+    )
+    feed = load_package(tods).get(name)
+    assert feed is not None
+    assert not feed.fully_read, f"the fixture meant to be a partial read of {name} read in full"
+    findings, coverage = _run(tmp_path, setting, tods=tods)
+    assert _local(findings) == []
+    measured, unmeasurable, reason = _measured(coverage, rule_id)
+    assert measured == 0
+    assert unmeasurable > 0
+    assert reason == f"{name} was not read in full, so no row in it is known to be complete"
+
+
+def test_an_employee_row_with_no_employee_id_is_not_an_employee(tmp_path: Path) -> None:
+    content = _employee_dates([date(2026, 1, 5)]) + "20260106,daily,10000,\n"
+    tods = _package(tmp_path, employee_run_dates__txt=content)
+    _, coverage = _run(tmp_path, "[policy]\nmax-consecutive-days-per-employee = 6\n", tods=tods)
+    assert _measured(coverage, "LOCAL-P005")[:2] == (1, 0)
+
+
+@pytest.mark.parametrize(
+    ("run_events", "gtfs_files", "assignments", "reason"),
+    [
+        (
+            ONE_REVENUE_EVENT.replace(",101,", ",ghost,"),
+            {},
+            None,
+            "the event's trip is not in the companion trips.txt, so its operating days are unknown",
+        ),
+        (
+            ONE_REVENUE_EVENT,
+            {
+                "trips__txt": "route_id,service_id,trip_id,trip_headsign,direction_id,block_id\n"
+                "12,daily,101,North,0,\n"
+            },
+            None,
+            "the event names no block_id and its trip has no block_id in the companion trips.txt",
+        ),
+        (
+            ONE_REVENUE_EVENT,
+            {},
+            "date,service_id,block_id,vehicle_id\nnot-a-date,daily,BLOCK-A,bus-1\n",
+            "a vehicle_assignments.txt row for the event's block has an unreadable date",
+        ),
+        (
+            ONE_REVENUE_EVENT,
+            {
+                "trips__txt": "route_id,service_id,trip_id,trip_headsign,direction_id,block_id\n"
+                "12,nights,101,North,0,BLOCK-A\n"
+            },
+            None,
+            "the supplemented calendars give no operating days for the trip's service_id",
+        ),
+    ],
+)
+def test_a_revenue_event_that_cannot_be_placed_is_unmeasurable(
+    tmp_path: Path,
+    run_events: str,
+    gtfs_files: dict[str, str],
+    assignments: str | None,
+    reason: str,
+) -> None:
+    replacements = {"run_events__txt": run_events}
+    if assignments is not None:
+        replacements["vehicle_assignments__txt"] = assignments
+    tods = _package(tmp_path, **replacements)
+    gtfs = _gtfs(tmp_path, **gtfs_files)
+    findings, coverage = _run(tmp_path, REQUIRE, tods=tods, gtfs=gtfs)
+    assert _local(findings) == []
+    assert _measured(coverage, "LOCAL-P006") == (0, 1, reason)
+
+
+def test_revenue_assignment_says_when_the_package_has_no_assignments_file(tmp_path: Path) -> None:
+    tods = _package(tmp_path, run_events__txt=ONE_REVENUE_EVENT)
+    (tods / "vehicle_assignments.txt").unlink()
+    (finding,) = _local(_run(tmp_path, REQUIRE, tods=tods)[0])
+    assert "The package has no vehicle_assignments.txt." in finding.message
+
+
+def test_revenue_assignment_without_run_events_says_so(tmp_path: Path) -> None:
+    tods = _package(tmp_path)
+    (tods / "run_events.txt").unlink()
+    _, coverage = _run(tmp_path, REQUIRE, tods=tods)
+    assert _measured(coverage, "LOCAL-P006") == (0, 0, "the package has no run_events.txt")
+
+
+def test_revenue_assignment_with_a_companion_but_no_calendar_is_skipped(tmp_path: Path) -> None:
+    tods = _package(tmp_path, run_events__txt=ONE_REVENUE_EVENT)
+    gtfs = _gtfs(tmp_path, calendar__txt=None)
+    _, coverage = _run(tmp_path, REQUIRE, tods=tods, gtfs=gtfs)
+    assert _outcome(coverage, "LOCAL-P006").status == "skipped:needs_gtfs_table"

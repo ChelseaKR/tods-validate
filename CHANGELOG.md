@@ -43,6 +43,29 @@ Added:
   examples in `examples/conformance-adapters/`, and the test suite loads the
   one for this project's own report rather than retyping it.
 
+- A `[policy]` table in `tods-validate.toml`, for the limits an agency's
+  labour agreement sets and the TODS spec cannot: worked time, piece length,
+  minimum break, spread, consecutive days per employee, and a vehicle on every
+  day a revenue event operates. They are checked as `LOCAL-P001` to
+  `LOCAL-P006`, each finding quotes the limit in force and ends by saying it is
+  agency policy, not the specification, and severity is set beside the limit.
+  [#189](https://github.com/ChelseaKR/tods-validate/issues/189)
+
+  With no `[policy]` table nothing reaches this code: no band in the coverage
+  manifest, no conformance fixture, no catalog page, and every report is
+  unchanged. With one, the manifest gains a separate local band stating each
+  configured rule's denominator, zero and unmeasurable included, and the JSON
+  report an optional `coverage.localPolicy` block.
+
+  Breaks are declared, never guessed. The spec lets a producer name event types
+  freely, so `max-run-minutes` and `min-break-minutes` refuse to load without
+  `break-event-types`, and a `break-event-types` that neither reads is refused
+  too. A limit of zero or less, a fraction, or an unknown setting stops the run
+  with exit 2 rather than being adjusted. See
+  [docs/local-policy.md](docs/local-policy.md) and
+  [ADR 0009](docs/adr/0009-local-policy-rules.md), which records why these take
+  a third namespace instead of the `OPS-` that ADR 0008 expected.
+
 - `OPS-W001`, an opt-in check for whether a pick can actually be worked. It
   resolves each movement's endpoints to coordinates in the companion GTFS
   (after supplements), divides the great-circle distance by the time allowed,
