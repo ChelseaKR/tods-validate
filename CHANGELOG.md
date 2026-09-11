@@ -84,6 +84,41 @@ Added:
 
 Fixed:
 
+- The Node dependency audit (SEC-11) read one of the two npm projects in this
+  repository. `npm audit` reports on the lockfile in its working directory and
+  nothing else, and `scripts/check_npm_audit.py` ran it once at the root — so
+  `editor/vscode/`, which has its own `package.json` and `package-lock.json`,
+  was outside the merge-blocking gate entirely. It is audited now, and the
+  project list is discovered by walking the tree for lockfiles rather than
+  written down, so a third project is covered without an edit. A walk that
+  finds nothing fails instead of reporting a clean audit over nothing, and
+  every run prints how many projects it adjudicated out of how many it found.
+
+  The gap was not theoretical. Measured on 2026-09-10 against the unmodified
+  committed tree: the shipped gate exits 0 saying "no unwaived HIGH/CRITICAL
+  advisories", while the widened one exits 1 naming
+  `editor/vscode: GHSA-2883-XCG3-V3HH (high) in js-yaml`, a HIGH advisory in
+  the `@vscode/vsce` packaging toolchain that Dependabot had found and no gate
+  of this repository's own could see. `editor/vscode/package-lock.json` moves
+  js-yaml 4.3.1 to 4.3.2 here, which is the whole of that diff: nothing else
+  was added, removed, or moved.
+
+  The extension did have an audit — `npm audit --audit-level=high` in
+  `.github/workflows/vscode-extension.yml` — and it could not have caught this,
+  because that workflow is path-filtered to `editor/vscode/**`. It runs when
+  the lockfile changes, and an advisory is published against a lockfile that
+  has not: the job last ran green on 2026-09-06 with the advisory live. That
+  step is gone, and the runbook that described it has been corrected;
+  `tests/test_npm_audit_gate.py` holds the walk to the lockfiles this
+  repository commits, so narrowing it back to the root fails there.
+
+  `waivers.yml` entries of `kind: npm-audit` gained an optional `tree:` field,
+  defaulting to the repository root. A waiver's prose is an argument about one
+  dependency tree — WVR-001 reasons about a package five levels below pa11y-ci
+  in the accessibility toolchain — and must not accept the same advisory
+  somewhere it says nothing about. A `tree:` naming a directory with no
+  lockfile fails the gate, so a waiver cannot outlive the project it describes.
+
 - `scripts/generate_rules_doc.py` grouped rules into catalog bands by a single
   digit and silently skipped any rule that matched no band. A rule in a new
   namespace would have been dropped from `docs/rules.md` and from the 47

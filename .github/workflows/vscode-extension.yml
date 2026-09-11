@@ -43,8 +43,22 @@ jobs:
         run: npm ci --ignore-scripts
       - name: Type-check
         run: npm run check
-      - name: Audit dependencies
-        run: npm audit --audit-level=high
+      # There is no `npm audit` step here any more, and its absence is the
+      # point. This workflow is path-filtered to `editor/vscode/**`, so it runs
+      # when the lockfile changes -- and an advisory is published against a
+      # lockfile that has not. Measured on 2026-09-10: this job last ran on
+      # 2026-09-06 and was green, while GHSA-2883-xcg3-v3hh sat live against
+      # js-yaml 4.3.1 in the committed lock, found by Dependabot and by no gate
+      # of this repository's own.
+      #
+      # `make npm-audit` now audits every npm project in the tree, root and
+      # extension alike, and it runs in the `audit` job of ci.yml on every pull
+      # request and every push to main. It also adjudicates against waivers.yml
+      # rather than taking `--audit-level` as its only lever, so a reviewed and
+      # dated exception is possible here for the first time -- which the step
+      # this replaces could never have honoured, and would have contradicted.
+      # tests/test_npm_audit_gate.py holds that walk to the lockfiles this
+      # repository commits, so narrowing it back to the root fails there.
       - name: Package VSIX
         run: npm run package
       - name: Verify VSIX contents
