@@ -1,0 +1,145 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/ChelseaKR/tods-validate/main/docs/handoff.schema.json",
+  "title": "tods-validate handoff record",
+  "description": "A go/no-go decision bound to the bytes it was made about, written by `tods-validate handoff` and checked by `tods-validate handoff verify`. It carries no timestamp: it is a function of the input bytes, the settings and the tool version, so verification recomputes it and compares.",
+  "type": "object",
+  "required": ["handoffVersion", "tool", "specVersion", "inputs", "settings", "decision", "decisionBasis", "summary", "coverage", "merge"],
+  "properties": {
+    "handoffVersion": { "type": "string", "description": "Version of this record schema. Fields are only added within a major version." },
+    "tool": {
+      "type": "object",
+      "required": ["name", "version"],
+      "properties": {
+        "name": { "const": "tods-validate" },
+        "version": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "specVersion": { "type": "string" },
+    "inputs": {
+      "type": "object",
+      "required": ["package", "companion"],
+      "properties": {
+        "package": {
+          "type": "object",
+          "required": ["files"],
+          "properties": { "files": { "$ref": "#/$defs/files" } },
+          "additionalProperties": false
+        },
+        "companion": {
+          "description": "null when no companion GTFS feed was available. 'package' when the package carried its own GTFS files, which are hashed under 'package'. 'flag' when one was given separately, with its files.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["source"],
+              "properties": { "source": { "const": "package" } },
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "required": ["source", "files"],
+              "properties": { "source": { "const": "flag" }, "files": { "$ref": "#/$defs/files" } },
+              "additionalProperties": false
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "settings": {
+      "type": "object",
+      "description": "Every setting the decision depends on, resolved, so the record means next year what it meant when it was written, whatever a named profile becomes.",
+      "required": ["profile", "failOn", "enable", "ignore", "specVersion", "encoding", "severityRemap", "maxImpliedSpeedKph"],
+      "properties": {
+        "profile": { "type": ["string", "null"] },
+        "failOn": { "enum": ["error", "warning", "info"] },
+        "enable": { "type": "array", "items": { "type": "string" } },
+        "ignore": { "type": "array", "items": { "type": "string" } },
+        "specVersion": { "type": "string" },
+        "encoding": { "type": ["string", "null"] },
+        "severityRemap": { "type": "object", "additionalProperties": { "enum": ["ERROR", "WARNING", "INFO"] } },
+        "maxImpliedSpeedKph": { "type": ["number", "null"] }
+      },
+      "additionalProperties": false
+    },
+    "decision": {
+      "enum": ["accept", "reject"],
+      "description": "'accept' only when nothing is at or above failOn and every check that wanted an input got one. A record made without a companion GTFS feed is 'reject', because its reference checks never ran."
+    },
+    "decisionBasis": {
+      "type": "object",
+      "required": ["blockingRules", "checksNotRun"],
+      "properties": {
+        "blockingRules": { "type": "array", "items": { "type": "string" }, "description": "Rule IDs with a finding at or above failOn, after ignore." },
+        "checksNotRun": { "type": "array", "items": { "type": "string" }, "description": "Rule IDs that could not run because an input was missing." }
+      },
+      "additionalProperties": false
+    },
+    "summary": {
+      "type": "object",
+      "required": ["errors", "warnings", "infos"],
+      "properties": {
+        "errors": { "type": "integer", "minimum": 0 },
+        "warnings": { "type": "integer", "minimum": 0 },
+        "infos": { "type": "integer", "minimum": 0 }
+      },
+      "additionalProperties": false
+    },
+    "coverage": {
+      "type": "object",
+      "description": "The coverage manifest, exactly as the JSON report carries it; see coverage in docs/report.schema.json. Embedded so that a skipped check is visible in the record itself."
+    },
+    "merge": {
+      "description": "The supplement merge: per-file accounting and a digest of each file it writes, or why no merged feed could be produced.",
+      "oneOf": [
+        {
+          "type": "object",
+          "required": ["status", "files", "written"],
+          "properties": {
+            "status": { "const": "produced" },
+            "files": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "object",
+                "required": ["updated", "added", "deleted", "skipped"],
+                "properties": {
+                  "updated": { "type": "integer", "minimum": 0 },
+                  "added": { "type": "integer", "minimum": 0 },
+                  "deleted": { "type": "integer", "minimum": 0 },
+                  "skipped": { "type": "integer", "minimum": 0 }
+                },
+                "additionalProperties": false
+              }
+            },
+            "written": { "$ref": "#/$defs/files" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "required": ["status", "reason"],
+          "properties": { "status": { "const": "not-produced" }, "reason": { "type": "string", "minLength": 1 } },
+          "additionalProperties": false
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "files": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "sha256", "bytes"],
+        "properties": {
+          "name": { "type": "string", "minLength": 1 },
+          "sha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "bytes": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    }
+  }
+}
