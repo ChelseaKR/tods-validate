@@ -858,3 +858,16 @@ def test_revenue_assignment_with_a_companion_but_no_calendar_is_skipped(tmp_path
     gtfs = _gtfs(tmp_path, calendar__txt=None)
     _, coverage = _run(tmp_path, REQUIRE, tods=tods, gtfs=gtfs)
     assert _outcome(coverage, "LOCAL-P006").status == "skipped:needs_gtfs_table"
+
+
+def test_the_plain_rules_listing_names_each_local_rules_setting_after_the_registry(
+    tmp_path: Path,
+) -> None:
+    config = tmp_path / "tods-validate.toml"
+    config.write_text("[policy]\nmax-spread-minutes = 780\n", encoding="utf-8")
+    bare = CliRunner().invoke(main, ["rules"]).stdout.splitlines()
+    listed = CliRunner().invoke(main, ["rules", "--config", str(config)]).stdout.splitlines()
+    assert listed[: len(bare)] == bare
+    (local,) = listed[len(bare) :]
+    assert local.startswith("LOCAL-P004  WARNING  ")
+    assert local.endswith("(agency policy: max-spread-minutes = 780)")
