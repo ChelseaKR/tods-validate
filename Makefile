@@ -197,6 +197,15 @@ docs-check:
 	fi; \
 	exit $$status
 
+# What this repository *publishes*, as opposed to what docs-check's third check
+# covers, which is what it *teaches*. A corrected README cannot reach a consumer
+# who pinned `@v0` a year ago; only deleting the ref can. Kept out of
+# VERIFY_GATES because it reads the remote: a developer running `make verify` on
+# a train would otherwise fail a gate about origin's tag list. CI is where it
+# binds -- the `published-refs` job in ci.yml.
+published-refs-check:
+	$(PYTHON) scripts/check_published_refs.py
+
 contract-check:
 	$(PYTHON) scripts/check_public_contract.py
 

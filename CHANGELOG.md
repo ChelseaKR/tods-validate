@@ -196,6 +196,26 @@ Fixed:
   passes the check; a SHA whose `# vX.Y.Z` comment names another release does
   not, because the comment is the half a reader trusts.
 
+- The stray `v0` ref is gone from `origin`, and `make published-refs-check`
+  (the `published-refs` job) fails if it, or any other `vN`/`vN.N` ref, is ever
+  published again. The previous entry gates what this repository *teaches*;
+  this gates what it *publishes*, which a corrected README cannot reach — a
+  consumer who pinned `@v0` keeps resolving it whatever the docs say. The rule
+  is written for `vN` generally rather than for `v0`, because
+  `docs/plans/v1.0.0-readiness.md` already warned that `v1` "will invite
+  exactly the same pin".
+
+  The check reads `git ls-remote`, not the local tag list, since a clone can
+  carry a tag origin deleted or miss one origin has — and a remote that cannot
+  be listed is a failure, never a skip: "I could not look" and "there is
+  nothing there" print the same silence. An empty tag listing is a failure for
+  the same reason; this repository has published tags since `v0.1.0`.
+
+  `docs/CONFORMANCE-GAPS.md`'s stray-`v0` entry and
+  `docs/plans/v1.0.0-readiness.md`'s E4 row are updated to match. E4 cannot
+  read **Met** while the ref exists, because the job that proves it is the job
+  that has to be green.
+
 - The Node dependency audit (SEC-11) read one of the two npm projects in this
   repository. `npm audit` reports on the lockfile in its working directory and
   nothing else, and `scripts/check_npm_audit.py` ran it once at the root — so
