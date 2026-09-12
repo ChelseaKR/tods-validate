@@ -212,6 +212,12 @@ resolves to exactly the same settings as `strict`; it is a separate name
 because the two answer different questions, and a later change to one should
 not silently move the other.
 
+An agency can also write down its own operational limits, such as the longest
+spread or the shortest break its labour agreement allows, in a `[policy]` table
+in the same file. They run as `LOCAL-` rules, only when the table sets them, and
+every finding they produce says it is agency policy rather than the TODS
+specification. See [docs/local-policy.md](docs/local-policy.md).
+
 Some checks are off by default because they surface judgement calls rather than
 spec violations. Turn them on with `--enable coverage` (which GTFS trips have no
 run event; which blocks have no vehicle) or `--enable advisory` (e.g. long runs
