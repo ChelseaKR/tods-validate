@@ -3,11 +3,16 @@
 # workflows re-run it at the tagged commit before anything publishes
 # (REL-14/15).
 #
-# CI additionally runs five things this file does not, so a green `make verify`
+# CI additionally runs six things this file does not, so a green `make verify`
 # is a necessary condition for merge and not a sufficient one:
 #
 #   - the composite action's self-test, CodeQL, Semgrep and zizmor, which need
 #     GitHub itself;
+#   - the `published-refs` job, which runs `make published-refs-check` against
+#     origin's tag list. It is deliberately not a verify gate: in a fork,
+#     `origin` is the fork, whose tag list says nothing about what this project
+#     publishes, so the check would fail a contributor for a ref they cannot
+#     see. On CI it runs against the base repository;
 #   - the `perf` job, which runs `make perf-check` and `make memory-check`
 #     against baselines recorded on the runner's machine class (see those
 #     targets below);
@@ -19,7 +24,7 @@
 # This paragraph is checked against the workflows by
 # tests/test_ci_gate_parity.py, so a job added later cannot reject a tree that
 # `make verify` has just called green without saying so here.
-.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff perf-check memory-check
+.PHONY: verify lockfile lint format typecheck test docs-check published-refs-check contract-check i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff perf-check memory-check
 
 # Run the tools this repository pins, not whichever ones the shell happens to
 # find first.
@@ -196,6 +201,21 @@ docs-check:
 		status=1; printf '%s\n' 'action refs: FAIL'; \
 	fi; \
 	exit $$status
+
+# What this repository *publishes*, as opposed to what docs-check's third check
+# covers, which is what it *teaches*. A corrected README cannot reach a consumer
+# who pinned `@v0` a year ago; only deleting the ref can.
+#
+# Kept out of VERIFY_GATES, and the reason is forks rather than the network
+# (`audit` already needs a network, so that alone would not justify it). In a
+# clone of a fork, `origin` is the fork: its tag list is not this project's, and
+# an empty one is indistinguishable from a listing that failed. A contributor
+# would be failed for a ref they do not publish and cannot delete. CI runs it
+# against the base repository, which is the only place the question is
+# well-posed -- the `published-refs` job in ci.yml, declared in this file's
+# header and required by docs/rulesets/main.json.
+published-refs-check:
+	$(PYTHON) scripts/check_published_refs.py
 
 contract-check:
 	$(PYTHON) scripts/check_public_contract.py

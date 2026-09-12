@@ -347,11 +347,27 @@ response SLA (3 business days ack; 30/90-day fix-or-mitigate by severity).
   (rewriting published tags retroactively is destructive to anyone who
   already fetched them, and out of scope for a file-edit-only remediation
   pass).
-- **Stray `v0` tag** — noted in the audit as a leftover. **⛔ Not deleted**
-  by this pass (deleting a tag, even a stray one, is a git-history-editing
-  action the ground rules for this remediation asked to avoid unless
-  explicitly requested). To remove it yourself: `git tag -d v0` locally,
-  then `git push origin :refs/tags/v0` if it was ever pushed.
+- **Stray `v0` tag** — **closed 2026-09-12.** It was not only a leftover. It
+  was pushed, it was a lightweight tag at `097427f` (the v0.5.0 release
+  commit), and it never moved, so `ChelseaKR/tods-validate@v0` resolved six
+  releases back for as long as it existed. Measured that day, same TODS-only
+  package, same flags `action.yml` passes: at `@v0`, `--format github` — the
+  only format the composite action emits — printed `0 error(s), 0 warning(s),
+  0 info` and exited 0 while **16 of 43 checks had not run** for want of a
+  companion GTFS feed, 9 of them ERROR-severity, and said nothing about it;
+  `v0.11.0` prints `26 of 43 checks ran` and a `::notice` naming every one of
+  the 16. `v0.5.0` has neither `--require-complete-run` nor the
+  `require-complete-run` input, so the README's own remedy, applied to a
+  workflow pinned at `@v0`, is an input the action does not declare: GitHub
+  warns and runs the job anyway.
+
+  Removed with `git push origin :refs/tags/v0` (then `git tag -d v0`
+  locally). Two checks now hold the line: `scripts/check_action_refs.py`
+  (`make docs-check`) refuses a `vN`/`vN.N` ref in any documented example and
+  requires an exact pin to name the current release, and
+  `scripts/check_published_refs.py` (`make published-refs-check`, the
+  `published-refs` job) fails if such a ref is published again. The rule is
+  written for `vN` generally, so `v1` is refused in advance.
 - **DOC-07/REL-10, CHANGELOG heading format** — still `## vX.Y.Z - YYYY-MM-DD`,
   not `## [X.Y.Z] - YYYY-MM-DD`. The version-consistency grep added to
   `verify.yml` was written to match the *existing* format
