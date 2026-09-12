@@ -106,8 +106,8 @@ def test_check_mode_detects_drift(tmp_path: Path, monkeypatch) -> None:
 
 def test_every_published_page_carries_the_audited_stylesheet() -> None:
     # scripts/pa11y-ci.cjs audits the catalog index plus one rule page, on the
-    # reasoning that all 44 pages share one template. That reasoning is only
-    # sound while it is true, so this is where it is checked: an audit of one
+    # reasoning that every catalog page shares one template. That reasoning is
+    # only sound while it is true, so this is where it is checked: an audit of one
     # page is an audit of every page's *shape* precisely because the shape is
     # one string. Without this, a per-band or per-rule style override could
     # reintroduce the contrast failures the widened audit just removed.
@@ -142,7 +142,7 @@ def test_catalog_links_do_not_rely_on_colour_alone() -> None:
 
 
 # ---------------------------------------------------------------------------
-# The head, and the shared origin these 44 pages have to survive
+# The head, and the shared origin every catalog page has to survive
 #
 # The catalog is served at a path under chelseakr.github.io, which five sibling
 # projects also publish under, and https://chelseakr.github.io/ is itself a

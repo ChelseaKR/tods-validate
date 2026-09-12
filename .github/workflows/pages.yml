@@ -1,7 +1,10 @@
 name: Deploy playground
 
 # Publishes web/ (the in-browser Pyodide validator, its README, the share card,
-# the rule catalog index and 43 per-rule pages -- 47 files) to GitHub Pages.
+# the rule catalog index and one page per registered rule) to GitHub Pages.
+# The count is deliberately not written here: it moves with every rule, and a
+# number in a comment is a claim nothing recomputes. `git ls-files web` is the
+# list, and it is what scripts/check-deployed-tree.sh walks.
 # One-time setup: Settings -> Pages -> Source: "GitHub Actions".
 #
 # Runs as the last stage of a release, called from pypi-publish.yml after
@@ -19,7 +22,7 @@ name: Deploy playground
 # The push trigger below is new, and it closes the gap that made `live
 # integrity sentinel` structurally red. Everything in this repository that
 # looks at the deployment compares it with the DEFAULT BRANCH: the sentinel
-# checks out `main` and diffs all 47 published files against it daily, and
+# checks out `main` and diffs every published file against it daily, and
 # scripts/check-deployed-playground.sh records at length why the release tag
 # is the wrong oracle (a tag is not what a dispatch deploys, and an immutable
 # tag that shipped a stale pin held that check red for days against a
