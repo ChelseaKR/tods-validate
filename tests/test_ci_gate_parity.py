@@ -46,6 +46,10 @@ _CI_ONLY_JOBS = {
     # Path-filtered to editor/vscode/**, so it does not run on most pull
     # requests -- which is why its absence went unnoticed.
     "package": "VS Code extension",
+    # Asks what `origin` publishes. In a fork `origin` is the fork, so the
+    # question is only well-posed on CI, against the base repository; `make
+    # verify` would fail a contributor for a ref they cannot see or delete.
+    "published-refs": "`published-refs` job",
 }
 
 # Jobs that run a gate's recipe directly instead of invoking the make target.
