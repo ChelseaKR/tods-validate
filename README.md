@@ -277,7 +277,7 @@ package first so the merge rests on clean inputs.
 A CI job that checks the merged feed with MobilityData's gtfs-validator:
 
 ```yaml
-- uses: ChelseaKR/tods-validate@v0.10.0
+- uses: ChelseaKR/tods-validate@v0.11.0
   with:
     path: feed/tods
     gtfs: feed/gtfs
@@ -418,7 +418,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ChelseaKR/tods-validate@v0.10.0
+      - uses: ChelseaKR/tods-validate@v0.11.0
         with:
           path: feed/tods
           gtfs: feed/gtfs        # omit if GTFS files sit next to the TODS files
@@ -430,6 +430,16 @@ request include the checks that did not run and why (see
 out is the case worth knowing about: the 17 checks that read GTFS files cannot
 run, 9 of them ERROR-severity, and the job still passes. Add
 `require-complete-run: "true"` to fail it instead.
+
+**Pin an exact release**, as above, or a 40-character commit SHA — there is no
+`@v0` or `@v0.11` to pin to, deliberately. A major-only ref on a 0.x project
+promises a stability the version scheme does not offer: between v0.5.0 and
+v0.11.0 the minimum Python rose from 3.11 to 3.12, four rules were added, and
+`require-complete-run` came into existence. It is also the ref that quietly goes
+stale, since nothing fails when it stops moving —
+[`SECURITY.md`](SECURITY.md#supply-chain) asks you to pin by commit SHA or image
+digest rather than a moving tag for exactly that reason, and `make docs-check`
+fails if any example here names a ref that is not the current release.
 
 The action installs `tods-validate` from a hash-verified
 [`requirements-action.lock`](requirements-action.lock) (`pip install
