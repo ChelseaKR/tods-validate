@@ -69,6 +69,11 @@ def test_the_stray_ref_is_picked_out_of_a_real_listing(
     )
     tags = checker.remote_tags("origin")
     assert set(tags) == {"v0", "v0.5.0", "v0.11.0"}, "a peeled ^{} line became a tag"
+    # The object an annotated tag's own line names, not the commit its `^{}`
+    # line dereferences to. Both lines carry the same tag name, so a reader that
+    # does not skip the peeled one reports the wrong object and says nothing
+    # about it -- the diagnosis in the failure message is the whole output.
+    assert tags["v0.11.0"] == "2" * 40
     assert checker.moving_refs(tags) == ["v0"]
 
 
