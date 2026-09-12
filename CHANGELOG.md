@@ -66,6 +66,28 @@ Added:
   [ADR 0009](docs/adr/0009-local-policy-rules.md), which records why these take
   a third namespace instead of the `OPS-` that ADR 0008 expected.
 
+- `tods-validate handoff FEED --gtfs GTFS --out handoff.json`: a go/no-go
+  record bound to the bytes it describes, and `tods-validate handoff verify
+  RECORD FEED` to check one offline. The record carries the SHA-256 of every
+  file in the package and its companion, the settings resolved rather than the
+  profile's name, the coverage manifest, the merge manifest with a digest of
+  each file the merge writes, and the decision with the rule IDs behind it.
+  [#197](https://github.com/ChelseaKR/tods-validate/issues/197)
+
+  A decision of `accept` needs two things: nothing at or above the settings'
+  `fail-on`, and every check that wanted an input got one. A record made
+  without a companion GTFS feed is therefore a reject however clean the feed
+  is, because its seventeen reference checks never ran.
+
+  The record carries no timestamp, so `verify` recomputes it and compares
+  everything but the tool block: a record whose decision was left alone and
+  whose coverage was edited to hide a skipped check fails exactly as a flipped
+  decision does. It exits 0 when the record matches, 1 when re-running does not
+  reproduce it, and 2 when the bytes differ, the record cannot be read, or a
+  requested signature does not verify. Signing is `ssh-keygen -Y` under its own
+  namespace, so a release tag's signature cannot be replayed as a record's.
+  See [docs/handoff.md](docs/handoff.md).
+
 - `OPS-W001`, an opt-in check for whether a pick can actually be worked. It
   resolves each movement's endpoints to coordinates in the companion GTFS
   (after supplements), divides the great-circle distance by the time allowed,

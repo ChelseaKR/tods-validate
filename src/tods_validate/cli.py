@@ -43,6 +43,15 @@ from .doctor import (
 from .drift import analyze_drift, drift_to_dict, render_drift_markdown, render_drift_text
 from .findings import Finding, Severity
 from .fix import fix_package
+from .handoff import (
+    ACCEPT,
+    HandoffSettings,
+    render_record,
+    sign_record,
+    verify_record,
+    verify_signature,
+)
+from .handoff import build_record as build_handoff_record
 from .init import SHAPES, DestinationNotEmptyError
 from .init import scaffold as scaffold_package
 from .loader import Package, PackageNotFoundError, load_package
@@ -1397,6 +1406,194 @@ def explain(rule_id: str, output_format: str) -> None:
             "docs/rules.md for the rule catalog."
         )
     click.echo(render_rule_detail(rule_def, output_format))
+
+
+class _DefaultToCreate(click.Group):
+    """Route ``handoff FEED`` to ``handoff create FEED``.
+
+    The same arrangement as :class:`_DefaultToValidate`, one level down: a
+    first argument that is not a subcommand is the feed. A feed directory
+    literally named ``verify`` is created explicitly: ``handoff create verify/``.
+    """
+
+    def resolve_command(
+        self, ctx: click.Context, args: list[str]
+    ) -> tuple[str | None, click.Command | None, list[str]]:
+        try:
+            return super().resolve_command(ctx, args)
+        except click.UsageError:
+            return "create", self.get_command(ctx, "create"), args
+
+
+@main.group(name="handoff", cls=_DefaultToCreate)
+def handoff() -> None:
+    """Write or check a go/no-go record bound to the bytes it describes.
+
+    `tods-validate handoff FEED --out handoff.json` validates FEED and writes a
+    record carrying the SHA-256 of every file, the resolved settings, the
+    coverage and merge manifests, and the decision. `tods-validate handoff
+    verify handoff.json FEED` re-hashes the files and recomputes the record.
+    See docs/handoff.md.
+    """
+
+
+@handoff.command(name="create")
+@click.argument("path", type=click.Path(exists=False))
+@click.option(
+    "--gtfs",
+    "gtfs_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Companion GTFS feed (directory or .zip). Omit if the GTFS files sit next to "
+        "the TODS files."
+    ),
+)
+@click.option(
+    "--out",
+    "out_path",
+    required=True,
+    type=click.Path(dir_okay=False),
+    help="Where to write the record (JSON).",
+)
+@click.option(
+    "--profile",
+    type=click.Choice(sorted(PROFILES)),
+    default=None,
+    help="The named preset the decision is made under, e.g. ingest-ready.",
+)
+@click.option(
+    "--spec-version",
+    default=None,
+    help=f"TODS spec version to validate against.  [default: {SPEC_VERSION}]",
+)
+@click.option(
+    "--encoding", default=None, help="Override UTF-8 decoding for non-conforming exports."
+)
+@click.option(
+    "--config",
+    "config_path",
+    type=click.Path(exists=False),
+    default=None,
+    help=(
+        "Configuration file. Without this option, a tods-validate.toml in the "
+        "current directory is used if present."
+    ),
+)
+@click.option(
+    "--sign-key",
+    "sign_key",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Also write a detached SSH signature, <out>.sig, with this private key.",
+)
+def handoff_create(
+    path: str,
+    gtfs_path: str | None,
+    out_path: str,
+    profile: str | None,
+    spec_version: str | None,
+    encoding: str | None,
+    config_path: str | None,
+    sign_key: str | None,
+) -> None:
+    """Validate PATH and write a handoff record for it.
+
+    Exits 0 when the decision is accept and 1 when it is reject; the record is
+    written either way. Settings come from --profile and the config file, and
+    the record carries them resolved.
+    """
+    config = _resolve_config(config_path)
+    if profile is not None:
+        config = _merge(_profile_config(profile), config)
+    settings = HandoffSettings(
+        profile=profile or config.profile,
+        fail_on=config.fail_on or "error",
+        enable=tuple(sorted(set(config.enable))),
+        ignore=tuple(sorted(set(config.ignore))),
+        spec_version=spec_version or config.spec_version or SPEC_VERSION,
+        encoding=encoding or config.encoding,
+        severity_remap=tuple(sorted(config.severity_remap)),
+        max_implied_speed_kph=config.max_implied_speed_kph,
+    )
+    _check_enable(settings.enable)
+    _check_rule_ids(settings.ignore)
+    _check_spec_version(settings.spec_version)
+    try:
+        record = build_handoff_record(Path(path), Path(gtfs_path) if gtfs_path else None, settings)
+    except PackageNotFoundError as exc:
+        _fail(str(exc))
+    out = Path(out_path)
+    out.write_text(render_record(record), encoding="utf-8")
+    basis = record["decisionBasis"]
+    blocking = list(basis["blockingRules"]) if isinstance(basis, dict) else []
+    not_run = list(basis["checksNotRun"]) if isinstance(basis, dict) else []
+    click.echo(f"tods-validate handoff: decision {record['decision']} for {path}")
+    if blocking:
+        click.echo(f"  blocking rules: {', '.join(blocking)}")
+    if not_run:
+        click.echo(
+            f"  {len(not_run)} check(s) could not run because an input was "
+            f"missing: {', '.join(not_run)}"
+        )
+    click.echo(f"  wrote {out}")
+    if sign_key is not None:
+        try:
+            click.echo(f"  signed: {sign_record(out, Path(sign_key))}")
+        except (OSError, RuntimeError) as exc:
+            _fail(f"the record was written but could not be signed: {exc}")
+    sys.exit(EXIT_CLEAN if record["decision"] == ACCEPT else EXIT_FINDINGS)
+
+
+@handoff.command(name="verify")
+@click.argument("record_path", metavar="RECORD", type=click.Path(exists=False))
+@click.argument("path", type=click.Path(exists=False))
+@click.option(
+    "--gtfs",
+    "gtfs_path",
+    type=click.Path(exists=False),
+    default=None,
+    help="The companion GTFS feed, if the record was made with one.",
+)
+@click.option(
+    "--allowed-signers",
+    type=click.Path(exists=True, dir_okay=False),
+    default=None,
+    help="Also verify RECORD.sig against this ssh-keygen allowed_signers file.",
+)
+@click.option("--signer", default=None, help="The identity RECORD.sig must be signed by.")
+def handoff_verify(
+    record_path: str,
+    path: str,
+    gtfs_path: str | None,
+    allowed_signers: str | None,
+    signer: str | None,
+) -> None:
+    """Check that RECORD describes the feed at PATH.
+
+    Exit 0: the record matches. Exit 1: re-running under the record's settings
+    does not reproduce it, for example because its decision was changed. Exit
+    2: the files differ from the ones it hashed, the record cannot be read, or
+    a requested signature does not verify.
+    """
+    if (allowed_signers is None) != (signer is None):
+        _fail("--allowed-signers and --signer go together: name the file and the identity.")
+    record = Path(record_path)
+    if allowed_signers is not None and signer is not None:
+        try:
+            refused = verify_signature(record, Path(allowed_signers), signer)
+        except (OSError, RuntimeError) as exc:
+            refused = str(exc)
+        if refused is not None:
+            click.echo(
+                f"tods-validate handoff verify: signature does not verify: {refused}", err=True
+            )
+            sys.exit(EXIT_USAGE)
+        click.echo(f"signature: verified for {signer}")
+    result = verify_record(record, Path(path), Path(gtfs_path) if gtfs_path else None)
+    for line in result.lines:
+        click.echo(line, err=result.exit_code == EXIT_USAGE)
+    sys.exit(result.exit_code)
 
 
 @main.command(name="init")
