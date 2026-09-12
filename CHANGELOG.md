@@ -7,6 +7,42 @@ new checks may be added in minor releases.
 
 Added:
 
+- `tods-validate conformance run`: a harness that runs any validator over the
+  published conformance corpus and reports, per fixture, whether it agrees with
+  `expectations.json`. The corpus has been downloadable for months so that
+  another implementation could be checked against it; "run it and diff the
+  result" was left to each reader, and this is that step done once. Each
+  fixture is a subprocess with `{path}` substituted into a command template
+  that is split into a word list first (so a path with a space stays one
+  argument, and no shell is involved), and the rule identifiers are read back
+  out of that command's own output through a declared adapter. Text, Markdown
+  and JSON output; the Markdown is intended for the TODS Board thread.
+
+  **An adapter that reads nothing reports `unreadable`, never `agrees`.** That
+  is the whole design constraint. The `valid` fixture's expected rule set is
+  empty, so a reader pointed at the wrong stream would agree with it by
+  accident and publish a green row earned by a failure to read — this project's
+  own "absence rendered as a value" defect, in the tool built to compare
+  measurements. A `json` adapter separates the two structurally: `{"findings":
+  []}` has the array, and a document without it does not. A `regex` adapter
+  cannot, so it is required to declare `no_findings_pattern` — what the tool
+  prints when it is happy — and output matching neither expression is
+  unreadable.
+
+  Three exit codes rather than two: `0` only when every fixture was compared
+  and every comparison agreed, `1` when some fixture disagreed, `2` when any
+  fixture could not be compared at all. A command that hangs is reported as
+  timed out for **that fixture only**, because a hang on one input says nothing
+  about the others. Every report names the corpus digest it ran against, and
+  states how many fixtures were compared as well as how many agreed.
+
+  Nothing here judges which side of a disagreement is right; a disagreement is
+  a question about one implementation or about the spec text, which is the
+  signal the corpus exists to give. Measured against tods-validate itself at
+  0.11.0: 47 of 47 fixtures compared, 47 agree. Two adapters ship as worked
+  examples in `examples/conformance-adapters/`, and the test suite loads the
+  one for this project's own report rather than retyping it.
+
 - `OPS-W001`, an opt-in check for whether a pick can actually be worked. It
   resolves each movement's endpoints to coordinates in the companion GTFS
   (after supplements), divides the great-circle distance by the time allowed,

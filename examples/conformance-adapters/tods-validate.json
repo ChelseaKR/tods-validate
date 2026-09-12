@@ -1,0 +1,6 @@
+{
+  "name": "tods-validate",
+  "strategy": "json",
+  "pointer": "/findings/-/rule_id",
+  "source": "stdout"
+}

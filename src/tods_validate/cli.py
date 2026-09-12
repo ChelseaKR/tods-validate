@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING, NoReturn
 
@@ -20,6 +21,18 @@ from ._pkgio import UnreadableFileError
 from .anonymize import AlreadyProtectedError, anonymize_package
 from .baseline import diff_findings, load_baseline_identities
 from .config import PROFILES, Config, ConfigError, _merge, _profile_config, load_config
+from .conformance import (
+    DEFAULT_TIMEOUT_SECONDS,
+    DISAGREES,
+    AdapterError,
+    CorpusError,
+    conformance_to_dict,
+    load_adapter,
+    load_corpus,
+    render_conformance_markdown,
+    render_conformance_text,
+    run_conformance,
+)
 from .doctor import (
     ValidatePayload,
     doctor_to_dict,
@@ -1372,6 +1385,107 @@ def init_command(dest: str, shape: str, force: bool) -> None:
     click.echo(f"tods-validate init: wrote {len(written)} file(s) to {dest}")
     for path in written:
         click.echo(f"  {path}")
+
+
+@main.group(name="conformance")
+def conformance_group() -> None:
+    """Compare another validator against the published conformance corpus."""
+
+
+@conformance_group.command(name="run")
+@click.option(
+    "--command",
+    "command",
+    required=True,
+    help=(
+        "The validator to run, with {path} where the fixture directory goes, e.g. "
+        '"other-validator --json {path}". Split as a shell word list; no shell is used.'
+    ),
+)
+@click.option(
+    "--corpus",
+    "corpus_path",
+    required=True,
+    type=click.Path(exists=True),
+    help=(
+        "The conformance corpus: the published zip, or a directory holding the same "
+        "fixtures and expectations.json."
+    ),
+)
+@click.option(
+    "--adapter",
+    "adapter_path",
+    required=True,
+    type=click.Path(exists=True),
+    help="JSON file describing how to read rule identifiers out of that validator's output.",
+)
+@click.option(
+    "--timeout",
+    default=DEFAULT_TIMEOUT_SECONDS,
+    show_default=True,
+    type=click.FloatRange(min=0, min_open=True),
+    help="Seconds one fixture may take before it is reported as timed out.",
+)
+@click.option(
+    "--format",
+    "output_format",
+    type=click.Choice(["text", "json", "markdown"]),
+    default="text",
+    show_default=True,
+)
+def conformance_run(
+    command: str,
+    corpus_path: str,
+    adapter_path: str,
+    timeout: float,
+    output_format: str,
+) -> None:
+    """Run a validator over every fixture and report where it disagrees.
+
+    The corpus is published so others can run it; this is the "and diff the
+    result against expectations.json" half, done once. Each fixture is executed
+    as its own subprocess, the rule identifiers are read back out of that
+    command's own output through the declared adapter, and the two sets are
+    compared.
+
+    Disagreements are listed with both sides. Nothing here judges which side is
+    right: a fixture where two implementations differ is a question about one of
+    them or about the spec text, which is the signal the corpus exists to give.
+
+    An adapter that cannot read a run reports that fixture as unreadable, never
+    as agreement — the empty rule set of a clean feed and the empty rule set of
+    an unread output are the same list, and telling them apart is the whole
+    point of the adapter format.
+
+    Exits 0 only when every fixture was compared and every comparison agreed,
+    1 when some fixture disagreed, and 2 when any fixture could not be compared
+    at all, because a corpus that was not fully run has not been passed.
+    """
+    try:
+        adapter = load_adapter(Path(adapter_path).read_text(encoding="utf-8"))
+    except (OSError, AdapterError) as exc:
+        _fail(str(exc))
+
+    with tempfile.TemporaryDirectory(prefix="tods-conformance-") as workdir:
+        try:
+            corpus = load_corpus(Path(corpus_path), Path(workdir))
+        except (OSError, CorpusError) as exc:
+            _fail(str(exc))
+        try:
+            report = run_conformance(command, adapter, corpus, timeout=timeout)
+        except ValueError as exc:
+            _fail(str(exc))
+
+    if output_format == "json":
+        click.echo(json.dumps(conformance_to_dict(report), indent=2))
+    elif output_format == "markdown":
+        click.echo(render_conformance_markdown(report))
+    else:
+        click.echo(render_conformance_text(report))
+
+    if report.unmeasured:
+        sys.exit(EXIT_USAGE)
+    sys.exit(EXIT_FINDINGS if report.count(DISAGREES) else EXIT_CLEAN)
 
 
 @main.command(name="lsp")

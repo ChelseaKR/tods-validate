@@ -73,6 +73,81 @@ takes `exactly=True` to require the produced rule-ID set to match with nothing
 extra. Both return the `ValidationResult` so a passing test can inspect further.
 See [api.md](api.md#test-helpers).
 
+## Comparing another validator against the corpus
+
+The corpus is published so someone else can run it, and "run it and diff the
+result against `expectations.json`" used to be left to each reader.
+`tods-validate conformance run` is that step:
+
+```sh
+tods-validate conformance run \
+  --command "other-validator --json {path}" \
+  --corpus tods-conformance-corpus.zip \
+  --adapter examples/conformance-adapters/text-output.json \
+  --format markdown
+```
+
+Each fixture directory is executed as its own subprocess with `{path}`
+substituted (the template is split into a word list first, so a path with a
+space stays one argument; no shell is involved). The rule identifiers are read
+back out of that command's own output through the adapter, and compared with
+the fixture's entry in `expectations.json`.
+
+Every report names the corpus digest it ran against, and states how many
+fixtures were **compared** as well as how many agreed — `42 agree` and
+`42 agree, 5 never ran` are different results.
+
+### Outcomes and exit codes
+
+| Outcome | Meaning |
+| --- | --- |
+| `agrees` | The reported rule set is exactly the expected one. |
+| `disagrees` | Listed with what was reported and not expected, and expected and not reported. |
+| `unreadable` | The adapter could not read that run's output, or the command could not be started. |
+| `timed_out` | The command did not finish within `--timeout`. Only that fixture. |
+
+Exit `0` only when every fixture was compared and every comparison agreed, `1`
+when some fixture disagreed, and `2` when any fixture could not be compared at
+all. A corpus that was not fully run has not been passed, so the third case is
+its own code rather than folded into either of the others.
+
+Nothing here judges which side is right. A disagreement is a question about one
+implementation or about the spec text, and that is the signal the corpus exists
+to give.
+
+### Adapters
+
+An adapter is a small JSON file saying how to get rule identifiers out of one
+validator's output. Two worked examples ship in
+[`examples/conformance-adapters/`](../examples/conformance-adapters/), whose
+README documents every field.
+
+The one rule worth repeating here: **an adapter that reads nothing reports
+`unreadable`, never `agrees`.** The `valid` fixture expects no rules, so a
+reader pointed at the wrong stream would agree with it by accident. A `json`
+adapter separates the two structurally — `{"findings": []}` has the array, a
+document without it does not — and a `regex` adapter is therefore required to
+declare `no_findings_pattern`, matching what the tool prints when it is happy.
+
+### Running it against tods-validate itself
+
+The self-comparison is the harness's own sanity check, and it is one command:
+
+```sh
+python scripts/build_conformance_corpus.py dist/tods-conformance-corpus.zip
+tods-validate conformance run \
+  --command "tods-validate validate {path} --format json --enable coverage \
+             --enable advisory --enable experimental --enable feasibility" \
+  --corpus dist/tods-conformance-corpus.zip \
+  --adapter examples/conformance-adapters/tods-validate.json
+```
+
+Measured on 2026-09-10 at 0.11.0: **47 of 47 fixtures compared, 47 agree**. The
+test suite runs the same comparison over three fixtures rather than all
+forty-seven, because each fixture is a subprocess and the suite is a merge
+gate; the three include `valid`, which is the one the fail-closed rule is
+about.
+
 ## Contributing fixtures
 
 Real-world feeds that expose gaps are the most valuable contribution. If you can
