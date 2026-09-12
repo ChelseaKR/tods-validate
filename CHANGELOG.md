@@ -165,6 +165,37 @@ Added:
 
 Fixed:
 
+- The GitHub Action and pre-commit examples taught a pin one release out of
+  date, and nothing could notice. `README.md` and `.pre-commit-hooks.yaml` both
+  named `v0.10.0` from the day `v0.11.0` shipped, which is the second time the
+  pre-commit example went stale (#137 bumped it off `v0.4.0` by hand). Both
+  name `v0.11.0` now, and `make docs-check` gained a third check,
+  `scripts/check_action_refs.py`, that fails when a documented pin is not the
+  version `pyproject.toml` declares — so the release that bumps the version is
+  the release that bumps the examples.
+
+  The same check refuses a major- or minor-only ref outright, whatever it
+  currently points at. This repository published exactly one: `v0`, a
+  lightweight tag at the `v0.5.0` release commit, which never moved and is
+  recorded as a stray in `docs/CONFORMANCE-GAPS.md`. Measured against the same
+  TODS-only package on 2026-09-12, `tods-validate --format github` — the only
+  format the composite action emits — printed `0 error(s), 0 warning(s), 0
+  info` and exited 0 at `v0`, while 16 of 43 checks had not run for want of a
+  companion GTFS feed, 9 of them ERROR-severity; `v0.11.0` prints `26 of 43
+  checks ran` plus a `::notice` naming every one of the 16. `v0.5.0` has no
+  `--require-complete-run` and no `require-complete-run` input, so the README's
+  own remedy, set against a stale moving ref, is an undeclared input that
+  GitHub warns about and runs past. Deleting the published `v0` ref is an owner
+  action and is not done here; the check covers what this repository teaches.
+
+  `README.md`'s Action section now says why there is no `@v0` to pin: on a 0.x
+  project a major-only ref promises a stability the version scheme does not
+  offer — between `v0.5.0` and `v0.11.0` the minimum Python rose from 3.11 to
+  3.12 and four rules were added — and `SECURITY.md` already asks consumers to
+  pin by commit SHA or digest rather than a moving tag. A 40-character SHA
+  passes the check; a SHA whose `# vX.Y.Z` comment names another release does
+  not, because the comment is the half a reader trusts.
+
 - The Node dependency audit (SEC-11) read one of the two npm projects in this
   repository. `npm audit` reports on the lockfile in its working directory and
   nothing else, and `scripts/check_npm_audit.py` ran it once at the root — so

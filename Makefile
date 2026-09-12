@@ -166,7 +166,7 @@ typecheck:
 test:
 	$(PYTEST) --cov --cov-report=term-missing --cov-fail-under=90
 
-# Two independent drift checks, and both of them run.
+# Three independent drift checks, and all three of them run.
 #
 # These were two recipe lines. make aborts a recipe at its first failing line,
 # so a stale docs/rules.md meant check_doc_currency.py did not run at all: the
@@ -177,17 +177,23 @@ test:
 # docs-check exits non-zero if either failed.
 docs-check:
 	@status=0; \
-	printf '%s\n' '' 'docs check 1 of 2: generated docs match the rule registry'; \
+	printf '%s\n' '' 'docs check 1 of 3: generated docs match the rule registry'; \
 	if $(PYTHON) scripts/generate_rules_doc.py --check; then \
 		printf '%s\n' 'generated docs: PASS'; \
 	else \
 		status=1; printf '%s\n' 'generated docs: FAIL'; \
 	fi; \
-	printf '%s\n' '' 'docs check 2 of 2: stamped pages are current'; \
+	printf '%s\n' '' 'docs check 2 of 3: stamped pages are current'; \
 	if $(PYTHON) scripts/check_doc_currency.py; then \
 		printf '%s\n' 'doc currency: PASS'; \
 	else \
 		status=1; printf '%s\n' 'doc currency: FAIL'; \
+	fi; \
+	printf '%s\n' '' 'docs check 3 of 3: documented pins name the current release'; \
+	if $(PYTHON) scripts/check_action_refs.py; then \
+		printf '%s\n' 'action refs: PASS'; \
+	else \
+		status=1; printf '%s\n' 'action refs: FAIL'; \
 	fi; \
 	exit $$status
 
