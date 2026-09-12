@@ -20,7 +20,14 @@ from pathlib import Path
 
 from tods_validate.findings import Severity
 from tods_validate.report import RULE_PAGE_BASE
-from tods_validate.rules import EXAMPLES, Rule, all_rules, render_example_markdown
+from tods_validate.rules import (
+    EXAMPLES,
+    NOT_A_SPEC_REQUIREMENT,
+    Rule,
+    all_rules,
+    cites_spec,
+    render_example_markdown,
+)
 from tods_validate.schema import SPEC_VERSION
 
 DOC_PATH = Path(__file__).parent.parent / "docs" / "rules.md"
@@ -270,9 +277,19 @@ def generate() -> str:
             if example is not None:
                 lines.extend(render_example_markdown(example))
                 lines.append("")
-            lines.append(f"Spec reference: <{r.spec_section}>")
+            lines.append(f"{_citation_label(r)} <{r.spec_section}>")
             lines.append("")
     return "\n".join(lines)
+
+
+def _citation_label(r: Rule) -> str:
+    """The words before a rule's citation, in docs/rules.md and on its page.
+
+    "Spec reference" only where the citation is the spec. An OPS- rule cites
+    the ADR that decided it, and calling that link a spec reference is what
+    the second namespace exists to prevent; see ``cites_spec``.
+    """
+    return "Spec reference:" if cites_spec(r) else f"{NOT_A_SPEC_REQUIREMENT} Decision record:"
 
 
 def _rule_notes(r: Rule) -> str:
@@ -329,7 +346,7 @@ def _rule_page_html(r: Rule) -> str:
     <h1>{esc(r.title)}</h1>
     <p class="meta"><span class="badge">{esc(severity)}</span></p>
     {notes_html}<p>{esc(r.description)}</p>
-{interpretation_html}    <p>Spec reference: <a href="{spec_href}">{spec_text}</a></p>
+{interpretation_html}    <p>{esc(_citation_label(r))} <a href="{spec_href}">{spec_text}</a></p>
   </body>
 </html>
 """
