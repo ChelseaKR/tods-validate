@@ -46,6 +46,10 @@ _CI_ONLY_JOBS = {
     # Path-filtered to editor/vscode/**, so it does not run on most pull
     # requests -- which is why its absence went unnoticed.
     "package": "VS Code extension",
+    # Builds the wheel and sdist and reads their metadata. `make dist-metadata`
+    # exists and is deliberately not a `verify` gate: it needs a `dist/`, and
+    # building one needs the build backend from an index.
+    "packaging": "`packaging` job",
 }
 
 # Jobs that run a gate's recipe directly instead of invoking the make target.

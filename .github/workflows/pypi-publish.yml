@@ -79,6 +79,15 @@ jobs:
       - run: python -m pip install --upgrade build
       - run: python -m build
 
+      # The metadata of the exact artifacts about to be uploaded, read out of
+      # the wheel and the sdist themselves (#223). It runs here, after the
+      # build and before anything is attested or published, because PyPI
+      # metadata is immutable: a missing Project-URL noticed after this step
+      # costs a whole release to correct. Standard-library only, so it needs
+      # nothing this job has not already installed.
+      - name: Check the built distributions' metadata
+        run: python scripts/check_dist_metadata.py dist
+
       # CycloneDX 1.7 SBOM of the built wheel and its dependency closure.
       # Blocking: --validate fails the job on any schema violation (Section 6.2).
       - name: Generate CycloneDX SBOM
