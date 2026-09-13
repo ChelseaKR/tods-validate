@@ -33,7 +33,15 @@ classifiers = [
 dependencies = ["click>=8.1"]
 
 [project.urls]
+# Homepage is the documentation site rather than the source tree, deliberately:
+# it hosts the browser playground, so a reader who lands on the PyPI page can
+# validate a feed without installing anything. Repository, Issues and Changelog
+# were absent entirely until now, which left the published page with no route
+# to the project at all beyond the source tree.
+Homepage = "https://chelseakr.github.io/tods-validate/"
 Repository = "https://github.com/ChelseaKR/tods-validate"
+Issues = "https://github.com/ChelseaKR/tods-validate/issues"
+Changelog = "https://github.com/ChelseaKR/tods-validate/blob/main/CHANGELOG.md"
 "TODS specification" = "https://tods-transit.org/spec/"
 
 [project.scripts]

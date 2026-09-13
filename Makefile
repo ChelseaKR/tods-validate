@@ -3,7 +3,7 @@
 # workflows re-run it at the tagged commit before anything publishes
 # (REL-14/15).
 #
-# CI additionally runs five things this file does not, so a green `make verify`
+# CI additionally runs six things this file does not, so a green `make verify`
 # is a necessary condition for merge and not a sufficient one:
 #
 #   - the composite action's self-test, CodeQL, Semgrep and zizmor, which need
@@ -14,12 +14,16 @@
 #   - the VS Code extension package job, which type-checks, audits and builds
 #     a VSIX out of editor/vscode. It is path-filtered to that directory, so it
 #     is absent from most pull requests, which is how it stayed off this list
-#     for as long as it did.
+#     for as long as it did;
+#   - the `packaging` job, which builds the wheel and sdist and runs
+#     `make dist-metadata` over them. Kept out of `verify` for the reason
+#     `perf-check` is: it needs a build backend fetched from an index, so a
+#     laptop gate would fail offline rather than report anything.
 #
 # This paragraph is checked against the workflows by
 # tests/test_ci_gate_parity.py, so a job added later cannot reject a tree that
 # `make verify` has just called green without saying so here.
-.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff perf-check memory-check
+.PHONY: verify lockfile lint format typecheck test docs-check contract-check i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff perf-check memory-check dist-metadata
 
 # Run the tools this repository pins, not whichever ones the shell happens to
 # find first.
@@ -322,3 +326,13 @@ perf-check:
 # measurement inside `make test`, so the budget is not only checked in CI.
 memory-check:
 	$(PYTHON) scripts/check_memory_budget.py
+
+# What PyPI will actually be told, read out of the built wheel and sdist rather
+# than out of pyproject.toml (#223). Published metadata is immutable, so the
+# only place this can be caught is before the upload; the `publish` job runs it
+# against the exact artifacts it is about to hand to PyPI, and the `packaging`
+# CI job runs it on every pull request so a release is not the first time
+# anyone looks. Deliberately not a VERIFY_GATES gate: it needs `dist/`, and
+# building that needs the backend from an index.
+dist-metadata:
+	$(PYTHON) scripts/check_dist_metadata.py dist
