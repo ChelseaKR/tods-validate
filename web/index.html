@@ -81,6 +81,27 @@
       name="twitter:image:alt"
       content="tods-validate: validate TODS feeds everywhere. CLI, CI, browser, editor, pre-commit, Docker, and LSP."
     />
+    <!-- Structured data. Every value below is one this repository already
+         holds elsewhere, and tests/test_playground.py reads it from there
+         rather than from a second copy. What is deliberately absent, and why,
+         is in web/README.md; the reasoning is long and a visitor downloads
+         every byte of this file. -->
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebApplication",
+        "name": "tods-validate playground",
+        "description": "Validate a Transit Operational Data Standard (TODS) feed in your browser. Nothing is uploaded: the validator runs on your machine via Pyodide, so it is safe for non-public operational data.",
+        "url": "https://chelseakr.github.io/tods-validate/",
+        "image": "https://chelseakr.github.io/tods-validate/og-card.png",
+        "applicationCategory": "DeveloperApplication",
+        "operatingSystem": "Any",
+        "browserRequirements": "Requires WebAssembly",
+        "isAccessibleForFree": true,
+        "license": "https://spdx.org/licenses/Apache-2.0.html",
+        "codeRepository": "https://github.com/ChelseaKR/tods-validate"
+      }
+    </script>
     <style>
       :root {
         color-scheme: light dark;
@@ -164,6 +185,13 @@
 
     <footer>
       <p id="footer-version"></p>
+      <p>
+        The command-line tool, GitHub Action, pre-commit hook, Docker image and
+        editor extension behind this page live in the repository:
+        <a href="https://github.com/ChelseaKR/tods-validate"
+          >github.com/ChelseaKR/tods-validate</a
+        >
+      </p>
       <p>
         <a href="https://ko-fi.com/T6T6GMYTU" target="_blank" rel="noopener noreferrer"
           >Support this work on Ko-fi</a

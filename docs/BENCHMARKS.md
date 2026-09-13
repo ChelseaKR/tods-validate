@@ -131,18 +131,23 @@ ceilings, recorded in `perf/bundle-baseline.json`.
 
 | Surface | Measured | Budget |
 | --- | --- | --- |
-| `web/index.html` | 11,513 | 12,288 |
-| Whole published `web/` tree | 222,967 | 262,144 |
+| `web/index.html` | 13,001 | 13,312 |
+| Whole published `web/` tree | 224,455 | 262,144 |
 | Published page count | 48 | 60 |
 | HTML report at 10,000 findings | 2,348,762 | 3,145,728 |
 
-The `web/index.html` ceiling did not move when the share card landed. The
-head advertised a title, a description and a URL and no image, so every share
-of the playground arrived as grey text; the image tags cost 1.1 KiB and fit
-under the existing 12,288 ceiling, leaving 6% headroom rather than 16%. That
-is deliberate: this page is not supposed to grow, so the next addition of
-this size gets argued for when it is needed. The 1200x630 PNG is a static
-asset and does not enter either byte figure.
+The `web/index.html` ceiling has moved once, by 1,024 bytes, and this is the
+commit that moved it. The share card before it fitted under the old ceiling
+and left 6% headroom, on the stated understanding that the next addition of
+that size would be argued for rather than pre-absorbed. The argument is
+DISC-02: the page carried no link to `github.com/ChelseaKR/tods-validate`, so
+a reader who found the playground through a search had no route to the CLI,
+the GitHub Action, the pre-commit hook, the Docker image or the editor
+extension, and a crawler had to infer from prose that this page is software
+that runs in the reader's own browser. A backlink and one
+`application/ld+json` node cost 1.5 KiB between them, and the new ceiling
+leaves 311 bytes -- 2.3% -- so the tripwire is tighter now, not looser. The
+1200x630 PNG is a static asset and does not enter either byte figure.
 
 The last row is the one that can grow without anyone noticing: about 235 bytes
 per finding, so a template change adding 80 bytes to a row is invisible on a

@@ -30,6 +30,53 @@ accessibility toolchain already installs):
 PLAYGROUND_URL=http://localhost:8000/index.html node scripts/check-playground-boots.cjs
 ```
 
+## The backlink, and the structured data
+
+`index.html` carries a link to <https://github.com/ChelseaKR/tods-validate> in
+its footer and one `application/ld+json` node in its head. Both are gated by
+`tests/test_playground.py`, alongside the page's other hand-edited invariants.
+
+The link is DISC-02 in `DISCOVERY-AND-ADOPTION-STANDARD.md`. Until 2026-09-13
+the page had no such link at all: the only three URLs on it with `github` in
+them were `chelseakr.github.io` addresses -- the canonical, the `og:url` and
+the share card. This page is where somebody meets the validator after a
+search, and everything they would reach for next (the CLI, the GitHub Action,
+the pre-commit hook, the Docker image, the editor extension) is in the
+repository, so a page with no route to it ends the visit there.
+
+The JSON-LD node states what the page already states, in a form a crawler does
+not have to read prose to get: that this is a `WebApplication`, that it runs
+in the reader's own browser (`browserRequirements`), that it costs nothing
+(`isAccessibleForFree`), that it is Apache-2.0, and where the source is. Every
+value in it is held somewhere else first -- `name` is the `<h1>`,
+`description` is the meta description, `url` is the canonical, `image` is the
+share card, and `license` and `codeRepository` come from `pyproject.toml` --
+and the tests read it from those places rather than from a second copy kept in
+the test file, because an expectation copied out of the thing it checks moves
+with the mistake and stays green.
+
+What the node deliberately leaves out, and why:
+
+- **`softwareVersion`.** The page does pin a wheel version, in the script that
+  installs it, and `test_playground_installs_this_projects_version` holds that
+  pin to `pyproject.toml`. A copy of it in the head would be a different
+  thing: a crawler is served the head long after a release moves, and nothing
+  a reader can see would show that it had gone stale. The gate refuses the
+  field outright rather than trying to keep a third copy honest.
+- **`aggregateRating`, `ratingValue`, `reviewCount`, `interactionCount`.**
+  There are no ratings, no reviews and no usage figure this repository
+  measures. Structured data is the worst place to keep a number nothing
+  re-derives, because no reader of the page can see it is wrong.
+- **`datePublished` and `dateModified`.** A date nothing recomputes is the
+  same claim in another shape.
+- **A `Dataset` descriptor.** This page ships no dataset. Describing one would
+  be soliciting a harvest of feeds that, by design, never leave the browser.
+
+The reasoning lives here rather than in a comment in the page because
+`web/index.html` is downloaded in full by every visitor and is held to a byte
+ceiling in `perf/bundle-baseline.json`; this file is published but never
+fetched by the playground.
+
 ## Deployment
 
 The playground is published at
