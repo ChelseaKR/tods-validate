@@ -8,6 +8,7 @@ not from here; see web/README.md.)
 """
 
 import importlib.util
+import json
 import re
 import sys
 import tomllib
@@ -339,3 +340,145 @@ def test_the_external_runtime_script_still_carries_an_integrity_hash() -> None:
     page = _HTML.read_text(encoding="utf-8")
     for tag in re.findall(r"<script\b[^>]*\bsrc=[^>]*>", page, re.S):
         assert "integrity=" in tag, f"an external script ships without an SRI hash: {tag!r}"
+
+
+# ---------------------------------------------------------------------------
+# The route back to the repository, and the machine-readable description
+#
+# DISCOVERY-AND-ADOPTION-STANDARD.md DISC-02 asks that the homepage named in a
+# repository's GitHub About links to `github.com/<owner>/<repo>`. Measured on
+# 2026-09-13, the live page carried three URLs with `github` in them and all
+# three were `chelseakr.github.io`: the canonical, the og:url and the share
+# card. There was no route from the page to the source at all.
+#
+# That is not a formality. This page is where an agency meets the validator
+# after a search; the CLI, the pre-commit hook, the GitHub Action, the Docker
+# image and the editor extension are all in the repository, and a reader who
+# arrived here had no way to reach any of them.
+#
+# The JSON-LD block is the other half: a crawler reading this page had to infer
+# from prose that it is software, that it runs in the reader's own browser, and
+# that it is free. Everything in that block is a value this repository already
+# states somewhere, and the checks below read it from that somewhere rather
+# than from a second copy kept here -- an expectation copied out of the thing
+# it checks moves with the mistake and stays green.
+# ---------------------------------------------------------------------------
+
+# Anchors, with their link text, so a backlink with an empty label cannot pass.
+# `[^>]*` after the href is what carries this page's habit of putting the `>`
+# on the following line.
+_ANCHOR_RE = re.compile(r'<a\b[^>]*\bhref="([^"]+)"[^>]*>\s*(.*?)\s*</a\s*>', re.S)
+_LD_JSON_RE = re.compile(r'<script type="application/ld\+json">(.*?)</script>', re.S)
+
+# Fields that would put a figure in the head. softwareVersion is a real number
+# this project derives (pyproject.toml -> the pin above), and it is still
+# refused here: the head is served to a crawler long after a release moves it,
+# and nothing a reader can see would show it had gone stale. The rest are
+# figures nothing in this repository derives at all.
+_FORBIDDEN_IN_STRUCTURED_DATA = (
+    "softwareVersion",
+    "version",
+    "aggregateRating",
+    "ratingValue",
+    "reviewCount",
+    "ratingCount",
+    "interactionCount",
+    "interactionStatistic",
+    "datePublished",
+    "dateModified",
+    "fileSize",
+)
+
+
+def _project_urls() -> dict[str, str]:
+    urls: dict[str, str] = tomllib.loads(_PYPROJECT.read_text())["project"]["urls"]
+    return urls
+
+
+def _repository_url() -> str:
+    """Where this project says it lives -- one declaration, in pyproject.toml."""
+    return _project_urls()["Repository"]
+
+
+def _license_url() -> str:
+    """The SPDX page for the licence pyproject.toml declares, built from it."""
+    spdx = tomllib.loads(_PYPROJECT.read_text())["project"]["license"]
+    return f"https://spdx.org/licenses/{spdx}.html"
+
+
+def _canonical() -> str | None:
+    found = re.search(r'<link rel="canonical" href="([^"]+)"', _head())
+    return found.group(1) if found else None
+
+
+def _structured_data() -> dict[str, object]:
+    """The page's one JSON-LD node, parsed.
+
+    A block that is not valid JSON raises here rather than being skipped, which
+    is the whole point: a malformed node is invisible in a browser and silently
+    ignored by every consumer that would have read it.
+    """
+    blocks = _LD_JSON_RE.findall(_HTML.read_text(encoding="utf-8"))
+    assert len(blocks) == 1, f"expected exactly one JSON-LD block, found {len(blocks)}"
+    parsed = json.loads(blocks[0])
+    assert isinstance(parsed, dict), f"the JSON-LD node is a {type(parsed).__name__}, not an object"
+    return parsed
+
+
+def test_the_playground_links_back_to_the_repository() -> None:
+    anchors = _ANCHOR_RE.findall(_HTML.read_text(encoding="utf-8"))
+    # The negative control this check needs against itself: if the page's
+    # anchor markup changes shape and this sweep stops matching, an empty
+    # result would satisfy every assertion below by vacuum.
+    assert anchors, "the anchor sweep matched nothing; it has stopped reading this page"
+
+    repository = _repository_url()
+    labels = [text for href, text in anchors if href == repository]
+    assert labels, (
+        f"the playground does not link to {repository} (DISC-02). The links it does carry are "
+        f"{sorted({href for href, _ in anchors})}. This page is the only route a reader who "
+        f"arrived from a search has to the CLI, the Action, the hook and the extension."
+    )
+    assert all(label.strip() for label in labels), "the repository link carries no link text"
+
+
+def test_the_playground_carries_one_well_formed_structured_data_node() -> None:
+    data = _structured_data()
+    assert data.get("@context") == "https://schema.org"
+    assert data.get("@type") in {"WebApplication", "SoftwareApplication"}, (
+        f"the node describes a {data.get('@type')!r}; this page is an application"
+    )
+
+
+def test_the_structured_data_agrees_with_the_page_it_describes() -> None:
+    data = _structured_data()
+    page = _HTML.read_text(encoding="utf-8")
+
+    heading = re.search(r"<h1>([^<]+)</h1>", page)
+    assert heading is not None
+    assert data.get("name") == heading.group(1).strip()
+    assert data.get("description") == _meta("name", "description")
+    assert data.get("url") == _canonical()
+    assert data.get("image") == _meta("property", "og:image")
+
+
+def test_the_structured_data_agrees_with_what_the_project_declares() -> None:
+    data = _structured_data()
+    assert data.get("codeRepository") == _repository_url()
+    assert data.get("license") == _license_url()
+    # Free to use is a property of this page, not a price this repository could
+    # get wrong later: the validator runs in the reader's browser and the
+    # licence above is what permits it.
+    assert data.get("isAccessibleForFree") is True
+
+
+def test_the_structured_data_states_no_figure_nothing_re_derives() -> None:
+    data = _structured_data()
+    present = [field for field in _FORBIDDEN_IN_STRUCTURED_DATA if field in data]
+    assert not present, (
+        f"the structured data states {present}. A figure in the head is served to crawlers "
+        f"long after it stops being true, and no reader of this page can see that it has."
+    )
+    assert not re.search(r"\b[0-9]+\b", str(data.get("description", ""))), (
+        "the structured data's description states a figure nothing derives"
+    )
