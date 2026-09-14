@@ -532,7 +532,7 @@ so a flag to choose their format would be a claim rather than a capability.
 What is machine-readable here is the report, through `--format json`, `--format
 sarif`, and the schema at [docs/report.schema.json](docs/report.schema.json).
 That is a different thing from a log stream, and this section previously
-conflated them. Tracked in
+conflated them. Tracked in #231 and in
 [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#observability).
 
 ## Standards Conformance
@@ -542,26 +542,32 @@ Applicability and current state:
 
 | Standard | Applies? | State |
 |---|---|---|
-| CODE-QUALITY | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#code-quality) |
-| Security & Supply-Chain | Applies (ships code, parses untrusted input) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#security-and-supply-chain) |
-| CI-CD | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#ci-cd) |
-| RELEASE-AND-VERSIONING | Applies (PyPI + GHCR + GitHub Releases + Action) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#release-and-versioning) |
-| ACCESSIBILITY | Applies (scoped to the `--format html` report and the `web/` playground) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#accessibility) |
-| OBSERVABILITY | Applies at Tier C (see `## Observability` above) | Applies — Tier C; tracing N/A (no network surface); the tier's `--log-format json` is a gap, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#observability) |
+| CODE-QUALITY | Applies | Applies — gap tracked in #226, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#code-quality) |
+| Security & Supply-Chain | Applies (ships code, parses untrusted input) | Applies — gap tracked in #227, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#security-and-supply-chain) |
+| CI-CD | Applies | Applies — gap tracked in #228, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#ci-cd) |
+| RELEASE-AND-VERSIONING | Applies (PyPI + GHCR + GitHub Releases + Action) | Applies — gap tracked in #229, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#release-and-versioning) |
+| ACCESSIBILITY | Applies (scoped to the `--format html` report and the `web/` playground) | Applies — gap tracked in #230, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#accessibility) |
+| OBSERVABILITY | Applies at Tier C (see `## Observability` above) | Applies — Tier C; tracing N/A (no network surface); gap tracked in #231 — the tier's `--log-format json` flag does not exist — with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#observability) |
 | INTERNATIONALIZATION | N/A — no user-facing strings requiring translation | N/A — see [docs/I18N.md](docs/I18N.md) |
-| AI Development Measurement | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#ai-development-measurement) |
+| AI Development Measurement | Applies | Applies — gap tracked in #232, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#ai-development-measurement) |
 | AI Evaluation | N/A — no LLM/AI runtime | N/A — no LLM SDK or generative/agentic component anywhere in `src/` or `scripts/`; deterministic rule engine only |
-| Data Governance | Applies (validates user-supplied transit data) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#data-governance) |
-| DOCUMENTATION | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#documentation) |
-| Incident Response | Applies (published CLI, Action, packages, and containers) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#incident-response) |
-| Performance | Applies (CLI hot path and shipped HTML playground/report) | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#performance) |
-| QUALITY-AND-METRICS | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#quality-and-metrics) |
-| Responsible-Tech Framework | Applies | Applies — gap tracked, see [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#responsible-tech) |
+| Data Governance | Applies (validates user-supplied transit data) | Applies — gap tracked in #220, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#data-governance) |
+| DOCUMENTATION | Applies | Applies — gap tracked in #233, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#documentation) |
+| Incident Response | Applies (published CLI, Action, packages, and containers) | Applies — gap tracked in #234, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#incident-response) |
+| Performance | Applies (CLI hot path and shipped HTML playground/report) | Applies — gap tracked in #235, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#performance) |
+| QUALITY-AND-METRICS | Applies | Applies — gap tracked in #236, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#quality-and-metrics) |
+| Responsible-Tech Framework | Applies | Applies — gap tracked in #237, with the dated detail in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md#responsible-tech) |
 
-Gaps are tracked in [docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md), a
-dated ledger of open items per standard (this substitutes for individual
-GitHub issues for now — converting a row to a real issue is a `gh issue
-create` away; see that file's header).
+Every non-conformant row above names a public issue. Twelve were opened on
+2026-09-13 with the maintainer's go-ahead — #226, #227, #228, #229, #230, #231,
+#232, #233, #234, #235, #236, #237 — and the Data Governance row points at the
+existing #220 rather than duplicating it. Each says what the standard asks for,
+what this project does today, what the gap is, and what would close it.
+
+[docs/CONFORMANCE-GAPS.md](docs/CONFORMANCE-GAPS.md) remains the dated narrative
+ledger behind those issues. Its header still says no issues were opened, and
+that correction is deliberately held back: #210 and #222 both edit that file,
+and it is updated once they land.
 
 ## Development
 
