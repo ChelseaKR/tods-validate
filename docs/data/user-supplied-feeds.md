@@ -4,7 +4,7 @@
 
 This card exists to make a boundary explicit rather than to claim one. A user's
 feed is the *input* to a local validator. This project does not fetch it, does
-not store it, does not transmit it, and has no standing to state a licence, a
+not store it, does not transmit it, and has no standing to state a license, a
 refresh cadence, or a retention policy over an agency's operational records.
 Writing a card that asserted any of the three would be a governance claim over
 somebody else's data.
@@ -12,7 +12,7 @@ somebody else's data.
 | Field | Value |
 | --- | --- |
 | Source | The person running the tool. Never fetched by this project. |
-| Licence | The feed owner's. Not this project's to state. |
+| License | The feed owner's. Not this project's to state. |
 | Fetch/refresh cadence | Not applicable. Nothing is fetched: `SECURITY.md` records that validation, merge, stats, and anonymize make no network requests, and CI has no test that would pass if one did. |
 | Fetch timestamp | Not applicable. |
 | Known limitations | The tool sees whatever the user points it at, including fields it has no rule for. `anonymize` reports every column it did **not** pseudonymize (`AnonymizeResult.carried_through`), because a residual-risk list the caller has to read is more honest than a claim of coverage. |

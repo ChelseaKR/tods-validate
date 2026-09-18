@@ -161,7 +161,7 @@ def test_trend_renders_table_after_two_batch_runs(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 # max-implied-speed-kph: the OPS-W001 ceiling (ADR 0008)
 #
-# The ceiling is a stated judgement that every finding quotes, so an
+# The ceiling is a stated judgment that every finding quotes, so an
 # unusable value must stop the run rather than be repaired into a different
 # check than the operator asked for.
 # ---------------------------------------------------------------------------

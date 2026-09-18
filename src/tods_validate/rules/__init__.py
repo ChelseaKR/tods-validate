@@ -11,7 +11,7 @@ findings. Most IDs keep the historical TODS- prefix and are grouped in bands:
 - TODS-x5xx / TODS-x6xx: opt-in coverage and advisory checks
 
 A TODS- ID means the spec says so: every one of them cites the section it
-enforces. Checks that encode a judgement the spec does not make live in a
+enforces. Checks that encode a judgment the spec does not make live in a
 second namespace instead, so that promise stays true:
 
 - OPS-x0xx: operational feasibility, cited to an ADR rather than to the spec
@@ -34,7 +34,7 @@ from ..schema import GTFS_PRIMARY_KEYS, SPEC_VERSION, TableSpec, tables_for_vers
 
 # Default implied-speed ceiling for OPS-W001, in km/h, straight-line.
 #
-# This is a judgement, and it is set deliberately high. The distance model is
+# This is a judgment, and it is set deliberately high. The distance model is
 # great-circle, which always *understates* the real distance between two
 # points on a road network, so the implied speed it computes always
 # understates the speed actually required. A ceiling low enough to be
@@ -59,7 +59,7 @@ class ValidationContext:
     # Which TODS spec version to validate against (schema.SUPPORTED_SPEC_VERSIONS).
     spec_version: str = SPEC_VERSION
     # The implied-speed ceiling, in km/h, above which a consecutive pair of
-    # assignments is reported as not workable (OPS-W001). A stated judgement,
+    # assignments is reported as not workable (OPS-W001). A stated judgment,
     # not a fact: it is quoted in every finding and configurable via
     # `max-implied-speed-kph`. See config.py and ADR 0008.
     max_implied_speed_kph: float = DEFAULT_MAX_IMPLIED_SPEED_KPH
@@ -114,7 +114,7 @@ GTFS_CALENDARS = ("calendar.txt", "calendar_dates.txt")
 
 # Categories group rules by how aggressively they fire. "core" rules check the
 # spec and run by default. "coverage" and "advisory" rules are opt-in (see
-# default_enabled) because they surface judgement calls, not spec violations,
+# default_enabled) because they surface judgment calls, not spec violations,
 # and would be noise in a default CI gate.
 #
 # "feasibility" is opt-in for a different reason, and is deliberately not
@@ -127,7 +127,7 @@ CATEGORIES = ("core", "coverage", "advisory", "experimental", "feasibility")
 
 # Rule-ID namespaces. "TODS-" carries the project's citation promise: every
 # TODS- rule cites a section of the spec it enforces (tests/test_registry.py
-# holds both halves of this). A rule that encodes a judgement the spec does
+# holds both halves of this). A rule that encodes a judgment the spec does
 # not make must NOT take a TODS- ID, however useful it is, because a consumer
 # reading a TODS- finding is entitled to read it as "the spec says so".
 # "OPS-" is that second namespace: operational checks, cited to a project ADR
@@ -1008,7 +1008,7 @@ class RuleOutcome:
     measurement: Measurement | None = None
     # Set only on a LOCAL- outcome: the [policy] setting that configured the
     # rule, as it reads in the table (e.g. "max-spread-minutes = 660"). None on
-    # every registry rule, whose serialised outcome it therefore never changes.
+    # every registry rule, whose serialized outcome it therefore never changes.
     policy_setting: str | None = None
 
     @property

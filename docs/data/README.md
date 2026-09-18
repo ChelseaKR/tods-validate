@@ -2,7 +2,7 @@
 
 One card per data source this repository *ingests and ships*, per
 `docs/standards/DATA-GOVERNANCE-STANDARD.md` DG-01. Each states its tier (L0 to
-L3), licence, refresh cadence, known limitations, and retention line.
+L3), license, refresh cadence, known limitations, and retention line.
 
 `scripts/check_data_cards.py` enumerates the declared source list in
 [`sources.json`](sources.json) against the cards in this directory and fails
@@ -18,7 +18,7 @@ A user's TODS feed is the input to a validator that runs locally, holds it for
 the lifetime of one process, and writes nothing back. That feed can carry
 `employee_id`, `license_plate`, and `vehicle_label`, all of which the sensitive
 -field inventory classifies **L3**. It is not a source of this repository and
-it gets no card here, because a card asserts a licence, a refresh cadence, and
+it gets no card here, because a card asserts a license, a refresh cadence, and
 a retention line, and this project has no standing to assert any of the three
 about somebody else's operational data. Claiming otherwise would be a
 governance claim over an agency's records.

@@ -82,7 +82,7 @@ def _corpus_dir(tmp_path: Path, expectations: dict[str, list[str]]) -> Path:
 
 
 def _fake_validator(tmp_path: Path, body: str) -> Path:
-    """A validator whose whole behaviour is a Python expression over its argv."""
+    """A validator whose whole behavior is a Python expression over its argv."""
 
     script = tmp_path / "fake_validator.py"
     script.write_text(

@@ -55,7 +55,7 @@
 # Explicit paths rather than an exported PATH, because `export PATH` does not
 # reach a recipe like `typecheck`'s. A recipe line with no shell metacharacters
 # is exec'd directly instead of through /bin/sh, and that path search does not
-# honour make's exported value (GNU Make 3.81, which is what macOS ships): with
+# honor make's exported value (GNU Make 3.81, which is what macOS ships): with
 # `export PATH := $(CURDIR)/.venv/bin:$(PATH)` in force, `mypy` still found the
 # pipx build and still printed 96 errors, while `mypy; :` -- the same command
 # with a metacharacter, so run through the shell -- printed Success. A fix that
@@ -86,7 +86,7 @@ VERIFY_GATES := lockfile action-lock lint format typecheck test docs-check contr
 
 # The gates run one after another and every one of them runs, whatever the ones
 # before it did. This is deliberate. When `verify` was a prerequisite list, make
-# stopped at the first failure, so a red gate silently cancelled every gate
+# stopped at the first failure, so a red gate silently canceled every gate
 # after it -- an unfixable dependency advisory in the npm toolchain meant the
 # accessibility check had not run on any commit for weeks, and nothing said so.
 # Running them all is not the same as tolerating failures: each gate prints its

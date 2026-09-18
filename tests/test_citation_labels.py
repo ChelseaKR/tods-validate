@@ -1,4 +1,4 @@
-"""A citation is labelled by what it cites.
+"""A citation is labeled by what it cites.
 
 Every TODS- rule cites the section of the TODS specification it enforces, and
 no other rule does; tests/test_registry.py holds both halves of that. The
@@ -11,7 +11,7 @@ opened a second namespace to prevent.
 There are four places a citation is rendered: ``explain`` as text, ``explain
 --format markdown`` (which is also the editor hover, see ``lsp.hover_markdown``),
 docs/rules.md, and the published rule pages under web/rules/. Before this file
-all four labelled every citation as the specification.
+all four labeled every citation as the specification.
 """
 
 from __future__ import annotations

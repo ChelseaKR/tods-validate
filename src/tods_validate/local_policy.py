@@ -1,6 +1,6 @@
 """Local policy rules (LOCAL-P0xx): an agency's own operational limits.
 
-A labour agreement says how long a run may be, how short a break may be, and how
+A labor agreement says how long a run may be, how short a break may be, and how
 many days in a row one person may be scheduled. The TODS specification cannot
 say any of that, and an agency's scheduling tool usually knows it and drops it
 at export. This module evaluates those limits against a package, from a
@@ -24,7 +24,7 @@ ADR 0008 expected these to reuse ``OPS-``. ADR 0009 records why they cannot. An
 fixture, and these may do neither. The letter after an ``OPS-`` prefix is the
 rule's severity, and here the agency sets the severity, so an ID that encoded
 it would be wrong for any agency that chose differently. And an ``OPS-``
-finding is this project's judgement while a ``LOCAL-`` finding is the agency's
+finding is this project's judgment while a ``LOCAL-`` finding is the agency's
 own: a reader of a report should be able to tell whose rule fired.
 
 What the checks refuse to do

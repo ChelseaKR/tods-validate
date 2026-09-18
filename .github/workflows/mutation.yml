@@ -2,7 +2,7 @@ name: Mutation testing (advisory)
 
 # Advisory only. This never runs on pull_request or push, so it cannot block a
 # merge. It runs on demand and once a week to surface tests that have stopped
-# pinning down the rules engine's behaviour. See docs/mutation-testing.md.
+# pinning down the rules engine's behavior. See docs/mutation-testing.md.
 
 on:
   workflow_dispatch:

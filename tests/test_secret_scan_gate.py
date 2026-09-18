@@ -27,7 +27,7 @@ import pytest
 _ROOT = Path(__file__).resolve().parent.parent
 _MAKEFILE = _ROOT / "Makefile"
 _GITLEAKS_CONFIG = _ROOT / ".gitleaks.toml"
-# Resolved once, absolutely: the two behavioural tests run a real binary, and an
+# Resolved once, absolutely: the two behavioral tests run a real binary, and an
 # absolute path is both what the linter asks for and one fewer thing that can
 # resolve to something other than the scanner under test.
 _GITLEAKS = shutil.which("gitleaks")
@@ -143,7 +143,7 @@ def test_the_gitleaks_config_scopes_only_dependencies_and_build_output() -> None
 
 @pytest.mark.skipif(_GITLEAKS is None, reason="gitleaks is not installed")
 def test_a_planted_secret_is_found_in_an_uncommitted_file(tmp_path: Path) -> None:
-    """The behavioural half: the working-tree scan finds what history cannot.
+    """The behavioral half: the working-tree scan finds what history cannot.
 
     A directory that is not a git repository at all is the sharpest version of
     "not committed". The history scan has nothing to walk; the working-tree

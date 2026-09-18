@@ -31,7 +31,7 @@ they were handled:
   would look like an open defect if audited naively. Every candidate finding
   was therefore re-checked against `git show origin/main:<path>` and, for
   #153, against the GitHub contents API before being called a defect. Two
-  fail-opens found during the audit (`spec_watch.py` treating an unrecognised
+  fail-opens found during the audit (`spec_watch.py` treating an unrecognized
   document as "in sync"; `check_npm_audit.py` disarming its own cross-check on
   an unparseable report) turned out to be **already fixed on `main` by #151**,
   and are not re-fixed here.

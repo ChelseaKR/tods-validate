@@ -5,7 +5,7 @@
 nothing about whether any of those exports work, and two of them were reached
 by no test at all before this file existed: `tods_validate.read.to_dataframe`
 and `tods_validate.__version__`. Both are in the snapshot, so v1.0.0 would
-have promised semantic-versioning stability for behaviour the suite had never
+have promised semantic-versioning stability for behavior the suite had never
 run.
 
 `to_dataframe` is the sharper of the two. Its documented contract
@@ -57,7 +57,7 @@ def test_version_is_the_version_the_project_declares() -> None:
 
 
 def test_version_is_not_the_uninstalled_fallback() -> None:
-    """The fallback is correct behaviour and a wrong answer to ship.
+    """The fallback is correct behavior and a wrong answer to ship.
 
     `__init__` falls back to "0.0.0+unknown" when the distribution metadata is
     missing. A test run against an installed package that sees the fallback is

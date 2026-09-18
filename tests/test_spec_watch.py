@@ -243,8 +243,8 @@ def test_the_workflow_has_an_issue_body_to_post_when_the_comparison_fails(
 def _in_sync_missing_one_table(tmp_path: Path) -> Path:
     """The in-sync fixture with `vehicles.txt`'s heading renamed.
 
-    Stands in for the realistic partial-parse failure: upstream reorganises one
-    section, or the parser stops recognising it, and the other three tables
+    Stands in for the realistic partial-parse failure: upstream reorganizes one
+    section, or the parser stops recognizing it, and the other three tables
     still match.
     """
     text = (_FIXTURES / "in_sync.md").read_text(encoding="utf-8")

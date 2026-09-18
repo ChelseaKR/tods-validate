@@ -20,7 +20,7 @@ To try the validator without installing anything, use the
 [browser playground](https://chelseakr.github.io/tods-validate/). Validation
 runs locally in your browser; feed files are not uploaded. The website counts
 visits with Google Analytics 4 (Global Privacy Control and Do Not Track
-honoured, opt-out in every footer, ad features off) and never sees a feed; see
+honored, opt-out in every footer, ad features off) and never sees a feed; see
 its [privacy page](https://chelseakr.github.io/tods-validate/privacy.html).
 
 ## Choose a starting point
@@ -216,7 +216,7 @@ because the two answer different questions, and a later change to one should
 not silently move the other.
 
 An agency can also write down its own operational limits, such as the longest
-spread or the shortest break its labour agreement allows, in a `[policy]` table
+spread or the shortest break its labor agreement allows, in a `[policy]` table
 in the same file. They run as `LOCAL-` rules, only when the table sets them, and
 every finding they produce says it is agency policy rather than the TODS
 specification. See [docs/local-policy.md](docs/local-policy.md).
@@ -230,7 +230,7 @@ exports/tods --gtfs exports/gtfs` re-hashes the files and recomputes the
 decision, so the receiver checks the record rather than trusting it. See
 [docs/handoff.md](docs/handoff.md).
 
-Some checks are off by default because they surface judgement calls rather than
+Some checks are off by default because they surface judgment calls rather than
 spec violations. Turn them on with `--enable coverage` (which GTFS trips have no
 run event; which blocks have no vehicle) or `--enable advisory` (e.g. long runs
 with no break), or by rule ID. See [docs/rules.md](docs/rules.md).

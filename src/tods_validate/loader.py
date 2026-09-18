@@ -58,7 +58,7 @@ BLOCKING_PROBLEM_CODES = frozenset({"encoding", "empty", "csv_error"})
 # Codes that leave the file parsed but not fully read: the header and rows are
 # there, but some values did not survive the read. "ragged" means a row's
 # values do not line up with the header, so any field of that row may hold a
-# neighbouring column's value or nothing at all; "duplicate_header" means a
+# neighboring column's value or nothing at all; "duplicate_header" means a
 # column was declared twice and the second column's values were dropped. On a
 # TODS file these are findings in their own right (TODS-E104, TODS-E105).
 # On a file whose rows another check reads to resolve a reference, they are

@@ -4,7 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>OPS-W001: A movement in this run is too far to be made in the time allowed — tods-validate rule catalog</title>
-    <meta name="description" content="A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgement the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID." />
+    <meta name="description" content="A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgment the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID." />
     <!-- The rule below asks for a Subresource Integrity hash on a
          subresource the browser fetches and executes. A canonical link is
          not one: it is metadata, it starts no fetch, and integrity is not
@@ -16,7 +16,7 @@
     <meta property="og:site_name" content="tods-validate" />
     <meta property="og:url" content="https://chelseakr.github.io/tods-validate/rules/OPS-W001.html" />
     <meta property="og:title" content="OPS-W001: A movement in this run is too far to be made in the time allowed — tods-validate rule catalog" />
-    <meta property="og:description" content="A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgement the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID." />
+    <meta property="og:description" content="A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgment the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID." />
     <meta property="og:image" content="https://chelseakr.github.io/tods-validate/og-card.png" />
     <meta property="og:image:type" content="image/png" />
     <meta property="og:image:width" content="1200" />
@@ -80,7 +80,7 @@
     <h1>A movement in this run is too far to be made in the time allowed</h1>
     <p class="meta"><span class="badge">WARNING</span></p>
     <p class='meta'>Needs a companion GTFS feed. Opt-in: off by default, enable with --enable feasibility or --enable OPS-W001.</p>
-    <p>A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgement the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID.</p>
+    <p>A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgment the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID.</p>
     <p><strong>Interpretation:</strong> straight-line: distance is great-circle between stop coordinates, which understates road distance, so the implied speed reported is a lower bound on the speed actually required</p>
     <p>Not a TODS specification requirement. Decision record: <a href="https://github.com/ChelseaKR/tods-validate/blob/main/docs/adr/0008-operational-feasibility-namespace.md">https://github.com/ChelseaKR/tods-validate/blob/main/docs/adr/0008-operational-feasibility-namespace.md</a></p>
     <footer><p><a href="../privacy.html">Privacy and analytics</a></p><p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p></footer>

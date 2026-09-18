@@ -51,7 +51,7 @@ tier or when a source's paths no longer exist.
 The user-feed card is the one that needed care, and it is written to *decline*
 ownership rather than assert it: a feed is the input to a local validator that
 holds it for one process lifetime and writes nothing back, so this project has
-no standing to state a licence, a refresh cadence, or a retention line over an
+no standing to state a license, a refresh cadence, or a retention line over an
 agency's records. The card names the three L3 fields (`employee_id`,
 `license_plate`, `vehicle_label`), points at the existing DPIA-lite, and records
 that its "not retained" line stops being true by construction the day #76
@@ -390,7 +390,7 @@ because the only evaluation run is automated. It tables every surface against
 what has actually been checked. Writing that table found an unaudited surface:
 the 47 rule-catalog pages `pages.yml` publishes had never had a runner pointed
 at them. They are in the blocking gate now, and entering it they failed with
-141 colour-contrast errors and 43 link-distinguishability errors, both from one
+141 color-contrast errors and 43 link-distinguishability errors, both from one
 shared stylesheet that declared `color-scheme: light dark` and then painted
 neither scheme. Fixed; all four audited URLs pass.
 
