@@ -121,7 +121,7 @@ def _events_reaching(job_id: str) -> set[str]:
     """Which declared triggers can run this job, and everything it needs.
 
     Fails closed: an `if:` that mentions `github.event_name` in a shape this
-    parser does not recognise raises rather than being read as unrestricted.
+    parser does not recognize raises rather than being read as unrestricted.
     A parser that quietly gives up would turn every assertion below into one
     that cannot fail.
     """
