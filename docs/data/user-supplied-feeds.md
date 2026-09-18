@@ -16,7 +16,7 @@ somebody else's data.
 | Fetch/refresh cadence | Not applicable. Nothing is fetched: `SECURITY.md` records that validation, merge, stats, and anonymize make no network requests, and CI has no test that would pass if one did. |
 | Fetch timestamp | Not applicable. |
 | Known limitations | The tool sees whatever the user points it at, including fields it has no rule for. `anonymize` reports every column it did **not** pseudonymize (`AnonymizeResult.carried_through`), because a residual-risk list the caller has to read is more honest than a claim of coverage. |
-| Retention | **Not retained.** Process lifetime only. No cache, no telemetry, no accounts. |
+| Retention | **Not retained.** Process lifetime only. No cache, no accounts, and no feed content in any telemetry. The website's Google Analytics 4 page counts (ADR 0010) never read the file input or the report. |
 
 ## Which fields make this L3
 

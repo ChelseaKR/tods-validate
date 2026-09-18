@@ -336,10 +336,18 @@ def test_the_only_suppression_sits_directly_above_the_canonical() -> None:
 
 def test_the_external_runtime_script_still_carries_an_integrity_hash() -> None:
     # The other half of the same decision: the suppression above is defensible
-    # only while the real subresource on this page is still hashed.
+    # only while the real subresource on this page is still hashed. Every
+    # script with a scheme is external and must carry a hash. The one relative
+    # script is the site's own same-origin analytics loader (ADR 0010), which is
+    # published from this repository alongside the page itself.
     page = _HTML.read_text(encoding="utf-8")
-    for tag in re.findall(r"<script\b[^>]*\bsrc=[^>]*>", page, re.S):
+    tags = re.findall(r"<script\b[^>]*\bsrc=[^>]*>", page, re.S | re.I)
+    external = [tag for tag in tags if re.search(r'\bsrc="[a-z][a-z0-9+.-]*:', tag, re.I)]
+    assert external, "the Pyodide runtime script is missing"
+    for tag in external:
         assert "integrity=" in tag, f"an external script ships without an SRI hash: {tag!r}"
+    local = [tag for tag in tags if tag not in external]
+    assert local == ['<script src="analytics.js" defer>'], local
 
 
 # ---------------------------------------------------------------------------

@@ -27,6 +27,8 @@ module.exports = {
     // template produces, so auditing the index plus one page audits the shape
     // of all of them. tests/test_generate_rules_doc.py pins that reasoning.
     `${baseUrl}/rules/index.html`,
-    `${baseUrl}/rules/TODS-E307.html`
+    `${baseUrl}/rules/TODS-E307.html`,
+    // The privacy notice for the website's Google Analytics page counts (ADR 0010).
+    `${baseUrl}/privacy.html`
   ]
 };

@@ -229,7 +229,22 @@ _PAGE_STYLE = """\
       code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
       ul.rule-list { list-style: none; padding-left: 0; }
       ul.rule-list li { padding: 0.25rem 0; }
+      .analytics-choice button { font: inherit; color: var(--fg); background: var(--bg);
+        border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 1rem; }
 """
+
+# Every page loads the site's one first-party script, web/analytics.js, which
+# loads Google Analytics 4 only on the live site and never under Global Privacy
+# Control, Do Not Track or the footer opt-out (ADR 0010). It is a relative,
+# same-origin file, so it starts no cross-origin fetch of its own; gtag.js is
+# injected by that file at runtime. The footer carries the opt-out control that
+# analytics.js wires, and a link to the privacy page that describes it.
+_ANALYTICS_SCRIPT = '    <script src="../analytics.js" defer></script>\n'
+_ANALYTICS_FOOTER = (
+    '    <footer><p><a href="../privacy.html">Privacy and analytics</a></p>'
+    '<p class="analytics-choice" data-analytics-choice hidden><button type="button">'
+    'Opt out of analytics</button> <span role="status"></span></p></footer>\n'
+)
 
 
 def generate() -> str:
@@ -307,10 +322,10 @@ def _rule_notes(r: Rule) -> str:
 def _rule_page_html(r: Rule) -> str:
     """A self-contained, permanent HTML page for one rule.
 
-    No external assets (Pages/CSP-friendly): a single inline <style>, no
-    scripts, no fonts or images fetched over the network. All rule text is
-    HTML-escaped since it ultimately comes from source strings authored in
-    the rule modules.
+    No external assets (Pages/CSP-friendly): a single inline <style>, no fonts
+    or images fetched over the network, and one script, the same-origin
+    analytics loader (ADR 0010). All rule text is HTML-escaped since it
+    ultimately comes from source strings authored in the rule modules.
     """
     esc = html.escape
     severity = Severity[r.severity.name].name
@@ -339,7 +354,7 @@ def _rule_page_html(r: Rule) -> str:
     <title>{esc(title)}</title>
 {metadata}    <style>
 {_PAGE_STYLE}    </style>
-  </head>
+{_ANALYTICS_SCRIPT}  </head>
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
     <p class="id">{esc(r.id)}</p>
@@ -347,7 +362,7 @@ def _rule_page_html(r: Rule) -> str:
     <p class="meta"><span class="badge">{esc(severity)}</span></p>
     {notes_html}<p>{esc(r.description)}</p>
 {interpretation_html}    <p>{esc(_citation_label(r))} <a href="{spec_href}">{spec_text}</a></p>
-  </body>
+{_ANALYTICS_FOOTER}  </body>
 </html>
 """
 
@@ -392,7 +407,7 @@ def _index_page_html(rules: list[Rule]) -> str:
     <title>tods-validate rule catalog</title>
 {metadata}    <style>
 {_PAGE_STYLE}    </style>
-  </head>
+{_ANALYTICS_SCRIPT}  </head>
   <body>
     <h1>tods-validate rule catalog</h1>
     <p class="lede">
@@ -401,7 +416,7 @@ def _index_page_html(rules: list[Rule]) -> str:
       editor hovers, and CI annotations link back to; rule IDs are never
       renumbered once released, so a link made today keeps working.
     </p>
-{body}  </body>
+{body}{_ANALYTICS_FOOTER}  </body>
 </html>
 """
 

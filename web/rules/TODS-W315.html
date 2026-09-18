@@ -69,7 +69,10 @@
       code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
       ul.rule-list { list-style: none; padding-left: 0; }
       ul.rule-list li { padding: 0.25rem 0; }
+      .analytics-choice button { font: inherit; color: var(--fg); background: var(--bg);
+        border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 1rem; }
     </style>
+    <script src="../analytics.js" defer></script>
   </head>
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
@@ -80,5 +83,6 @@
     <p>A run event works a trip end to end (trip_id set, the matching mid_trip flag not 1), but its start_location is not the trip&#x27;s first stop, or its end_location is not the trip&#x27;s last stop, in the supplemented stop_times.txt.</p>
     <p><strong>Interpretation:</strong> the spec says these locations &#x27;should&#x27; be the trip endpoints, so a mismatch is a warning; skipped for mid-trip events and for trips with no stop_times.</p>
     <p>Spec reference: <a href="https://tods-transit.org/spec/#run_eventstxt">https://tods-transit.org/spec/#run_eventstxt</a></p>
+    <footer><p><a href="../privacy.html">Privacy and analytics</a></p><p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p></footer>
   </body>
 </html>

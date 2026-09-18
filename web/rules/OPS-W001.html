@@ -69,7 +69,10 @@
       code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
       ul.rule-list { list-style: none; padding-left: 0; }
       ul.rule-list li { padding: 0.25rem 0; }
+      .analytics-choice button { font: inherit; color: var(--fg); background: var(--bg);
+        border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 1rem; }
     </style>
+    <script src="../analytics.js" defer></script>
   </head>
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
@@ -80,5 +83,6 @@
     <p>A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgement the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID.</p>
     <p><strong>Interpretation:</strong> straight-line: distance is great-circle between stop coordinates, which understates road distance, so the implied speed reported is a lower bound on the speed actually required</p>
     <p>Not a TODS specification requirement. Decision record: <a href="https://github.com/ChelseaKR/tods-validate/blob/main/docs/adr/0008-operational-feasibility-namespace.md">https://github.com/ChelseaKR/tods-validate/blob/main/docs/adr/0008-operational-feasibility-namespace.md</a></p>
+    <footer><p><a href="../privacy.html">Privacy and analytics</a></p><p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p></footer>
   </body>
 </html>

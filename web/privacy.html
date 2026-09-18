@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'none'; script-src 'self' https://www.googletagmanager.com; style-src 'unsafe-inline'; connect-src https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; img-src 'self' https://*.google-analytics.com https://www.googletagmanager.com;"
+    />
+    <title>Privacy and analytics — tods-validate</title>
+    <meta
+      name="description"
+      content="What the tods-validate website sends to Google Analytics 4, what it never sends, and how to turn analytics off."
+    />
+    <!-- The rule below asks for a Subresource Integrity hash on a
+         subresource the browser fetches and executes. A canonical link is
+         not one: it is metadata, it starts no fetch, and integrity is not
+         defined on it. Suppressed at this tag only, never repository-wide;
+         the reasoning is in scripts/generate_rules_doc.py.
+         nosemgrep: html.security.audit.missing-integrity.missing-integrity -->
+    <link rel="canonical" href="https://chelseakr.github.io/tods-validate/privacy.html" />
+    <style>
+      :root {
+        color-scheme: light dark;
+        --fg: #1a1a1a;
+        --bg: #ffffff;
+        --muted: #595959;
+        --link: #0b4fa8;
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          --fg: #e8e8e8;
+          --bg: #121212;
+          --muted: #a8a8a8;
+          --link: #8ab4f8;
+        }
+      }
+      body {
+        font: 16px/1.5 system-ui, sans-serif;
+        max-width: 40rem;
+        margin: 2rem auto;
+        padding: 0 1rem;
+        color: var(--fg);
+        background: var(--bg);
+      }
+      h1 { margin-bottom: 0.25rem; font-size: 1.5rem; }
+      h2 { margin-top: 2rem; font-size: 1.1rem; }
+      .lede { color: var(--muted); }
+      a { color: var(--link); text-decoration: underline; }
+      code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
+      .analytics-choice button {
+        font: inherit;
+        min-height: 2.75rem;
+        padding: 0.5rem 1rem;
+        border-radius: 6px;
+        border: 1px solid #888;
+        cursor: pointer;
+      }
+      :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
+    </style>
+    <script src="analytics.js" defer></script>
+  </head>
+  <body>
+    <nav><a href="index.html">&larr; Playground</a> · <a href="rules/index.html">Rule catalog</a></nav>
+    <main>
+      <h1>Privacy and analytics</h1>
+      <p class="lede">
+        What the tods-validate website sends to Google Analytics, what it never sends, and how to
+        turn analytics off. This covers the website only. The command-line tool, the GitHub
+        Action, the pre-commit hook, the Docker image and the editor extension send nothing to
+        Google Analytics, and validation itself makes no network requests.
+      </p>
+
+      <h2>Your feed files stay in your browser</h2>
+      <p>
+        The playground validates the files you choose on your own machine, with Pyodide. It does
+        not upload them, store them, or send them to Google Analytics. The validation report is
+        never sent anywhere either.
+      </p>
+
+      <h2>Google Analytics</h2>
+      <p>
+        The playground, the rule catalog and this page use Google Analytics 4, a service of Google
+        LLC in the United States, to count visits. For each page you view, Google Analytics
+        receives:
+      </p>
+      <ul>
+        <li>the page address, with everything after a <code>?</code> or <code>#</code> removed;</li>
+        <li>the page title;</li>
+        <li>the domain of the site that linked you here, if any, and never the full address;</li>
+        <li>your browser, device type, screen size, and language; and</li>
+        <li>
+          an approximate location that Google works out from your IP address. Google Analytics 4
+          does not log or store IP addresses.
+        </li>
+      </ul>
+      <p>It may also record how far you scroll, and when you click a link that leaves this site.</p>
+      <p>
+        Google signals and ad personalization are turned off. The advertising consent signals (ad
+        storage, ad user data, and ad personalization) are denied for every visitor. Google keeps
+        this data for 14 months.
+      </p>
+
+      <h2>Cookies</h2>
+      <p>
+        Outside the European Economic Area, the United Kingdom, and Switzerland, Google Analytics
+        sets two first-party cookies, <code>_ga</code> and <code>_ga_TM683Q87RD</code>. They tell a
+        returning browser apart from a new one and last up to two years.
+      </p>
+      <p>
+        In the European Economic Area, the United Kingdom, and Switzerland, analytics storage is
+        denied, so Google Analytics sets no cookie. Google still receives a measurement without a
+        cookie identifier for each page you view.
+      </p>
+
+      <h2>How to turn analytics off</h2>
+      <p>
+        Google Analytics does not load if your browser sends Global Privacy Control or Do Not
+        Track.
+      </p>
+      <p>
+        You can also use the <strong>Opt out of analytics</strong> button at the bottom of any page
+        on this site. The choice is saved in this browser's local storage as
+        <code>tods-validate:analytics-opt-out</code>, not in a cookie. It covers this browser on
+        this device only, and clearing this site's data removes it. Opting out does not delete
+        Google Analytics cookies that were already set; you can delete those in your browser
+        settings.
+      </p>
+
+      <h2>Hosting and more information</h2>
+      <p>
+        GitHub Pages hosts this site. GitHub may process request details, such as your IP address,
+        to serve and protect the pages. Read
+        <a href="https://policies.google.com/technologies/partner-sites"
+          >how Google uses information from sites that use its services</a
+        >
+        and the <a href="https://policies.google.com/privacy">Google Privacy Policy</a>.
+      </p>
+    </main>
+    <footer>
+      <p class="analytics-choice" data-analytics-choice hidden>
+        <button type="button">Opt out of analytics</button>
+        <span role="status"></span>
+      </p>
+    </footer>
+  </body>
+</html>

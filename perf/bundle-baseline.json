@@ -1,22 +1,22 @@
 {
-  "measuredAt": "2026-09-13",
+  "measuredAt": "2026-09-18",
   "note": "Byte budgets for the HTML this project ships, closing the bundle half of the performance gap in docs/CONFORMANCE-GAPS.md. Bytes are exact, so these are absolute ceilings with deliberate headroom rather than ratios against a noisy measurement. Raising one is a decision: say why here, in the same commit. Measured by scripts/check_bundle_budget.py, regenerated with its --update flag; tests/test_bundle_budget.py runs the same comparison inside make test and holds the measured block, the rationale figures and the docs/BENCHMARKS.md table to a live measurement, so a stale number here fails rather than sitting quietly under its ceiling.",
   "limits": {
-    "playgroundPageBytes": 13312,
+    "playgroundPageBytes": 13824,
     "publishedSiteBytes": 262144,
     "publishedPageCount": 60,
     "reportBytesAt10kFindings": 3145728
   },
   "measured": {
-    "playgroundPageBytes": 13001,
-    "publishedSiteBytes": 224455,
-    "publishedPageCount": 48,
+    "playgroundPageBytes": 13574,
+    "publishedSiteBytes": 252181,
+    "publishedPageCount": 49,
     "reportBytesAt10kFindings": 2348762
   },
   "rationale": {
-    "playgroundPageBytes": "13 KiB against 12.7 KiB measured. The page is a single self-contained file with no external assets bar the SRI-pinned Pyodide script, and it should stay one screenful of markup plus its boot script. This is the first time the ceiling has moved, and the argument for the 1 KiB is DISC-02 in DISCOVERY-AND-ADOPTION-STANDARD.md: the page carried no link to its own repository, so a reader who arrived from a search had no route to the CLI, the GitHub Action, the pre-commit hook, the Docker image or the editor extension, and a crawler had to infer from prose that this is software that runs in the reader's own browser. The backlink and one application/ld+json node cost 1.5 KiB between them; the reasoning about what that node deliberately leaves out lives in web/README.md rather than in a comment every visitor downloads. That leaves 311 bytes of headroom, 2.3%, which holds the tripwire tighter than the 6% it had before rather than pre-absorbing the next addition: this page is still not supposed to grow. The 1200x630 card itself is a static asset, not markup, and does not enter this figure.",
-    "publishedSiteBytes": "256 KiB against 219 KiB measured. The ceiling was sized when the tree was 110 KiB, so the rule catalog could roughly double before it fired; the per-page meta and canonical tags, then the share-card tags on all 47 pages, and then the playground's backlink and structured data, have since taken the tree to 219 KiB, so the remaining headroom is about nine more rule pages rather than a doubling. The 1200x630 card itself is a static asset, not markup, and does not enter this figure. A build that started emitting something unintended into web/ still fires it.",
-    "publishedPageCount": "60 against 48. One page per rule plus two indexes; 46 rules today. Catches a generator that starts writing pages nobody asked for, which a byte total alone can miss.",
+    "playgroundPageBytes": "13.5 KiB against 13.3 KiB measured. The page is a single self-contained file with no external assets bar the SRI-pinned Pyodide script, and it should stay one screenful of markup plus its boot script. This is the first time the ceiling has moved, and the argument for the 1 KiB is DISC-02 in DISCOVERY-AND-ADOPTION-STANDARD.md: the page carried no link to its own repository, so a reader who arrived from a search had no route to the CLI, the GitHub Action, the pre-commit hook, the Docker image or the editor extension, and a crawler had to infer from prose that this is software that runs in the reader's own browser. The backlink and one application/ld+json node cost 1.5 KiB between them; the reasoning about what that node deliberately leaves out lives in web/README.md rather than in a comment every visitor downloads. That left 311 bytes of headroom. The ceiling moved a second time, by 512 bytes, on 2026-09-17, for the owner's decision to count visits with Google Analytics 4 on every public site (ADR 0010): the minimum GA origins in the CSP, one sentence beside the lede saying GA never sees a feed file or the report, the analytics.js script tag and the footer opt-out control cost 573 bytes together, and the reasoning stays in ADR 0010 and web/README.md rather than in a comment every visitor downloads. That leaves 250 bytes of headroom, 1.8%, tighter again than before: this page is still not supposed to grow. The 1200x630 card itself is a static asset, not markup, and does not enter this figure.",
+    "publishedSiteBytes": "256 KiB against 246 KiB measured. The ceiling was sized when the tree was 110 KiB, so the rule catalog could roughly double before it fired; the per-page meta and canonical tags, then the share-card tags on all 47 pages, then the playground's backlink and structured data, and then the Google Analytics 4 loader, privacy page, script tag and footer opt-out on every page (ADR 0010), have since taken the tree to 246 KiB, so the remaining headroom is about fifteen more rule pages rather than a doubling. The 1200x630 card itself is a static asset, not markup, and does not enter this figure. A build that started emitting something unintended into web/ still fires it.",
+    "publishedPageCount": "60 against 49. One page per rule, two indexes and the privacy page; 46 rules today. Catches a generator that starts writing pages nobody asked for, which a byte total alone can miss.",
     "reportBytesAt10kFindings": "3 MiB against 2.24 MiB measured, about 235 bytes per finding. This is the number that can grow silently: a template change adding 80 bytes to a row is invisible on a fixture and adds 800 KB here. FIX-15's contract is that a 10,000-finding report stays usable, and a report that has to be downloaded before it can be read is not."
   }
 }

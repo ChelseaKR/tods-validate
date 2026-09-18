@@ -7,6 +7,17 @@ new checks may be added in minor releases.
 
 Added:
 
+- The website (playground, rule catalog, and a new `privacy.html`) counts
+  visits with Google Analytics 4 (`G-TM683Q87RD`), loaded by one first-party
+  file, `web/analytics.js`, only over HTTPS on
+  `chelseakr.github.io/tods-validate/` and never under Global Privacy Control,
+  Do Not Track or the new footer "Opt out of analytics" button (remembered as
+  `tods-validate:analytics-opt-out`). Consent Mode v2 denies the three ad
+  signals everywhere and analytics storage in the EEA, UK and CH; Google
+  signals and ad personalization are off; the page address is sent without
+  its query string or fragment, and the loader never reads a feed file or the
+  report. The playground CSP admits the minimum GA origins. See ADR 0010. The
+  CLI, Action, hook, Docker image, LSP and editor extension are unchanged.
 - `tods-validate conformance run`: a harness that runs any validator over the
   published conformance corpus and reports, per fixture, whether it agrees with
   `expectations.json`. The corpus has been downloadable for months so that
