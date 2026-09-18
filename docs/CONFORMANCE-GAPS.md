@@ -329,8 +329,24 @@ re-checked, not just that upload didn't error. Version-consistency
 (tag == `pyproject.toml` version == `CITATION.cff` version, and
 `CHANGELOG.md` has a matching dated section) and an annotated+signed-tag
 check (REL-08) are both wired into `verify.yml`, gated on `inputs.tag != ''`
-so they only run for a real release event, never for `workflow_dispatch`
-smoke-runs or PR-time `make verify`. `SECURITY.md` now states a
+so they do not run for PR-time `make verify`, which has no tag to check.
+
+**Corrected 2026-09-08:** this paragraph used to add "never for
+`workflow_dispatch` smoke-runs", and treated a dispatch as a smoke-run. It was
+not one. `publish` in `pypi-publish.yml` declares no trigger condition, so a
+dispatch uploaded to PyPI with an empty `tag` — both release checks skipped —
+and `verify-published` carried `if: github.event_name == 'release'`, so
+nothing read back what had landed. Run `31966563243` (2026-08-16, dispatched
+from `main`) is the record: steps "Version consistency (REL-03)" and "Tag is
+annotated and signed (REL-08)" `skipped`, `publish` `success`,
+`verify-published` `skipped`, run conclusion `success`. A skipped job does not
+fail a run, and a PyPI upload cannot be withdrawn. `workflow_dispatch` now
+takes a **required** `tag`, threaded to `verify`, and `verify-published` runs
+on every trigger that can publish;
+`tests/test_publish_verification_parity.py` holds both properties. The
+environment's `v*` deployment branch policy closes the branch case in
+addition, but it never closed this one: a dispatch from a version tag still
+skipped every one of those checks. `SECURITY.md` now states a
 supported-versions policy (latest 0.x only, pre-1.0) and a concrete
 response SLA (3 business days ack; 30/90-day fix-or-mitigate by severity).
 
