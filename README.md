@@ -18,7 +18,10 @@ where, and what good looks like, and cites the spec section it comes from.
 
 To try the validator without installing anything, use the
 [browser playground](https://chelseakr.github.io/tods-validate/). Validation
-runs locally in your browser; feed files are not uploaded.
+runs locally in your browser; feed files are not uploaded. The website counts
+visits with Google Analytics 4 (Global Privacy Control and Do Not Track
+honoured, opt-out in every footer, ad features off) and never sees a feed; see
+its [privacy page](https://chelseakr.github.io/tods-validate/privacy.html).
 
 ## Choose a starting point
 

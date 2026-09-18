@@ -69,7 +69,10 @@
       code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
       ul.rule-list { list-style: none; padding-left: 0; }
       ul.rule-list li { padding: 0.25rem 0; }
+      .analytics-choice button { font: inherit; color: var(--fg); background: var(--bg);
+        border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 1rem; }
     </style>
+    <script src="../analytics.js" defer></script>
   </head>
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
@@ -80,5 +83,6 @@
     <p>run_events.txt writes the same event_type or job_type two or more ways, differing only in capitalization or in the separator between words. The spec lets a producer use any values but asks for them to be consistent, and a consumer that matches on the literal value reads the spellings as unrelated types. Advisory only: two spellings can be two genuinely different values.</p>
     <p><strong>Interpretation:</strong> advisory: two values count as one value spelled differently when they match after case-folding and removing spaces, hyphens, and underscores</p>
     <p>Spec reference: <a href="https://tods-transit.org/spec/#run_eventstxt">https://tods-transit.org/spec/#run_eventstxt</a></p>
+    <footer><p><a href="../privacy.html">Privacy and analytics</a></p><p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p></footer>
   </body>
 </html>

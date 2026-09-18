@@ -4,16 +4,17 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <!--
-      Content-Security-Policy: restricts network access to the two origins
-      the playground actually needs: cdn.jsdelivr.net (Pyodide runtime, wasm,
-      and its bundled packages) and files.pythonhosted.org / pypi.org
-      (micropip fetching the tods-validate wheel and its metadata).
+      Content-Security-Policy: restricts network access to the origins the
+      playground actually needs: cdn.jsdelivr.net (Pyodide runtime, wasm,
+      and its bundled packages), files.pythonhosted.org / pypi.org
+      (micropip fetching the tods-validate wheel and its metadata), and the
+      Google Analytics 4 origins analytics.js needs (ADR 0010).
       'wasm-unsafe-eval' is required for Pyodide's WebAssembly execution;
       'unsafe-inline' is required for the inline <script> and <style> below.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net; style-src 'self' 'unsafe-inline'; connect-src https://cdn.jsdelivr.net https://files.pythonhosted.org https://pypi.org; img-src 'self' data:; frame-src 'self'; worker-src blob:; child-src blob:;"
+      content="default-src 'none'; script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' https://cdn.jsdelivr.net https://www.googletagmanager.com; style-src 'self' 'unsafe-inline'; connect-src https://cdn.jsdelivr.net https://files.pythonhosted.org https://pypi.org https://*.google-analytics.com https://*.analytics.google.com https://www.googletagmanager.com; img-src 'self' data: https://*.google-analytics.com https://www.googletagmanager.com; frame-src 'self'; worker-src blob:; child-src blob:;"
     />
     <title>tods-validate playground: check a TODS feed in your browser</title>
     <!--
@@ -153,6 +154,7 @@
       }
       code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
     </style>
+    <script src="analytics.js" defer></script>
   </head>
   <body>
     <main>
@@ -162,6 +164,7 @@
         Nothing is uploaded: the validator runs entirely on your machine via
         Pyodide (WebAssembly), so it is safe for non-public operational data.
       </p>
+      <p>Google Analytics counts visits but never sees your files or the report (<a href="privacy.html">privacy</a>).</p>
 
       <div class="panel">
         <p id="files-help">
@@ -197,6 +200,7 @@
           >Support this work on Ko-fi</a
         >
       </p>
+      <p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p>
     </footer>
 
     <!-- Pyodide runtime. Update the version to the current Pyodide release,

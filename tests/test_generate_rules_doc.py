@@ -58,7 +58,14 @@ def test_rule_page_carries_expected_fields_and_escapes_html() -> None:
         assert f'rel="{loading_rel}"' not in page, f"{loading_rel} would be an external fetch"
     for link in re.findall(r"<link\b[^>]*>", page):
         assert 'rel="canonical"' in link, f"unexpected <link>: {link}"
-    assert "<script" not in page
+    # One script only: the same-origin analytics loader (ADR 0010), relative
+    # to the site, deferred, and before </head>. Anything else, and any script
+    # with a scheme, would be an external fetch this page does not make.
+    scripts = re.findall(r"<script\b[^>]*>", page, re.IGNORECASE)
+    assert scripts == ['<script src="../analytics.js" defer>'], scripts
+    assert page.index("../analytics.js") < page.index("</head>")
+    assert page.count("data-analytics-choice") == 1
+    assert '<a href="../privacy.html">Privacy and analytics</a>' in page
 
 
 def test_rule_page_html_escapes_field_text() -> None:

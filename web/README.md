@@ -4,7 +4,16 @@ A zero-install, zero-upload TODS validator that runs entirely in the browser via
 [Pyodide](https://pyodide.org). `index.html` loads Pyodide, installs the
 published `tods-validate` wheel with micropip, writes the chosen files into
 Pyodide's virtual filesystem, and calls `validate_feed` + `render_html`. Because
-nothing leaves the browser, it is safe for non-public operational data.
+the feed files and the report never leave the browser, it is safe for
+non-public operational data.
+
+Every page here (the playground, `privacy.html` and the generated rule catalog)
+also loads `analytics.js`, which counts visits with Google Analytics 4 on the
+live site only, never under Global Privacy Control, Do Not Track or the footer
+opt-out, with ad features off and the page address sent without its query string
+or fragment. It never reads the file input or the report. See
+[ADR 0010](../docs/adr/0010-google-analytics-4-on-the-website.md) and
+`privacy.html`. Served from `localhost` it loads nothing from Google.
 
 ## Test it locally before sharing it
 

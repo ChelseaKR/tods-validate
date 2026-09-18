@@ -95,6 +95,18 @@ control — it validates whatever feed the operator points it at — but the
 tool's own footprint is: read in, findings out, nothing persisted beyond
 what the operator chooses to write (`--format`, `fix -o`, `anonymize -o`).
 
+**Website analytics (2026-09-17, ADR 0010).** The website (playground, rule
+catalog, privacy page) counts visits with Google Analytics 4, a transfer to
+Google LLC in the US. It receives the page address without query string or
+fragment, the title, the referring origin, browser/device data and an
+approximate location Google derives from the IP address; it never receives a
+feed file, a finding, or the report. It does not load under Global Privacy
+Control, Do Not Track or the footer opt-out, denies every advertising consent
+signal, denies analytics storage (no cookie) in the EEA, UK and CH, keeps
+Google signals and ad personalization off, and retains data for 14 months.
+`web/privacy.html` is the visitor-facing notice. The tool itself (CLI, Action,
+hook, Docker image, LSP, editor extension) is unaffected.
+
 **Threat model for the people in the data.** The realistic threat is
 re-identification if a feed (or a validation report quoting feed values,
 e.g. an error message echoing an `employee_id`) is shared outside the

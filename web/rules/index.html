@@ -69,7 +69,10 @@
       code { background: rgba(127, 127, 127, 0.15); padding: 0 0.25rem; border-radius: 3px; }
       ul.rule-list { list-style: none; padding-left: 0; }
       ul.rule-list li { padding: 0.25rem 0; }
+      .analytics-choice button { font: inherit; color: var(--fg); background: var(--bg);
+        border: 1px solid var(--line); border-radius: 6px; padding: 0.5rem 1rem; }
     </style>
+    <script src="../analytics.js" defer></script>
   </head>
   <body>
     <h1>tods-validate rule catalog</h1>
@@ -152,5 +155,6 @@
     <ul class="rule-list">
       <li><a href="OPS-W001.html"><code>OPS-W001</code></a> &mdash; A movement in this run is too far to be made in the time allowed <span class="badge">WARNING</span></li>
     </ul>
+    <footer><p><a href="../privacy.html">Privacy and analytics</a></p><p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p></footer>
   </body>
 </html>
