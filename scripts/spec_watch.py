@@ -25,7 +25,7 @@ tables are out of scope by design, and a spec table found for a name not in
 Every report names what it compared. A tripwire that cannot say what it
 looked at cannot be trusted when it says nothing is wrong: an unparseable
 document used to yield zero tables, zero diffs, and "schema.py is in sync
-with the upstream spec" at exit 0. A run that recognises no field table now
+with the upstream spec" at exit 0. A run that recognizes no field table now
 raises `SpecParseError`, and a run that reads some of the in-scope tables but
 not all of them reports the gap and exits advisory rather than reporting
 sync it did not establish.
@@ -337,7 +337,7 @@ def parse_spec_tables(text: str) -> dict[str, SpecTable]:
                     continue
         i += 1
     if not tables:
-        # Nothing was recognised, so nothing can be compared. Returning {} here
+        # Nothing was recognized, so nothing can be compared. Returning {} here
         # used to flow through diff_tables (zero iterations) into "schema.py is
         # in sync with the upstream spec" and exit 0 -- a green tripwire for a
         # document this script did not understand at all. Upstream restructuring
@@ -435,7 +435,7 @@ def _not_found_sentence(scope: ComparisonScope) -> str:
     return (
         f"The spec markdown had no field table for {', '.join(scope.not_found)}, "
         f"so {were} not compared at all. Either the spec dropped {those}, or "
-        "this script's parser no longer recognises its heading or columns."
+        "this script's parser no longer recognizes its heading or columns."
     )
 
 

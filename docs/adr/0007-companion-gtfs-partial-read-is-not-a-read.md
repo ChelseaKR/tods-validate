@@ -18,7 +18,7 @@ splits the defects it can find in a CSV into two kinds:
   it.
 - **Degrading** (`ragged`, `duplicate_header`): parsing finished, but some
   values did not survive it. A ragged row's values do not line up with the
-  header, so any field of that row may hold a neighbouring column's value or
+  header, so any field of that row may hold a neighboring column's value or
   nothing. A duplicated column name means the second column's values were
   dropped.
 

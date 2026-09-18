@@ -10,7 +10,7 @@ counterexample; Hypothesis also stores failing examples under
 
 Kept out of ``[tool.mutmut] pytest_add_cli_args_test_selection`` in
 pyproject.toml: mutmut drives mutants with the rule-test modules that pin
-specific rule behaviour against fixture feeds, and this module's generated
+specific rule behavior against fixture feeds, and this module's generated
 inputs would just add search-loop runtime without doing that, so it is left
 out of the mutation baseline.
 """

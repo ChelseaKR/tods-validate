@@ -156,7 +156,7 @@ source_paths = ["src/tods_validate"]
 # get killed by whichever test runs first rather than pointing at a specific
 # rule's coverage gap (see FIX-03 in docs/ideation/02-large-scale-fixes.md).
 only_mutate = ["src/tods_validate/rules/*"]
-# Drive mutants with the rule test modules: each one asserts rule behaviour
+# Drive mutants with the rule test modules: each one asserts rule behavior
 # against the fixture feeds (a passing + failing fixture per rule). Other
 # suites (CLI, config, playground) make cwd/file assumptions that do not hold
 # inside mutmut's mutants/ copy, so they are left out of the mutation run.

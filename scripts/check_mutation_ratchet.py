@@ -81,7 +81,7 @@ def main() -> int:
     if rate < float(floor):
         print(
             f"::error::mutation kill rate {rate:.1%} is below the committed floor "
-            f"{float(floor):.1%}. Something stopped pinning down behaviour it used "
+            f"{float(floor):.1%}. Something stopped pinning down behavior it used "
             "to pin down; see docs/mutation-testing.md."
         )
         return 1

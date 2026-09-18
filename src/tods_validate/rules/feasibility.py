@@ -19,7 +19,7 @@ being can do.
 
 Closing that gap means asserting a travel-time model, and the TODS spec says
 nothing about travel time. The project's promise is that a ``TODS-`` ID cites
-the section of the spec it enforces, so encoding this judgement under a
+the section of the spec it enforces, so encoding this judgment under a
 ``TODS-`` ID would spend that promise on an opinion. It gets its own
 namespace, its own opt-in category, and its own band in the coverage manifest
 instead. See ADR 0008.
@@ -70,7 +70,7 @@ def great_circle_km(a: tuple[float, float], b: tuple[float, float]) -> float:
     Uses the haversine form rather than the spherical law of cosines: the
     latter loses catastrophic precision at short distances, which is exactly
     the range this check spends most of its time in (two stops a few hundred
-    metres apart). ``asin`` is clamped because floating-point error can push
+    meters apart). ``asin`` is clamped because floating-point error can push
     the argument marginally past 1.0 for antipodal points.
     """
     lat1, lon1 = radians(a[0]), radians(a[1])
@@ -158,7 +158,7 @@ def _legs(ordered: list[_Event]) -> Iterator[_Leg]:
         "consecutive events -- covers more ground than the time allowed for it permits, so "
         "the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which "
         "compares location identifiers, this resolves both endpoints to coordinates in the "
-        "companion GTFS and measures the distance. It encodes a judgement the TODS spec does "
+        "companion GTFS and measures the distance. It encodes a judgment the TODS spec does "
         "not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID."
     ),
     # Deliberately not a spec URL: this rule is not entailed by the spec, and

@@ -145,9 +145,9 @@ def _check_license(msg: Message) -> list[Result]:
         ),
         Result(
             # `license = { file = "LICENSE" }` resolves to the file's contents,
-            # so the index page's License field becomes the whole licence text.
+            # so the index page's License field becomes the whole license text.
             # outcome-receipts published exactly that; it is cheap to refuse here.
-            "no legacy License field carrying licence text",
+            "no legacy License field carrying license text",
             legacy is None,
             "License: absent"
             if legacy is None

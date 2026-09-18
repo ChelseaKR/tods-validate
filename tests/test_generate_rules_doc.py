@@ -128,7 +128,7 @@ def test_every_published_page_carries_the_audited_stylesheet() -> None:
 
 def test_the_catalog_stylesheet_paints_both_schemes() -> None:
     # The defect the widened audit found: `color-scheme: light dark` with no
-    # colour or background on `body`, so the user agent painted dark-mode text
+    # color or background on `body`, so the user agent painted dark-mode text
     # on an unpainted canvas and every text element failed contrast. A page
     # that declares the scheme must define the palette for both halves of it.
     gen = _load_generator()
@@ -139,10 +139,10 @@ def test_the_catalog_stylesheet_paints_both_schemes() -> None:
     assert "background: var(--bg)" in style
 
 
-def test_catalog_links_do_not_rely_on_colour_alone() -> None:
+def test_catalog_links_do_not_rely_on_color_alone() -> None:
     # WCAG 1.4.1, flagged 43 times on the index by HTML_CodeSniffer: links were
     # `color: inherit` with `text-decoration: none`, so they were not
-    # distinguishable from body text by colour *or* anything else.
+    # distinguishable from body text by color *or* anything else.
     style = _load_generator()._PAGE_STYLE
     assert "text-decoration: underline" in style
     assert "text-decoration: none" not in style
@@ -230,7 +230,7 @@ def test_every_page_carries_a_share_card_that_agrees_with_the_page() -> None:
         # `summary` asks X for a square thumbnail. These pages carry a 1200x630
         # landscape card, which is the shape every network crops an unfurled
         # link to; the mismatch is why the previous head shipped no image at all
-        # and every share of a rule page arrived as bare grey text.
+        # and every share of a rule page arrived as bare gray text.
         assert '<meta name="twitter:card" content="summary_large_image" />' in head, name
         title = _attribute(head, r"<title>([^<]*)</title>")
         assert _attribute(head, r'<meta property="og:title" content="([^"]*)"') == title, name

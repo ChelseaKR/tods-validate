@@ -266,7 +266,7 @@ def test_the_playground_share_card_is_a_landscape_image_that_is_published() -> N
     """The page said what it was and showed nothing.
 
     The head carried og:title, og:description and og:url and no image at all,
-    so every share of the playground arrived as grey text on LinkedIn, Slack
+    so every share of the playground arrived as gray text on LinkedIn, Slack
     and X. Two ways an image tag goes wrong just as quietly, and both are
     checked here rather than discovered in someone else's feed: a URL naming a
     file that is not in web/, which pages.yml uploads whole, so the card 404s;
@@ -409,7 +409,7 @@ def _repository_url() -> str:
 
 
 def _license_url() -> str:
-    """The SPDX page for the licence pyproject.toml declares, built from it."""
+    """The SPDX page for the license pyproject.toml declares, built from it."""
     spdx = tomllib.loads(_PYPROJECT.read_text())["project"]["license"]
     return f"https://spdx.org/licenses/{spdx}.html"
 
@@ -476,7 +476,7 @@ def test_the_structured_data_agrees_with_what_the_project_declares() -> None:
     assert data.get("license") == _license_url()
     # Free to use is a property of this page, not a price this repository could
     # get wrong later: the validator runs in the reader's browser and the
-    # licence above is what permits it.
+    # license above is what permits it.
     assert data.get("isAccessibleForFree") is True
 
 

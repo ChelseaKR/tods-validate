@@ -6,7 +6,7 @@ body:
     attributes:
       value: |
         Ideas are welcome, including ones that turn out to be a bad fit. If you
-        are unsure whether something is a bug or intended behaviour, open a
+        are unsure whether something is a bug or intended behavior, open a
         discussion instead and we can work it out there.
   - type: textarea
     id: problem

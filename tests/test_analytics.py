@@ -48,7 +48,7 @@ CONSENT_REQUIRED = [
     *("SK", "IS", "LI", "NO", "GB", "CH"),
 ]
 
-# In CI a missing Node is a broken job, not a reason to skip the behaviour tests.
+# In CI a missing Node is a broken job, not a reason to skip the behavior tests.
 needs_node = pytest.mark.skipif(
     shutil.which("node") is None and not os.environ.get("CI"),
     reason="Node.js unavailable",

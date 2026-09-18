@@ -4,7 +4,7 @@ Line coverage tells you which code ran during the tests. It does not tell you
 whether the tests would notice if that code were wrong. Mutation testing fills
 that gap: it makes small edits to the source (a `<` becomes `<=`, an `and`
 becomes `or`, a constant changes) and reruns the suite. A mutant that the tests
-still pass is a *survivor* — a change to behaviour that no test caught.
+still pass is a *survivor* — a change to behavior that no test caught.
 
 This is run with [mutmut](https://github.com/boxed/mutmut) and scoped to the
 validation rules engine (`src/tods_validate/rules/`), the code that decides
@@ -91,7 +91,7 @@ uses):
   `tests/test_fields.py::test_impossible_calendar_date_is_flagged`.
 - **`_uses_trip_ids` forced to always return `False`.** This helper decides
   whether TODS-W302 warns that the companion GTFS has no `trips.txt` when run
-  events reference trips. Neutralised, the warning disappeared silently. Killed
+  events reference trips. Neutralized, the warning disappeared silently. Killed
   by
   `tests/test_references.py::test_trip_reference_without_companion_trips_warns_w302`.
 

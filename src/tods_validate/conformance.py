@@ -415,7 +415,7 @@ def build_argv(command: str, fixture_path: Path) -> list[str]:
         )
     # No emptiness check below: the placeholder is itself a word, so a template
     # that contains it always splits to at least one token. A guard here would
-    # be a branch nothing can reach, which reads as a defence and is not one.
+    # be a branch nothing can reach, which reads as a defense and is not one.
     tokens = shlex.split(command)
     return [token.replace(PATH_PLACEHOLDER, str(fixture_path)) for token in tokens]
 

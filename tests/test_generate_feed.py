@@ -172,14 +172,14 @@ def test_a_different_seed_produces_a_different_archive(tmp_path: Path) -> None:
     assert first.read_bytes() != other.read_bytes()
 
 
-def test_every_published_profile_builds_and_is_labelled(tmp_path: Path) -> None:
+def test_every_published_profile_builds_and_is_labeled(tmp_path: Path) -> None:
     generator = _load_generator()
     # The release job builds one archive per profile. A profile that stopped
     # building, or stopped carrying its synthetic label, would be published as
-    # a silently unlabelled artifact.
+    # a silently unlabeled artifact.
     for profile in generator.PROFILES:
         out = tmp_path / f"{profile}.zip"
-        # --trips overrides the profile's preset. The labelling and manifest
+        # --trips overrides the profile's preset. The labeling and manifest
         # paths do not depend on size, and clean-100k at full size is a 4.5 MB
         # archive this test does not need to build to answer its question.
         generator.main(["--profile", profile, "--seed", "1", "--trips", "200", "--out", str(out)])

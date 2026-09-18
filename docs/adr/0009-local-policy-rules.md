@@ -8,7 +8,7 @@
 
 ## Context
 
-A labour agreement says how long a run may last, how short a break may be, and
+A labor agreement says how long a run may last, how short a break may be, and
 how many days in a row one person may be scheduled. The TODS specification says
 none of this and cannot: these are agreements between an agency and its
 workforce, and they differ from one agency to the next. Scheduling tools know
@@ -40,8 +40,8 @@ enough.
   severity is set in the policy table, so an ID that encoded one would be wrong
   for every agency that chose another. The letter here is `P`, for policy, and
   it never changes.
-- **They are someone else's judgement.** An `OPS-` finding is this project's
-  judgement about what a person can physically do, with a default the project
+- **They are someone else's judgment.** An `OPS-` finding is this project's
+  judgment about what a person can physically do, with a default the project
   chose and defends in ADR 0008. A `LOCAL-` finding is the agency's own rule
   applied to its own schedule. A reader of a report, or of a CAD/AVL ingest
   log, should be able to tell from the ID alone whose rule fired.
@@ -88,7 +88,7 @@ it is a change to all three.
 
 ### 4. Breaks are declared, never guessed
 
-`TODS-I601` recognises a break by an `event_type` containing "break", "lunch"
+`TODS-I601` recognizes a break by an `event_type` containing "break", "lunch"
 or "meal", and it can afford to because it is advisory. A limit an agency
 enforces cannot rest on a guess about the agency's own vocabulary, and the spec
 lets a producer name event types freely. So:

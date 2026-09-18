@@ -169,9 +169,9 @@ def _band_of(rule: Rule) -> str:
     return key
 
 
-# Every colour here is stated for both schemes and checked against WCAG 2.1 AA.
+# Every color here is stated for both schemes and checked against WCAG 2.1 AA.
 # The previous stylesheet declared `color-scheme: light dark` and then set no
-# colour or background on `body`, so the user agent painted dark-mode text on
+# color or background on `body`, so the user agent painted dark-mode text on
 # an unpainted canvas: axe reported a contrast failure on every text element of
 # every published page, `<h1>` and body copy included. It was never seen
 # because `scripts/pa11y-ci.cjs` audited `index.html` and a generated report
@@ -181,7 +181,7 @@ def _band_of(rule: Rule) -> str:
 #   --fg 17.40 / 15.29   --muted 7.00 / 7.88   --link 7.78 / 8.89
 #   --line 5.33 / 6.66 (badge border; non-text, so 3:1 would do)
 #
-# Links also carry an underline rather than colour alone (WCAG 1.4.1), which is
+# Links also carry an underline rather than color alone (WCAG 1.4.1), which is
 # what HTML_CodeSniffer flagged 43 times on the index: `a { color: inherit }`
 # plus `text-decoration: none` left them indistinguishable from body text by
 # any means at all.
