@@ -21,3 +21,44 @@ updates:
       interval: monthly
     cooldown:
       default-days: 7
+  # The digest-pinned `python:*-slim` base of the Dockerfile at the root; the
+  # tag and the digest move together.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+  # The pa11y-ci accessibility gate (root package.json) and the VS Code
+  # extension (editor/vscode). CI installs both with `npm ci` from their
+  # committed lockfiles.
+  - package-ecosystem: npm
+    directories:
+      - /
+      - /editor/vscode
+    schedule:
+      interval: monthly
+    cooldown:
+      default-days: 7
+    ignore:
+      # `@types/vscode` must not outrun `engines.vscode` (^1.75.0) in
+      # editor/vscode/package.json: `vsce package` refuses to build a VSIX whose
+      # types are newer than the oldest VS Code it claims to support, so every
+      # minor or major bump here would arrive red. Raise the two together by
+      # hand when the minimum supported VS Code moves.
+      - dependency-name: "@types/vscode"
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
+
+# Not covered by any entry above, because Dependabot has no ecosystem for these
+# pins (or, for `overrides`, does not read that block). Renovate's default
+# managers proposed bumps to them until renovate.json was scoped to the
+# standards bump (#240). They are now a manual check:
+#   - `.python-version` (the local / uv interpreter), when adopting a new Python
+#     minor
+#   - the `python-version:`, `node-version:` and `java-version:` inputs to the
+#     actions/setup-* steps in .github/workflows/ and action.yml, including
+#     ci.yml's matrix
+#   - the `overrides` for pa11y and puppeteer in the root package.json (#212)
+#   - the digest-pinned `semgrep/semgrep` job container in semgrep.yml
