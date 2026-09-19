@@ -4,7 +4,7 @@ Last verified: 2026-08-27
 Recheck cadence: after any use, and quarterly with the incident-response
 standard's own cadence.
 
-Open an `incident` issue labelled `sev1` (public surface) or `sev2` (staged but
+Open an `incident` issue labeled `sev1` (public surface) or `sev2` (staged but
 caught before push) **now**, before working the steps. The issue's open and
 close timestamps are the recovery-time signal; a rotation nobody timestamped
 cannot be measured.
@@ -97,4 +97,4 @@ or SEV2. The incident issue is not closed until that file is committed.
 Include the rotation record: which credential, revoked when, confirmed how,
 and what the audit log showed.
 
-<!-- doc-currency: sha256=3ef1654132f1 -->
+<!-- doc-currency: sha256=a5de28db9375 -->

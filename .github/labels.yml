@@ -5,8 +5,8 @@
 # `gh label list` on 2026-08-27 showed none of these labels existed. Create
 # them with:
 #
-#   while read -r name colour description; do
-#     gh label create "$name" --color "$colour" --description "$description" --force
+#   while read -r name color description; do
+#     gh label create "$name" --color "$color" --description "$description" --force
 #   done < <(python -c "import yaml,sys;
 #   [print(l['name'], l['color'], l['description']) for l in
 #    yaml.safe_load(open('.github/labels.yml'))['labels']]")

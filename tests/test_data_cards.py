@@ -128,8 +128,8 @@ def test_a_matching_set_passes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) 
 
 
 def test_the_l3_boundary_is_stated_rather_than_omitted() -> None:
-    # The judgement this directory turns on: a user's feed is L3 by content and
-    # is not a source this project can claim a licence or retention line over.
+    # The judgment this directory turns on: a user's feed is L3 by content and
+    # is not a source this project can claim a license or retention line over.
     # If that card is ever dropped, the omission would read as "no L3 data
     # here", which is the opposite of true.
     card = ROOT / "docs" / "data" / "user-supplied-feeds.md"

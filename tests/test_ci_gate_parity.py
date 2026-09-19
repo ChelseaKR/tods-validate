@@ -50,6 +50,10 @@ _CI_ONLY_JOBS = {
     # question is only well-posed on CI, against the base repository; `make
     # verify` would fail a contributor for a ref they cannot see or delete.
     "published-refs": "`published-refs` job",
+    # Builds the wheel and sdist and reads their metadata. `make dist-metadata`
+    # exists and is deliberately not a `verify` gate: it needs a `dist/`, and
+    # building one needs the build backend from an index.
+    "packaging": "`packaging` job",
 }
 
 # Jobs that run a gate's recipe directly instead of invoking the make target.

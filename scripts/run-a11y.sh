@@ -35,6 +35,10 @@ cp web/index.html "$a11y_tmp/index.html"
 # at them.
 mkdir -p "$a11y_tmp/rules"
 cp web/rules/*.html "$a11y_tmp/rules/"
+# The privacy notice, and the analytics loader every page references (ADR 0010).
+# Served from 127.0.0.1 the loader never contacts Google; it only wires the
+# footer's opt-out control, so the audit sees the real, visible button.
+cp web/privacy.html web/analytics.js "$a11y_tmp/"
 "$a11y_validator" tests/fixtures/invalid/TODS-E201 --format html \
   > "$a11y_tmp/report.html" || [[ "$?" -eq 1 ]]
 

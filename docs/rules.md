@@ -1080,7 +1080,7 @@ Spec reference: <https://tods-transit.org/spec/#vehicle_assignmentstxt>
 
 Severity: INFO. Opt-in: off by default, enable with `--enable advisory` or `--enable TODS-I601`.
 
-A run is on duty for a long continuous span with no event whose type names a break, lunch, or meal. Advisory only: break modelling varies by agency and labor agreement, so this is never an error.
+A run is on duty for a long continuous span with no event whose type names a break, lunch, or meal. Advisory only: break modeling varies by agency and labor agreement, so this is never an error.
 
 Interpretation: advisory: 'break' detected by event_type containing break/lunch/meal
 
@@ -1140,7 +1140,7 @@ Spec reference: <https://tods-transit.org/spec/#run_eventstxt>
 
 Severity: WARNING. Needs a companion GTFS feed. Opt-in: off by default, enable with `--enable feasibility` or `--enable OPS-W001`.
 
-A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgement the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID.
+A movement the run requires -- either inside one event, or in the gap between two consecutive events -- covers more ground than the time allowed for it permits, so the implied travel speed exceeds the configured ceiling. Unlike TODS-W409, which compares location identifiers, this resolves both endpoints to coordinates in the companion GTFS and measures the distance. It encodes a judgment the TODS spec does not make, which is why it is opt-in and carries an OPS- rather than a TODS- ID.
 
 Interpretation: straight-line: distance is great-circle between stop coordinates, which understates road distance, so the implied speed reported is a lower bound on the speed actually required
 

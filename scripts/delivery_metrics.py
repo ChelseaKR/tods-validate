@@ -3,7 +3,7 @@
 
 `docs/standards/QUALITY-AND-METRICS-STANDARD.md` asks for "a `gh api`-based
 collector [that] reads deploy, release, and publish workflow runs plus
-`incident`-labelled issues, then writes a committed quarterly
+`incident`-labeled issues, then writes a committed quarterly
 `DORA-<year>-Q<n>.md` report and JSON snapshot", and states that
 "library/CLI repositories report DF/LT only" and that "the collector never
 fabricates a zero".
@@ -38,7 +38,7 @@ ROOT = Path(__file__).resolve().parents[1]
 # number is absent instead of leaving a reader to guess.
 NOT_APPLICABLE = {
     "failedDeploymentRecoveryTime": (
-        "no incident-labelled issue exists yet; becomes measurable from issue "
+        "no incident-labeled issue exists yet; becomes measurable from issue "
         "open and close timestamps at the first one (IR-03)"
     ),
     "deploymentReworkRate": (

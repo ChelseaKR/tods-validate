@@ -6,7 +6,7 @@ actually asks of a new pick: **what changed in the data itself**. This module
 does, by primary key.
 
 Two things it deliberately does not do. It produces no findings and passes no
-judgement on whether a change is right; and it never reports a file it could not
+judgment on whether a change is right; and it never reports a file it could not
 read as a file whose rows were all deleted. That second one is the whole reason
 the ``unreadable`` bucket exists: an unreadable ``run_events.txt`` on the NEW
 side has zero rows, and a keyed comparison that trusted the row count would
@@ -146,7 +146,7 @@ class PickDiff:
         and reporting that as a clean diff would count a check that could not
         run as a check that passed. Both are already errors in their own right
         under `validate` (TODS-E103 and TODS-E204), so this is not a new
-        judgement about the feed, only a refusal to answer over one.
+        judgment about the feed, only a refusal to answer over one.
         """
         return tuple(
             f for f in self.files if f.not_compared_kind == "unreadable" or f.duplicate_keys

@@ -19,12 +19,16 @@
 #   - the VS Code extension package job, which type-checks, audits and builds
 #     a VSIX out of editor/vscode. It is path-filtered to that directory, so it
 #     is absent from most pull requests, which is how it stayed off this list
-#     for as long as it did.
+#     for as long as it did;
+#   - the `packaging` job, which builds the wheel and sdist and runs
+#     `make dist-metadata` over them. Kept out of `verify` for the reason
+#     `perf-check` is: it needs a build backend fetched from an index, so a
+#     laptop gate would fail offline rather than report anything.
 #
 # This paragraph is checked against the workflows by
 # tests/test_ci_gate_parity.py, so a job added later cannot reject a tree that
 # `make verify` has just called green without saying so here.
-.PHONY: verify lockfile lint format typecheck test docs-check published-refs-check contract-check i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff perf-check memory-check
+.PHONY: verify lockfile lint format typecheck test docs-check published-refs-check contract-check i18n-check incident-check data-cards-check audit npm-audit secrets a11y citation-cff perf-check memory-check dist-metadata
 
 # Run the tools this repository pins, not whichever ones the shell happens to
 # find first.
@@ -56,7 +60,7 @@
 # Explicit paths rather than an exported PATH, because `export PATH` does not
 # reach a recipe like `typecheck`'s. A recipe line with no shell metacharacters
 # is exec'd directly instead of through /bin/sh, and that path search does not
-# honour make's exported value (GNU Make 3.81, which is what macOS ships): with
+# honor make's exported value (GNU Make 3.81, which is what macOS ships): with
 # `export PATH := $(CURDIR)/.venv/bin:$(PATH)` in force, `mypy` still found the
 # pipx build and still printed 96 errors, while `mypy; :` -- the same command
 # with a metacharacter, so run through the shell -- printed Success. A fix that
@@ -87,7 +91,7 @@ VERIFY_GATES := lockfile action-lock lint format typecheck test docs-check contr
 
 # The gates run one after another and every one of them runs, whatever the ones
 # before it did. This is deliberate. When `verify` was a prerequisite list, make
-# stopped at the first failure, so a red gate silently cancelled every gate
+# stopped at the first failure, so a red gate silently canceled every gate
 # after it -- an unfixable dependency advisory in the npm toolchain meant the
 # accessibility check had not run on any commit for weeks, and nothing said so.
 # Running them all is not the same as tolerating failures: each gate prints its
@@ -342,3 +346,13 @@ perf-check:
 # measurement inside `make test`, so the budget is not only checked in CI.
 memory-check:
 	$(PYTHON) scripts/check_memory_budget.py
+
+# What PyPI will actually be told, read out of the built wheel and sdist rather
+# than out of pyproject.toml (#223). Published metadata is immutable, so the
+# only place this can be caught is before the upload; the `publish` job runs it
+# against the exact artifacts it is about to hand to PyPI, and the `packaging`
+# CI job runs it on every pull request so a release is not the first time
+# anyone looks. Deliberately not a VERIFY_GATES gate: it needs `dist/`, and
+# building that needs the backend from an index.
+dist-metadata:
+	$(PYTHON) scripts/check_dist_metadata.py dist

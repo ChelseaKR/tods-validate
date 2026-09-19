@@ -32,7 +32,7 @@ finding. Every `TODS-` rule carries a `spec_section` URL; `docs/rules.md`, SARIF
 `helpUri`, the editor hover and the published rule catalog all surface it. A
 producer who receives a `TODS-` finding is entitled to read it as *the standard
 requires this*. Issuing an opinion under a `TODS-` ID would spend that promise
-on a judgement, and would do so invisibly — the finding would look exactly like
+on a judgment, and would do so invisibly — the finding would look exactly like
 the forty-five that are genuinely spec-cited.
 
 ## Decision
@@ -62,7 +62,7 @@ is.
 
 `feasibility` is a new value in `CATEGORIES`, opt-in like `coverage` and
 `advisory`, and deliberately not folded into either. `coverage` and `advisory`
-are judgement calls *about how to read the spec*. `feasibility` is not about the
+are judgment calls *about how to read the spec*. `feasibility` is not about the
 spec at all. Keeping them apart is what lets `--enable advisory` remain a
 statement about spec interpretation, and it gives the band its own line in the
 coverage manifest.
@@ -91,7 +91,7 @@ divided is the straight line and not the route. At 120 km/h straight-line, a
 flagged movement is one no ground vehicle could make regardless of the route it
 took.
 
-The number is a judgement, not a fact, so **every finding quotes the ceiling in
+The number is a judgment, not a fact, so **every finding quotes the ceiling in
 force**, the way the severity-remap disclosure already works. An impossible
 configured value (zero, negative, non-finite, or a boolean) is a config error
 and exits 2 rather than being clamped into a different check than the operator
@@ -153,7 +153,7 @@ able to apply.
 
 ## Alternatives considered
 
-**Extend `TODS-W409`.** Rejected: it would put an uncitable judgement behind a
+**Extend `TODS-W409`.** Rejected: it would put an uncitable judgment behind a
 spec-cited ID, and would change the meaning of an existing rule's findings for
 every consumer already baselining against it.
 

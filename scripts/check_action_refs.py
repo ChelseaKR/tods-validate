@@ -117,7 +117,7 @@ def _judge(ref: str, rest: str, current: str) -> str | None:
         comment = SHA_COMMENT_RE.search(rest)
         if comment is not None and comment.group("version") != current:
             return (
-                f"is a commit SHA labelled v{comment.group('version')}, but the "
+                f"is a commit SHA labeled v{comment.group('version')}, but the "
                 f"current release is v{current}. Either the SHA or its comment "
                 f"is stale, and the comment is the half a reader trusts."
             )

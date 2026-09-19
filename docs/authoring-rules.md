@@ -80,7 +80,7 @@ definitions, repeated from [rules.md](rules.md):
 When the spec is ambiguous, implement the permissive reading and record the
 choice: set the rule's `interpretation=` (it is surfaced in `rules --format
 json` so consumers can audit it) and, if the ambiguity is real, add an entry to
-[spec-questions.md](spec-questions.md). A judgement call that would be noise in a
+[spec-questions.md](spec-questions.md). A judgment call that would be noise in a
 default gate belongs in an opt-in category (`coverage` or `advisory`) with
 `default_enabled=False`, not as a core WARNING.
 

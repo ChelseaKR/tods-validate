@@ -185,7 +185,7 @@ def _read_gtfs_validator_notices(raw: object) -> _NoticeCounts | str:
     zero notices read out of a document this code did not understand renders
     identically to a genuinely clean gtfs-validator run ("0 error notice(s),
     0 warning notice(s), 0 info notice(s)"), which is exactly the misreading
-    this module exists to prevent. A shape this version does not recognise is
+    this module exists to prevent. A shape this version does not recognize is
     a stage that produced no result, so the caller reports it FAILED (#147).
 
     Being strict costs something and it is the right trade here: if a future

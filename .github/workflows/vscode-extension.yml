@@ -56,7 +56,7 @@ jobs:
       # request and every push to main. It also adjudicates against waivers.yml
       # rather than taking `--audit-level` as its only lever, so a reviewed and
       # dated exception is possible here for the first time -- which the step
-      # this replaces could never have honoured, and would have contradicted.
+      # this replaces could never have honored, and would have contradicted.
       # tests/test_npm_audit_gate.py holds that walk to the lockfiles this
       # repository commits, so narrowing it back to the root fails there.
       - name: Package VSIX

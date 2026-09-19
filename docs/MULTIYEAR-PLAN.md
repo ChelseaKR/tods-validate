@@ -31,7 +31,7 @@ which of those it is drawing on.
 
 ## The through-line
 
-`ideation/04-impact-and-sequencing.md` closes on the judgement this plan is
+`ideation/04-impact-and-sequencing.md` closes on the judgment this plan is
 built around: the existing roadmaps point outward at feeds, upstream
 adoption, and new surfaces, and the highest-leverage unwritten work points
 inward, at making the validator's own claims structurally true before real
@@ -54,7 +54,7 @@ closed and says what it did not read.
   upstream spec, printed "schema.py is in sync with the upstream spec" and
   exited 0 for any document it could not parse, and for a partial parse where
   the tables it did read happened to match. Every report now names the tables
-  it compared; a run that recognises nothing raises, and a partial run exits
+  it compared; a run that recognizes nothing raises, and a partial run exits
   advisory. The weekly workflow opens an issue for a failed comparison, not
   only for drift, because a tripwire that fails silently is the failure it
   exists to catch.
@@ -123,7 +123,7 @@ Not executed, and why:
 | Tagging `v1.0.0` | The maintainer. Signed, annotated tags are not something an automated pass creates. |
 | ~~Enabling the branch ruleset (CQ-37 to 43, CICD-03/11-18) and the PyPI environment scoping (CICD-06)~~ | Both done 2026-09-01. `protect-main` requires sixteen checks with no bypass actors, and `docs/rulesets/main.json` is its export; the `publish` job is scoped to a `pypi` environment PyPI now names. |
 | Deleting the stray `v0` tag | The maintainer. `docs/CONFORMANCE-GAPS.md` already records that deleting a published ref is out of scope for a file-editing pass, and the two commands to do it. |
-| #143 (structure warning for a recognized-but-unexpected file) and #144 (a second advisory rule) | Nothing, except that both need a spec citation chosen and defended, both are labelled `good first issue` deliberately, and the plan already says neither blocks the release. Left open for a contributor rather than absorbed. |
+| #143 (structure warning for a recognized-but-unexpected file) and #144 (a second advisory rule) | Nothing, except that both need a spec citation chosen and defended, both are labeled `good first issue` deliberately, and the plan already says neither blocks the release. Left open for a contributor rather than absorbed. |
 
 **Depends on.** Upstream PR #156 (people, not engineering), and a
 conformance-only release, which only the maintainer can cut. The two settings
@@ -193,12 +193,12 @@ Not executed, and why:
 | Item | Blocked on |
 | --- | --- |
 | FIX-04's compact row representation (`Row.values` as a view over a tuple) | Nothing external, but it is L-to-XL work touching every rule's data access, and it wants the differential corpus as a safety net. Deferred deliberately rather than started; the budget gate means it can be attempted later against a number. |
-| A Lighthouse baseline | A judgement the maintainer should make, not an agent. It means a new npm toolchain on top of the one already carrying an unpatchable high-severity advisory (`extract-zip` via puppeteer via `pa11y-ci`), for a metric that overlaps what axe and HTML_CodeSniffer already gate. The bundle half of that gap is closed; this half is stated rather than quietly ticked. |
+| A Lighthouse baseline | A judgment the maintainer should make, not an agent. It means a new npm toolchain on top of the one already carrying an unpatchable high-severity advisory (`extract-zip` via puppeteer via `pa11y-ci`), for a metric that overlaps what axe and HTML_CodeSniffer already gate. The bundle half of that gap is closed; this half is stated rather than quietly ticked. |
 | Final calibration of any of these against real data | #76. Every number in `docs/BENCHMARKS.md` says synthetic, because it is. |
 
 **Depends on.** Phase 2's contract freeze, so that performance work cannot
 quietly change behavior. That freeze is blocked on a release cycle, so this
-phase honoured the constraint instead of the schedule: the one behavioural
+phase honored the constraint instead of the schedule: the one behavioral
 change here (the value pool) is byte-for-byte identical in output, and the
 whole suite plus the conformance corpus pass unchanged.
 
@@ -263,7 +263,7 @@ Not executed, and why:
 
 | Item | Blocked on |
 | --- | --- |
-| Publishing the extension to the Marketplace and Open VSX (EXP-10) | Two publisher accounts and a legal acceptance: an Azure DevOps organisation with a Marketplace-scoped PAT, and an Eclipse Foundation account with the Contributor Agreement signed. Neither is something a repository can hold. The runbook is written so this is one session's work. |
+| Publishing the extension to the Marketplace and Open VSX (EXP-10) | Two publisher accounts and a legal acceptance: an Azure DevOps organization with a Marketplace-scoped PAT, and an Eclipse Foundation account with the Contributor Agreement signed. Neither is something a repository can hold. The runbook is written so this is one session's work. |
 | Creating the six incident labels | They are declared in `.github/labels.yml`, not created; `gh label list` shows none exist. Creating them is a repository change, with the command in that file's header. IR-02's live check needs them first. |
 | A second maintainer | A person, not a milestone. `.github/CODEOWNERS` has been ready since it landed. The measured consequence is now written down rather than felt: 113 of 118 merged pull requests had zero review. |
 
@@ -295,7 +295,7 @@ last updated 2026-07-12**. Nothing has been declined and nothing has been
 adopted; the question has not been answered.
 
 Nothing in this phase has been started, and starting it would be the overclaim
-the plan already warns against. Attestations that nobody upstream recognises
+the plan already warns against. Attestations that nobody upstream recognizes
 are a certificate this project issues to itself, and an annex proposed to a
 board that has not answered the smaller question first is a worse version of
 asking it. The fallback, a well-maintained third-party catalog, is what exists
@@ -364,7 +364,7 @@ live on **2026-08-27**; all eight gates were still open.
 | Screen-reader and keyboard walkthrough (#74) | A human with assistive technology, ideally a real AT user. Open, updated 2026-08-21 | The blocking axe and HTML_CodeSniffer gates are a floor; `docs/a11y/STATEMENT.md` names WCAG 2.1 AA as the target and deliberately makes no conformance claim, because automated checks are not evidence of usability |
 | Confirming the deployed playground end to end (#146) | Recording browser, OS and date against the live page. Open, updated 2026-08-23 | `scripts/check-playground-boots.cjs` now boots the live page in a real browser and asserts a finding renders, which answers most of it; the dated record is the remainder |
 | Spec additions upstream: rosters (#45), runtimes (#42, #43), chargers (#46) | Upstream adopting any of the four. All open; #45 last touched 2024-08-26, #42 and #43 2024-08-28, #46 2023-12-29 | `docs/research/E1-upstream-spec-state.md` records that none is merged and one has been dormant for over two and a half years; `spec_watch` is the tripwire for the spec text, `check_phase_gates.py` for the proposals themselves |
-| Two good first rules (#143, #144) | A contributor, or a maintainer deciding to absorb them. Open, updated 2026-08-23 | Both are labelled `good first issue` on purpose and neither blocks the v1.0.0 release; `docs/authoring-rules.md` carries the contract, fixture requirement, and doc-regeneration step for each |
+| Two good first rules (#143, #144) | A contributor, or a maintainer deciding to absorb them. Open, updated 2026-08-23 | Both are labeled `good first issue` on purpose and neither blocks the v1.0.0 release; `docs/authoring-rules.md` carries the contract, fixture requirement, and doc-regeneration step for each |
 
 ## What would tell us this plan is wrong
 

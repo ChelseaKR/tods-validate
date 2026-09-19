@@ -19,7 +19,7 @@ remaining work is one session rather than a research project.
 Publishing needs two publisher accounts and a terms acceptance, none of which
 a repository can hold or an automated pass can create:
 
-- **Visual Studio Marketplace** needs an Azure DevOps organisation, a
+- **Visual Studio Marketplace** needs an Azure DevOps organization, a
   publisher created under it, and a personal access token scoped to
   Marketplace (Manage). The publisher id `tods-validate`, already declared in
   `editor/vscode/package.json`, has to be registered by a person and may be
@@ -83,4 +83,4 @@ npx ovsx publish tods-validate-*.vsix --pat "$OPEN_VSX_TOKEN"
   worked once, scoped to an environment, and with the same trusted-publisher
   reasoning `pypi-publish.yml` documents.
 
-<!-- doc-currency: sha256=0226c4eeceec -->
+<!-- doc-currency: sha256=00acd226a982 -->

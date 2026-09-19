@@ -188,7 +188,7 @@ def build_code_actions(
     ``get_line(index)`` returns the document's line text without its newline, or
     None when out of range. Only TODS-W206 (trim the padded value in place) and
     TODS-W408 (delete the duplicate row) are offered; everything else needs a
-    human's judgement and is left to ``validate``.
+    human's judgment and is left to ``validate``.
     """
     actions: list[lsp.CodeAction] = []
     for diagnostic in diagnostics:

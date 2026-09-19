@@ -33,7 +33,7 @@
     },
     "failedDeploymentRecoveryTime": {
       "value": null,
-      "reason": "no incident-labelled issue exists yet; becomes measurable from issue open and close timestamps at the first one (IR-03)"
+      "reason": "no incident-labeled issue exists yet; becomes measurable from issue open and close timestamps at the first one (IR-03)"
     },
     "deploymentReworkRate": {
       "value": null,

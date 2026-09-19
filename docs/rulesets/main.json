@@ -74,6 +74,9 @@
             "context": "lint"
           },
           {
+            "context": "packaging"
+          },
+          {
             "context": "perf"
           },
           {

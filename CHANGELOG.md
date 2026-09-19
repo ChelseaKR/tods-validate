@@ -7,6 +7,17 @@ new checks may be added in minor releases.
 
 Added:
 
+- The website (playground, rule catalog, and a new `privacy.html`) counts
+  visits with Google Analytics 4 (`G-TM683Q87RD`), loaded by one first-party
+  file, `web/analytics.js`, only over HTTPS on
+  `chelseakr.github.io/tods-validate/` and never under Global Privacy Control,
+  Do Not Track or the new footer "Opt out of analytics" button (remembered as
+  `tods-validate:analytics-opt-out`). Consent Mode v2 denies the three ad
+  signals everywhere and analytics storage in the EEA, UK and CH; Google
+  signals and ad personalization are off; the page address is sent without
+  its query string or fragment, and the loader never reads a feed file or the
+  report. The playground CSP admits the minimum GA origins. See ADR 0010. The
+  CLI, Action, hook, Docker image, LSP and editor extension are unchanged.
 - `tods-validate conformance run`: a harness that runs any validator over the
   published conformance corpus and reports, per fixture, whether it agrees with
   `expectations.json`. The corpus has been downloadable for months so that
@@ -44,7 +55,7 @@ Added:
   one for this project's own report rather than retyping it.
 
 - A `[policy]` table in `tods-validate.toml`, for the limits an agency's
-  labour agreement sets and the TODS spec cannot: worked time, piece length,
+  labor agreement sets and the TODS spec cannot: worked time, piece length,
   minimum break, spread, consecutive days per employee, and a vehicle on every
   day a revenue event operates. They are checked as `LOCAL-P001` to
   `LOCAL-P006`, each finding quotes the limit in force and ends by saying it is
@@ -104,7 +115,7 @@ Added:
 
   It is the first rule outside the `TODS-` namespace, and that is deliberate.
   A `TODS-` ID cites the section of the spec it enforces, and the spec says
-  nothing about travel time, so issuing this judgement under a `TODS-` ID would
+  nothing about travel time, so issuing this judgment under a `TODS-` ID would
   have made an opinion indistinguishable from a conformance failure.
   `tests/test_registry.py` now enforces both halves of that promise: every
   `TODS-` rule cites the spec, and no other rule does. See
@@ -268,10 +279,46 @@ Fixed:
   exactly the six fixtures that carry a `stops.txt`.
 
 - `explain`, editor hovers, `docs/rules.md` and the published rule page all
-  labelled `OPS-W001`'s citation, which is ADR 0008, as the TODS specification
+  labeled `OPS-W001`'s citation, which is ADR 0008, as the TODS specification
   (`Spec:`, `[TODS specification]`, `Spec reference:`). A rule outside the
   `TODS-` namespace now reads "Not a TODS specification requirement. Decision
   record:" before its link. Every `TODS-` rule renders exactly as it did.
+
+- A `workflow_dispatch` of `pypi-publish.yml` uploaded to PyPI with its
+  release checks skipped, and reported success. `publish` carries no trigger
+  condition, so both of the workflow's triggers reach it — but `verify` was
+  called with an empty `tag` outside a release event, which disables the two
+  checks in `verify.yml` gated on `inputs.tag != ''` (tag/`pyproject.toml`/
+  `CITATION.cff`/`CHANGELOG.md` version consistency, and that the tag is an
+  annotated tag whose SSH signature verifies against the committed
+  `allowed_signers`), and `verify-published` — the job that re-downloads what
+  landed on PyPI and checks its provenance — carried
+  `if: github.event_name == 'release'`.
+
+  Measured on run `31966563243` (2026-08-16, dispatched from `main`): the
+  `verify / verify` job reports "Version consistency (REL-03)" and "Tag is
+  annotated and signed (REL-08)" as **skipped**, `publish` as **success**, and
+  `verify-published` as **skipped**. A skipped job does not fail a run, so the
+  run concluded `success`. `docs/CONFORMANCE-GAPS.md` described the gating as
+  restricting those checks to a real release, "never for `workflow_dispatch`
+  smoke-runs" — but a dispatch was never a smoke-run, because nothing stopped
+  it publishing. That sentence is corrected there.
+
+  `workflow_dispatch` now takes a **required** `tag` input, which flows to
+  `verify`, so the dispatch path enforces the same version-consistency and
+  signed-tag checks the release path does; and `verify-published` no longer
+  carries a trigger condition, so what actually reached PyPI is re-read on
+  every path that can publish. `deploy-playground` is deliberately unchanged
+  and stays release-only: redeploying the site is a separate publication
+  decision from uploading a wheel.
+
+  `tests/test_publish_verification_parity.py` pins it structurally — it walks
+  the `needs:` closure rather than matching a job name, refuses an empty
+  literal in any branch of the tag expression, requires every `inputs.*` the
+  expression reads to be declared `required`, and asserts the set of triggers
+  that reach the upload is a subset of the set that reach the read-back. Its
+  trigger analysis raises on an `if:` shape it does not recognize rather than
+  reading an unparsed condition as unrestricted.
 
 - `scripts/generate_rules_doc.py` grouped rules into catalog bands by a single
   digit and silently skipped any rule that matched no band. A rule in a new
@@ -304,7 +351,7 @@ Fixed:
   `web/index.html` and all 45 catalog pages carried `og:title`,
   `og:description` and `og:url` and no `og:image` or `twitter:image`, with
   `twitter:card` set to `summary`, so a link to the playground or to a rule
-  page unfurled on LinkedIn, Slack or X as grey text. `web/og-card.png` is
+  page unfurled on LinkedIn, Slack or X as gray text. `web/og-card.png` is
   1200x630, the box all three fit an unfurled image to, and `twitter:card` is
   now `summary_large_image`. The catalog pages get theirs from
   `scripts/generate_rules_doc.py`, which derives the card's absolute URL from
@@ -426,7 +473,7 @@ Fixed:
   They now describe the shape rather than a number. A sixth gate was not
   added on purpose: the count is already checked where it is a published
   claim, and requiring five more edits every time a rule lands would make
-  adding a rule a documentation exercise. No behaviour, output or gate
+  adding a rule a documentation exercise. No behavior, output or gate
   changes here.
 
 Changed:
@@ -584,15 +631,15 @@ Fixed:
 - The 44 rule-catalog pages published at `web/rules/` had never been audited
   for accessibility. `pages.yml` deploys the whole `web/` tree; `make a11y`
   pointed axe and HTML_CodeSniffer at `index.html` and a generated report and
-  at nothing else. Added to the gate, they failed it: **141 colour-contrast
-  errors and 43 "links must be distinguishable without relying on colour"
+  at nothing else. Added to the gate, they failed it: **141 color-contrast
+  errors and 43 "links must be distinguishable without relying on color"
   errors**, from two defects in one shared stylesheet. It declared
   `color-scheme: light dark` and then set no `color` or `background` on
   `body`, so a user agent in dark mode painted light text on an unpainted
   canvas and every text element failed, `<h1>` and body copy included; and
   links were `color: inherit` with `text-decoration: none`, leaving them
   indistinguishable from body text by any means at all. Both fixed, every
-  colour stated for both schemes with its computed ratio recorded, all four
+  color stated for both schemes with its computed ratio recorded, all four
   audited URLs passing.
 - `scripts/generate_feed.py` promised packages that "can be regenerated
   bit-for-bit", but wrote zip entries with build-time mtimes, so two runs of
@@ -661,7 +708,7 @@ Fixed:
     restructuring its headings, renaming the Type or Required columns, or the
     raw URL serving any other 200 all landed there, and the weekly workflow
     greps stdout for drift, so nothing would have reported that the tripwire
-    had stopped working. A run that recognises no field table now raises and
+    had stopped working. A run that recognizes no field table now raises and
     prints a report under a heading the workflow opens an issue for; a run
     that reads some of the four in-scope tables but not all of them names the
     ones it did not read and exits 2 rather than 0. Every report, clean ones
@@ -1059,7 +1106,7 @@ Docs:
 ## [0.9.1] - 2026-08-18
 
 A patch release that repairs the release pipeline itself and ships one
-playground change. No validator behaviour changes: no rule added, removed,
+playground change. No validator behavior changes: no rule added, removed,
 renumbered or re-severitied, and the CLI, Action, and report contracts are
 untouched. It matters because the two pipeline defects below are why the
 deployed playground still serves tods-validate 0.7.0 today; this is the
@@ -1107,7 +1154,7 @@ Docs:
 
 ## [0.9.0] - 2026-08-16
 
-Behaviour change for Action and CLI consumers: two checks now report findings
+Behavior change for Action and CLI consumers: two checks now report findings
 they did not report in v0.8.0, and one stops reporting findings it should never
 have reported. On the same feed, `tods-validate` can therefore exit 1 where
 v0.8.0 exited 0, or exit 0 where v0.8.0 exited 1. Nothing about the exit-code

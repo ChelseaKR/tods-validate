@@ -103,7 +103,7 @@ def test_a_pair_just_over_the_ceiling_is_flagged(tmp_path) -> None:
 
 
 def test_the_configured_ceiling_is_what_is_applied(tmp_path) -> None:
-    """The ceiling is honoured, not merely accepted and ignored."""
+    """The ceiling is honored, not merely accepted and ignored."""
     _write(tmp_path, "daily,1,10,Deadhead,near,08:00:00,far,08:16:00")  # 112.5 km/h
     assert _findings(tmp_path) == []
     assert len(_findings(tmp_path, max_implied_speed_kph=100.0)) == 1

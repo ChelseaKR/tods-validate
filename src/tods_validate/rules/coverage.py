@@ -1,6 +1,6 @@
 """Opt-in coverage and advisory checks (TODS-x5xx, TODS-x6xx).
 
-These do not check spec conformance; they surface judgement calls a scheduler
+These do not check spec conformance; they surface judgment calls a scheduler
 or analyst might want to know about. They are off by default (a clean feed can
 legitimately trip them) and are enabled with ``--enable coverage`` /
 ``--enable advisory`` or by rule ID.
@@ -105,7 +105,7 @@ def blocks_without_vehicle(context: ValidationContext) -> Iterator[Finding]:
     title="Run has a long span with no break event",
     description=(
         "A run is on duty for a long continuous span with no event whose type names a "
-        "break, lunch, or meal. Advisory only: break modelling varies by agency and "
+        "break, lunch, or meal. Advisory only: break modeling varies by agency and "
         "labor agreement, so this is never an error."
     ),
     spec_section=f"{SPEC_URL}#run_eventstxt",

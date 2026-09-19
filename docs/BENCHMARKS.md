@@ -131,18 +131,28 @@ ceilings, recorded in `perf/bundle-baseline.json`.
 
 | Surface | Measured | Budget |
 | --- | --- | --- |
-| `web/index.html` | 11,513 | 12,288 |
-| Whole published `web/` tree | 222,967 | 262,144 |
-| Published page count | 48 | 60 |
+| `web/index.html` | 13,574 | 13,824 |
+| Whole published `web/` tree | 252,175 | 262,144 |
+| Published page count | 49 | 60 |
 | HTML report at 10,000 findings | 2,348,762 | 3,145,728 |
 
-The `web/index.html` ceiling did not move when the share card landed. The
-head advertised a title, a description and a URL and no image, so every share
-of the playground arrived as grey text; the image tags cost 1.1 KiB and fit
-under the existing 12,288 ceiling, leaving 6% headroom rather than 16%. That
-is deliberate: this page is not supposed to grow, so the next addition of
-this size gets argued for when it is needed. The 1200x630 PNG is a static
-asset and does not enter either byte figure.
+The `web/index.html` ceiling has moved twice. The first move was by 1,024
+bytes. The share card before it fitted under the old ceiling
+and left 6% headroom, on the stated understanding that the next addition of
+that size would be argued for rather than pre-absorbed. The argument is
+DISC-02: the page carried no link to `github.com/ChelseaKR/tods-validate`, so
+a reader who found the playground through a search had no route to the CLI,
+the GitHub Action, the pre-commit hook, the Docker image or the editor
+extension, and a crawler had to infer from prose that this page is software
+that runs in the reader's own browser. A backlink and one
+`application/ld+json` node cost 1.5 KiB between them, and that ceiling left
+311 bytes -- 2.3% -- so the tripwire got tighter, not looser. The second move,
+by 512 bytes on 2026-09-17, is for the owner's decision to count visits with
+Google Analytics 4 on every public site (ADR 0010): the minimum GA origins in
+the CSP, one sentence beside the lede saying GA never sees a feed file or the
+report, the `analytics.js` script tag and the footer opt-out cost 573 bytes
+together, leaving 250 bytes -- 1.8% -- tighter again. The 1200x630 PNG is a
+static asset and does not enter either byte figure.
 
 The last row is the one that can grow without anyone noticing: about 235 bytes
 per finding, so a template change adding 80 bytes to a row is invisible on a

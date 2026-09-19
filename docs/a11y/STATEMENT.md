@@ -23,7 +23,7 @@ position from the attempt at a manual walkthrough, and #74 tracks the real one.
 
 | Surface | Target | Checked by | Blocking |
 | --- | --- | --- | --- |
-| Terminal output (`--format text`) | WCAG 2.1 AA where applicable | Design review only: severity is carried by a word, never colour, and no ANSI colour is emitted at all, so `NO_COLOR` has nothing to disable | Design invariant, pinned by `tests/test_report.py` |
+| Terminal output (`--format text`) | WCAG 2.1 AA where applicable | Design review only: severity is carried by a word, never color, and no ANSI color is emitted at all, so `NO_COLOR` has nothing to disable | Design invariant, pinned by `tests/test_report.py` |
 | HTML report (`--format html`) | WCAG 2.1 AA | axe + HTML_CodeSniffer at `WCAG2AA`, on a freshly generated report, every pull request | Yes (`make a11y`) |
 | Playground page (`web/index.html`) | WCAG 2.1 AA | The same two runners, **on the `?a11y-static=1` branch**, which deliberately skips the Pyodide boot. The booted state is not audited | Yes (`make a11y`) |
 | Rule catalog (`web/rules/`, 47 published pages) | WCAG 2.1 AA | The same two runners, on the index and one rule page. All 47 come from one template in `scripts/generate_rules_doc.py`, which `--check` gates and `tests/test_generate_rules_doc.py` pins | Yes (`make a11y`), since 2026-08-27 |
@@ -34,15 +34,15 @@ position from the attempt at a manual walkthrough, and #74 tracks the real one.
 ## What the last check found
 
 The rule catalog entered the blocking gate on 2026-08-27 and failed it: 141
-colour-contrast errors and 43 "links must be distinguishable without relying on
-colour" errors across the index and a rule page. Both were one defect each in
+color-contrast errors and 43 "links must be distinguishable without relying on
+color" errors across the index and a rule page. Both were one defect each in
 one shared stylesheet. The pages declared `color-scheme: light dark` and then
 set no `color` or `background` on `body`, so a user agent in dark mode painted
 light text on an unpainted canvas and every text element failed, `<h1>` and
 body copy included; and links were `color: inherit` with `text-decoration:
 none`, which left them not distinguishable from body text by any means.
 
-Both are fixed, every colour is now stated for both schemes with its computed
+Both are fixed, every color is now stated for both schemes with its computed
 ratio recorded in the generator, and all four audited URLs pass. Those pages
 had been published since the catalog shipped, behind the accessibility section
 of the README, with no runner ever pointed at them. That is the honest reason
@@ -70,6 +70,6 @@ If an output is hard to read or operate with assistive technology, that is a
 bug. Open an issue at
 <https://github.com/ChelseaKR/tods-validate/issues>, or email the address in
 `SECURITY.md` if you would rather not do so publicly. Please say which surface
-and which assistive technology, including versions; both change behaviour.
+and which assistive technology, including versions; both change behavior.
 
-<!-- doc-currency: sha256=2bf2d69b2d14 -->
+<!-- doc-currency: sha256=7ebf505dc819 -->
