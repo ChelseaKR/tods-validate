@@ -18,14 +18,14 @@ ERROR-severity, and which has neither `--require-complete-run` nor the
 A major- or minor-only ref has only two possible failure modes and this project
 has no appetite for either:
 
-* it moves, and a consumer's pinned CI changes behaviour without a release they
+* it moves, and a consumer's pinned CI changes behavior without a release they
   chose -- which is what `SECURITY.md`'s supply-chain section tells consumers to
   avoid by pinning "by commit SHA or image digest rather than a moving tag", and
   what `docs/standards/RELEASE-AND-VERSIONING-STANDARD.md` calls non-conformant;
 * it stops moving, silently, which is what happened.
 
 Under 0.x the first is worse than it sounds: minor releases here are allowed to
-change behaviour, and between v0.5.0 and v0.11.0 the minimum Python rose from
+change behavior, and between v0.5.0 and v0.11.0 the minimum Python rose from
 3.11 to 3.12 and four rules were added. So no `vN` or `vN.N` ref is published,
 and `v1` -- which `docs/plans/v1.0.0-readiness.md` warns "will invite exactly
 the same pin" -- is refused in advance by the same rule.
