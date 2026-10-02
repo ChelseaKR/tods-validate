@@ -94,7 +94,7 @@ Which archetype a repo belongs to — and its per-standard `applies` / `na: "<re
 ## E. Accessibility audit
 **Frame:** **WCAG 2.2 AA is the floor, not the goal**; retain any higher conformance a repository declares. The goal is that the primary task is completable by someone using a screen reader, a keyboard, magnification, or reduced motion. Tools whose *own HTML output* is user-facing must gate on their output's accessibility, not only their UI's.
 
-- **Method:** automated (`axe-core --tags wcag2a,wcag2aa,wcag22aa`, Lighthouse, `pa11y-ci`) for the mechanical ~30–57%, plus a manual pass: keyboard-only walkthrough, screen-reader walkthrough (VoiceOver + NVDA), 200% zoom, 320 px reflow, contrast, motion, form-error clarity, and the **WCAG 2.2 additions** (2.4.11 Focus Not Obscured, 2.5.7 Dragging, **2.5.8 Target Size 24×24 px**, 3.2.6 Consistent Help, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication).
+- **Method:** automated (`axe-core --tags wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa`, Lighthouse, `pa11y-ci`) for the mechanical ~30–57%, plus a manual pass: keyboard-only walkthrough, screen-reader walkthrough (VoiceOver + NVDA), 200% zoom, 320 px reflow, contrast, motion, form-error clarity, and the **WCAG 2.2 additions** (2.4.11 Focus Not Obscured, 2.5.7 Dragging, **2.5.8 Target Size 24×24 px**, 3.2.6 Consistent Help, 3.3.7 Redundant Entry, 3.3.8 Accessible Authentication).
 - **Commitments:** zero automated violations at AA, a recorded manual walkthrough per primary task, and an accessibility statement (ACR/VPAT 2.4 format).
 - **Enforcement:** thresholds, the SR-matrix checklist, and any provisional disposition are owned by `ACCESSIBILITY-STANDARD.md` (§2.0); this audit supplies the narrative. In summary:
   - **AUTO-GATE** — axe zero critical/serious/moderate; Lighthouse a11y ≥ 0.9 (≥95 where self-declared); **`pa11y-ci` is blocking** with a curated, justified ignore list. `continue-on-error` and `|| true` are forbidden. The structural Python/lint checker and browser engine both block.
@@ -121,7 +121,7 @@ The gate standards measure faithfulness, red-team findings, and model-card compl
 | --- | --- | --- | --- | --- |
 | **AI system inventory + risk register** [RTF-09] | NIST AI RMF MAP; ISO 42001 Clause 6.1 | before any AI feature ships; quarterly review | REVIEW-GATE | `docs/audits/ai-risk-register.md` (signed) |
 | **AI System Impact Assessment** [RTF-10] | ISO 42001 Clause 6.1.4 | any AI feature processing personal data, making consequential decisions, or exposed to external users | REVIEW-GATE | `docs/audits/ai-impact-assessment.md` |
-| **Statement of Applicability** (42 Annex A controls) [RTF-11] | ISO 42001 | production AI system; annual + post-architecture-change | REVIEW-GATE | `docs/audits/iso42001-soa.md` |
+| **Statement of Applicability** (38 Annex A controls) [RTF-11] | ISO 42001 | production AI system; annual + post-architecture-change | REVIEW-GATE | `docs/audits/iso42001-soa.md` |
 | **EU AI Act risk classification** [RTF-12] | EU AI Act Annex III + GPAI | every AI feature; re-run on material change | REVIEW-GATE | `docs/audits/eu-ai-act-classification.md` |
 | **Conformity-assessment package** [RTF-13] | EU AI Act Art. 17/18/47 | only if classified high-risk (Annex III) | REVIEW-GATE | gated artifact bundle |
 | **Red-team report** [RTF-14] | OWASP LLM Top 10 v2.0; PyRIT/Garak | before each major model release; after prompt/arch change | REVIEW-GATE | `docs/audits/redteam-<date>.md` |
@@ -129,12 +129,12 @@ The gate standards measure faithfulness, red-team findings, and model-card compl
 
 **Current framework versions (verify at build time):**
 
-| Framework | Version / status as of 2026-06-21 | Relevance to this portfolio |
+| Framework | Version / status as of 2026-10-01 | Relevance to this portfolio |
 | --- | --- | --- |
-| NIST AI RMF | 1.0 (Jan 2023) + **GenAI Profile NIST AI 600-1** (Jul 2024); Agentic Profile concept note Apr 2026 | living risk register; 12 GenAI risks; 72 subcategories |
+| NIST AI RMF | 1.0 (Jan 2023; NIST states it is being revised under the AI Action Plan, no draft published) + **GenAI Profile NIST AI 600-1** (Jul 2024); Critical Infrastructure Profile concept note Apr 2026; Cyber AI Profile (NIST IR 8596) preliminary draft Dec 2025 | living risk register; 12 GenAI risks; 72 subcategories |
 | ISO/IEC 42001 | :2023 (Dec 2023) — only certifiable AIMS | SoA, impact assessments, risk register |
-| EU AI Act | Reg. (EU) 2024/1689 — **full high-risk application Aug 2, 2026**; GPAI obligations live since Aug 2025; Annex III conformity deadline Dec 2, 2027 | classify every AI feature and write down the decision |
-| OWASP Top 10 for LLM Apps | **v2.0 (Nov 2024)**, LLM01–LLM10:2025 | red-team checklist (see AI-EVAL standard) |
+| EU AI Act | Reg. (EU) 2024/1689, as amended by Reg. (EU) 2026/1744 (Digital Omnibus on AI, OJ Jul 24, 2026) — general application Aug 2, 2026; GPAI obligations live since Aug 2025; high-risk obligations (Ch. III §§1–3) deferred to **Dec 2, 2027 (Annex III)** and **Aug 2, 2028 (Annex I)**; two added Art. 5 prohibitions apply from Dec 2, 2026 | classify every AI feature and write down the decision |
+| OWASP Top 10 for LLM Apps | **2026 edition** published (OWASP announcement Sep 1, 2026; LLM01–LLM10:2026, Excessive Agency now LLM03); the portfolio checklist stays pinned to **v2.0 (Nov 2024)**, LLM01–LLM10:2025, until AI-EVALUATION-STANDARD.md adopts the 2026 edition. Also: OWASP Top 10 for Agentic Applications 2026 (Dec 2025, ASI01–ASI10) | red-team checklist (see AI-EVAL standard) |
 | WCAG | **2.2 AA** (Oct 2023, upd. Dec 2024) — floor; WCAG 3.0 still Working Draft, no compliance action | audit E (see A11Y standard) |
 | OWASP ASVS | **5.0** | audit F target = L2 (see security standard) |
 | Model Cards / Datasheets | Mitchell et al. / Gebru et al.; HF Hub spec current | audit D transparency artifacts |
@@ -218,4 +218,4 @@ change or push before it becomes externally readable.
 
 ---
 
-Last verified: 2026-06-21 · Recheck cadence: quarterly, and immediately on any revision to NIST AI RMF / AI 600-1, ISO 42001, EU AI Act enforcement phases, WCAG, or OWASP ASVS / LLM Top 10. (Confirm current framework versions at build time.)
+Last verified: 2026-10-01 · Recheck cadence: quarterly, and immediately on any revision to NIST AI RMF / AI 600-1, ISO 42001, EU AI Act enforcement phases, WCAG, or OWASP ASVS / LLM Top 10. (Confirm current framework versions at build time.)

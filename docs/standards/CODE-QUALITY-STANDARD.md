@@ -41,15 +41,35 @@ The entire toolchain consolidates into a single root `pyproject.toml`. **No** `r
 
 | Concern | Tool | Canonical pin / target | Measured by | Gate |
 |---------|------|------------------------|-------------|------|
-| Lint + format + import-sort + modernize + bandit [CQ-04] | **ruff** | `>=0.15.0` (current 0.15.x); `select=[E,W,F,I,UP,B,SIM,S,C90,RUF]`, `ignore=[E501]` | `ruff check` (exit≠0 fails) + `ruff format --check` | AUTO-GATE |
+| Lint + format + import-sort + modernize + bandit [CQ-04] | **ruff** | `>=0.15.0` (current 0.16.x); `select=[E,W,F,I,UP,B,SIM,S,C90,RUF]`, `ignore=[E501]` | `ruff check` (exit≠0 fails) + `ruff format --check` | AUTO-GATE |
 | Cyclomatic complexity [CQ-05] | ruff C901 | `max-complexity = 10` | same `ruff check` run | AUTO-GATE |
 | Static typing [CQ-06] | **mypy `--strict`** (pin `>=1.18`) — or **pyright `strict`** / **pyrefly `>=1.1`** for new repos wanting speed | **zero** errors | `mypy --strict` (or `pyright`/`pyrefly check`) exit≠0 fails | AUTO-GATE |
 | Test runner [CQ-07] | **pytest** | `>=8.0` (`minversion = "8.0"`); `--strict-markers --strict-config --import-mode=importlib` | `pytest` exit code | AUTO-GATE |
 | Coverage (branch) [CQ-08] | **pytest-cov** + coverage.py 7.x | **≥85% branch** (applications) / **≥90%** (published libraries); `branch = true` | `--cov-fail-under` exit≠0 fails | AUTO-GATE |
-| Dependency resolution [CQ-09] | **uv** | `>=0.11.0`; `uv.lock` committed; CI runs `uv sync --frozen` | lockfile-drift check + frozen install | AUTO-GATE |
+| Dependency resolution [CQ-09] | **uv** | `>=0.11.0`; `uv.lock` committed; CI runs `uv lock --check`, then installs with `uv sync --frozen` | lockfile-drift check + frozen install | AUTO-GATE |
 | Build backend [CQ-10] | **hatchling** | `build-backend = "hatchling.build"` | wheel build in CI | AUTO-GATE |
 | CVE scan (deps) [CQ-11] | **pip-audit** | block on fixed HIGH+CRITICAL — **`\|\| true` is forbidden** | `pip-audit` exit code (see §9) | AUTO-GATE |
 | Dev-side fast feedback [CQ-12] | **pre-commit** | ruff hooks pinned to `v0.15.x`; mypy/pyright as pre-push | local + `pre-commit.ci` | REVIEW-GATE |
+
+> **CQ-09 correction, 2026-08-15.** Until today this control prescribed `uv sync
+> --frozen` and called that the lockfile-drift check. It is not one. `--frozen`
+> installs from `uv.lock` *without reading* `pyproject.toml`, so by construction it
+> cannot notice that the two disagree. Measured on a project whose `pyproject.toml`
+> was edited without relocking — the exact shape of a `pip`-ecosystem Dependabot PR:
+>
+> | command | exit |
+> |---|---|
+> | `uv lock --check` | 1 |
+> | `uv sync --locked` | 1 |
+> | `uv sync --frozen` | **0** |
+>
+> Every repo that implemented CQ-09 as written therefore had a drift gate that could
+> not fail. At least one had a genuinely drifted lock on `main` with all CI jobs
+> green. Two further notes for implementers: a bare `uv run` **silently rewrites**
+> `uv.lock` before running, so a gate invoked that way repairs the very thing it
+> checks — put `uv lock --check` first, before anything that can touch the lock. And
+> `conformance_check.py`'s `lockfile_present` tests presence only; it has never
+> tested freshness.
 
 **Single-source ruff/mypy/pytest config** (paste into root `pyproject.toml`; this is the portfolio default — repos change values, not keys):
 
@@ -79,7 +99,7 @@ quote-style = "double"
 strict = true
 warn_return_any = true
 disallow_untyped_defs = true
-# pyright/pyrefly equivalent: typeCheckingMode = "strict"
+# pyright: [tool.pyright] typeCheckingMode = "strict"; pyrefly: [tool.pyrefly] preset = "strict"
 
 [tool.pytest.ini_options]
 minversion = "8.0"
@@ -103,7 +123,8 @@ show_missing = true
 
 ```make
 verify:
-	uv sync --frozen
+	uv lock --check           # CQ-09 drift gate; MUST precede anything that relocks
+	uv sync --frozen          # install exactly the lock (NOT a drift check)
 	ruff check .
 	ruff format --check .
 	mypy --strict src        # or: pyright  /  pyrefly check
@@ -155,7 +176,7 @@ Applies to every TypeScript frontend, map UI, and Lambda handler. One `eslint.co
 | Type strictness [CQ-13] | `tsc --noEmit` | `strict: true` **plus** `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`, `noImplicitReturns`, `noUnusedLocals`, `noUnusedParameters`, `noImplicitOverride`, `noFallthroughCasesInSwitch` | `tsc --noEmit` exit code | AUTO-GATE |
 | Lint [CQ-14] | ESLint v10 flat + typescript-eslint v8 | `strictTypeChecked` + `stylisticTypeChecked` + `react-hooks/recommended` (incl. `exhaustive-deps`) + `jsx-a11y/recommended`; `--max-warnings 0`; `eslint-config-prettier` last | `eslint .` exit code | AUTO-GATE |
 | Format [CQ-15] | Prettier 3 | `singleQuote:true, trailingComma:"all", printWidth:100, semi:true`; run via `prettier --check .` | separate CI step | AUTO-GATE |
-| Unit/component tests + coverage [CQ-16] | Vitest v4 (`provider:"v8"`) | lines/branches/functions/statements **≥80%**, `coverage.perFile: true` | threshold exit code | AUTO-GATE |
+| Unit/component tests + coverage [CQ-16] | Vitest v4 (`provider:"v8"`) | lines/branches/functions/statements **≥80%**, `coverage.thresholds.perFile: true` | threshold exit code | AUTO-GATE |
 | E2E [CQ-17] | Playwright | Chromium min; `retries:2`, `forbidOnly:!!process.env.CI` | suite exit code | AUTO-GATE |
 | Bundle budget [CQ-18] | size-limit v12 | critical-path JS **≤170 KB gzip** | `andresz1/size-limit-action` PR gate | AUTO-GATE |
 | Chunk warning [CQ-19] | Vite 8 | `build.chunkSizeWarningLimit: 500`; `target:"baseline-widely-available"` | build log + reviewer | REVIEW-GATE |
@@ -187,7 +208,7 @@ Any repository with project configuration below the root surfaces a root
 
 | Rule | Requirement | Gate |
 |------|-------------|------|
-| Lockfile [CQ-09] | `uv.lock` committed; CI installs with `uv sync --frozen` (fails if lock is stale) | AUTO-GATE |
+| Lockfile [CQ-09] | `uv.lock` committed; CI runs `uv lock --check` **before** any command that could rewrite the lock, then installs with `uv sync --frozen` | AUTO-GATE |
 | Dev deps [CQ-27] | declared in PEP 735 `[dependency-groups]` (not `[project.optional-dependencies]`) so linters/type-checkers never ship as extras | AUTO-GATE (lint of `pyproject.toml`) |
 | Hash pinning (deployed services) [CQ-28] | `uv pip compile --generate-hashes` for the deployed requirement set | REVIEW-GATE |
 | Update bot [CQ-29] | Dependabot **or** Renovate enabled (`minimumReleaseAge: 72h`); required for OpenSSF Scorecard `Dependency-Update-Tool` | REVIEW-GATE (artifact: committed config) |
@@ -207,6 +228,7 @@ GitHub Actions SHA-pinning, SBOM, Sigstore signing, and SLSA provenance are **no
 | **No `TODO`/`FIXME`/`HACK` without a linked issue** [CQ-34] | every such marker carries an issue URL, e.g. `# TODO(#142): ...`; bare markers fail CI | AUTO-GATE |
 | No `type: ignore` / `eslint-disable` / `# noqa` without a linked issue [CQ-35] | each suppression carries a code *and* an issue reference; blanket ignores fail CI | AUTO-GATE |
 | Commented-out code [CQ-36] | forbidden on `main`; delete it (git is the archive) | REVIEW-GATE |
+| American English in code [CQ-50] | identifiers, comments, docstrings, and UI strings use American spelling; a persisted or published identifier (storage key, DB attribute, schema field, API route or parameter, env var, CLI flag, public function name) is renamed only by migration, versioned contract, or deprecated alias, never by find-and-replace | AUTO-GATE (owned by `DOCUMENTATION-STANDARD.md` §11, DOC-22: codespell `en-GB_to_en-US` over tracked files) |
 
 Bare-TODO gate (drop into CI; portfolio-standard regex):
 
@@ -270,7 +292,8 @@ validity. Hosted mode discovers the PR head and comment through GitHub, then fai
 API proves the declared login is the sole push-capable human and authored the exact current-head
 attestation. The ordinary read-only token also proves every visible active-ruleset field; GitHub
 redacts `bypass_actors` without ruleset write access, so the owner comment binds the fetched ruleset
-ID/update time and explicitly declares that list empty. PR code never receives a ruleset-write
+ID/update time and explicitly declares that list to be her repository-role bypass and nothing else
+(`CI-CD-STANDARD.md` §5: an empty list is the lockout, not a stricter gate). PR code never receives a ruleset-write
 credential. Missing API access, visible drift/bypass, stale ruleset identity, or a collaborator count
 that cannot be proven is a failed gate.
 
@@ -316,7 +339,9 @@ A merge to `main` requires **every** AUTO-GATE green and every applicable REVIEW
 
 ```
 AUTO-GATE (CI, blocking):
-  1. uv sync --frozen                         # lock not stale
+  0. uv lock --check                          # lock IS fresh — must run first, before
+                                              #   anything that could rewrite uv.lock
+  1. uv sync --frozen                         # install exactly the lock (NOT a drift check)
   2. ruff check .                             # lint + imports + bandit(S) + complexity(C901≤10)
   3. ruff format --check .                    # formatting
   4. mypy --strict src                        # (or pyright / pyrefly check) — zero errors
@@ -362,6 +387,27 @@ REVIEW-GATE because run time makes it a poor per-PR blocker; the artifact is a c
 
 ---
 
+## 10a. Generated output is validated against its external spec
+
+An equality or snapshot test compares output with what its author expected. When the expectation is wrong, the test does not miss the bug; it enforces it. A validator written against the external spec is the only check that does not share the author's assumptions.
+
+**Why this is a rule.** On 2026-09-18, a calendar site's provenance test asserted that a `<time datetime>` attribute equaled a raw Python `isoformat()` string with six fractional-second digits (`2026-09-18T08:31:30.924377+00:00`). HTML's valid date-time syntax allows at most three. The test passed; the nightly deploy's HTML validator rejected every league and team page, so the live site stopped updating. The only CI build that validated HTML ran without the fetched data that produced the value. The fix emitted whole seconds and rewrote the test to require an HTML-valid date-time.
+
+| Metric | Target | Measured by | Gate |
+|--------|--------|-------------|------|
+| Output validated against its published spec in CI [CQ-49] | each kind of generated output is validated in CI by a validator for its spec: HTML by html-validate or vnu (the Nu Html Checker); JSON that has a published schema by a JSON Schema validator (jsonschema, check-jsonschema, ajv); `.ics` feeds by an RFC 5545 parser-validator (icalendar, ical.js); no validator step muted | the validator step in CI; `automation/published_output_controls.py` checks the wiring (conformance key `spec_validated_output`) | AUTO-GATE (report-only through 2026-10-18) |
+
+- **Validate the output, not a sample of it.** Run the validator over what the build produces for deploy, and over a fixture build that exercises the populated paths. A value that appears only with fetched data never reaches a validator that sees an empty build.
+- **Equality and snapshot tests do not substitute.** Keep them for behavior. A snapshot of invalid output is invalid output, and an assertion that output equals a hand-written string restates the author's belief about the spec.
+- **A validator that cannot fail is not a validator.** No `|| true`, no `continue-on-error`: the same rule SEC-11 applies to security scanners.
+- **Similar outputs follow the same rule** wherever a reference validator exists: sitemaps and feeds, GTFS, OSCAL, FHIR, SARIF. The conformance control detects HTML, JSON Schema and `.ics` today; for the others, the reviewer checks it.
+
+**Applicability**, as the control detects it from the manifest, the tree and the workflows: HTML when `applicability.yml` has `html: true`, the archetype is `static-site`, or a workflow deploys GitHub Pages; JSON when the repository commits a JSON Schema outside test fixtures (`*.schema.json`, or a `schema/` or `schemas/` file that declares a json-schema.org `$schema`); `.ics` when non-test source writes `BEGIN:VCALENDAR` or calls an iCalendar serializer.
+
+**Conformance control.** `spec_validated_output` passes when every detected kind has a matching validator named in a workflow, a Makefile or other build file, a `package.json` script, a test file, or a validation module, and no workflow step that runs a validator is muted. It is wiring evidence (`kind: presence`): it cannot tell a test that parses output with a validator from one that builds its expected value with the same library. It is report-only through 2026-10-18 and scored from 2026-10-19 (`automation/report_only.py`).
+
+---
+
 ## 11. When this standard does NOT apply — declare N/A, never skip silently
 
 A repo that opts out of a rule records the decision; silence is a defect. The declaration lives in the repo's `README.md` "Standards conformance" block (or an ADR for §8 triggers) as `N/A — <reason>`.
@@ -374,6 +420,7 @@ A repo that opts out of a rule records the decision; silence is a defect. The de
 | Mutation testing (§10) | repo has no safety-critical module | `mutation: N/A — no load-bearing correctness guarantee` |
 | Playwright E2E | library/CLI with no UI | `e2e: N/A — no browser surface` |
 | Container CVE scan | repo ships no Dockerfile | `container-scan: N/A — no Dockerfile` |
+| Spec validation of generated output (§10a) | repo emits no HTML, no JSON with a published schema, and no `.ics` | `spec-validation: N/A — emits no spec-governed output` |
 
 What is **never** N/A for shipping code: ruff, type-checking, pytest+coverage floor, complexity ≤10, `uv.lock` frozen, dependency CVE scan, no-bare-TODO, PR review, single-root-config. A repo cannot declare these out of scope.
 
@@ -403,4 +450,4 @@ Each repo's `README.md` carries this table so a reader sees compliance at a glan
 
 ---
 
-Last verified: 2026-06-21 · Recheck cadence: quarterly, and on any release of ruff (minor), uv (minor), mypy/pyright/pyrefly (minor), TypeScript (minor), ESLint/typescript-eslint (major), Vitest (major), or a new PEP affecting `pyproject.toml` / packaging.
+Last verified: 2026-10-01 · Recheck cadence: quarterly, and on any release of ruff (minor), uv (minor), mypy/pyright/pyrefly (minor), TypeScript (minor), ESLint/typescript-eslint (major), Vitest (major), or a new PEP affecting `pyproject.toml` / packaging.

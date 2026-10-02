@@ -46,7 +46,7 @@ Declared: 2026-06-21 · Reviewer: <name>
 
 | Concern | Python repos | TS/React frontends | Rationale / rejected |
 |---|---|---|---|
-| Message catalog | **gettext `.po`/`.pot`** via Babel `pybabel` | **MF2 via `@messageformat/core` + `@formatjs/cli`** | gettext is legacy-appropriate for Python and has `xgettext`/`msgfmt` CI tooling. MF2 is the **normative successor to ICU MF1** (Stable in CLDR 47, LDML TR35 Part 9). *Rejected: ICU MF1 for new TS work — superseded; bespoke dicts — no extraction/plural/parity tooling.* |
+| Message catalog | **gettext `.po`/`.pot`** via Babel `pybabel` | **MF2 via `messageformat` (v4) + `@formatjs/cli`** | gettext is legacy-appropriate for Python and has `xgettext`/`msgfmt` CI tooling. MF2 is the **normative successor to ICU MF1** (Stable in CLDR 47, LDML TR35 Part 9). *Rejected: ICU MF1 for new TS work — superseded; bespoke dicts — no extraction/plural/parity tooling.* |
 | Message syntax (new strings) | gettext plural `Plural-Forms` header | **MF2** (`.match`, `{$count :number}`, required `*` wildcard) | New code MUST NOT introduce ICU MF1 resources. Any MF1 repo files `MIGRATION_MF2.md` (§9). |
 | Locale data | **ICU/CLDR 48.2** (`PyICU`/`babel` CLDR tables) | **Ecma-402 `Intl.*`** (CLDR-backed in V8) + `@formatjs` for messages | CLDR is the single canonical source for numbers/currency/dates/plurals/collation/lists. *Rejected: hardcoded date patterns and `%` string formatting — locale-incorrect.* |
 | Number/currency/date | `babel.numbers` / `babel.dates` (CLDR) | `Intl.NumberFormat`, `Intl.DateTimeFormat`, `Intl.RelativeTimeFormat`, `Intl.ListFormat` | Use CLDR **semantic skeletons**, not literal patterns. CLDR 48 relative date+time combos ("tomorrow at 12:30") must render. |
@@ -100,14 +100,14 @@ Every in-scope repo wires these into `make verify` (Python) or the npm `verify` 
 | # | Metric | Target | Measured by | Gate |
 |---|---|---|---|---|
 | G1 | UTF-8 encoding [I18N-03] | 0 non-UTF-8 files/strings | `git ls-files -z \| xargs -0 file --mime-encoding` asserts `utf-8`/`us-ascii`; DB columns asserted UTF-8 in migration test | merge-blocking |
-| G2 | No hardcoded UI strings [I18N-04] | 0 natural-language strings outside an i18n call | Python: `pybabel extract` + ratchet on count; TS: `formatjs extract` + `i18n-ally`/`eslint-plugin-formatjs` `no-literal-string` | merge-blocking |
+| G2 | No hardcoded UI strings [I18N-04] | 0 natural-language strings outside an i18n call | Python: `pybabel extract` + ratchet on count; TS: `formatjs extract` + `i18n-ally`/`eslint-plugin-formatjs` `no-literal-string-in-jsx` | merge-blocking |
 | G3 | BCP 47 tag validity [I18N-05] | 0 malformed tags | Validate every tag in code/config/headers/HTML via `Intl.Locale(tag)` (TS) / `babel.Locale.parse` (PY); registry-check authored locales | merge-blocking |
 | G4 | HTML root `lang` (WCAG 3.1.1 A) [I18N-06] | 100% pages valid `lang` | axe-core rule `html-has-lang` + `html-lang-valid` in CI (graduate from advisory — see ACCESSIBILITY-STANDARD) | merge-blocking |
 | G5 | Translation completeness + placeholder parity [I18N-07] | 0 missing keys, 0 broken/renamed placeholders, full CLDR plural categories | `i18n-check`/custom script: every source key in every target locale; plural categories `zero/one/two/few/many/other` present where the locale requires; placeholder set identical source↔target | merge-blocking |
 | G6 | **EN/ES key-parity** (every shipping bilingual repo) [I18N-08] | `keys(en) == keys(es)` exactly | Catalog diff in CI; symmetric-difference must be empty | merge-blocking |
 | G7 | PO compilation [I18N-09] | 0 `msgfmt` errors/warnings | `msgfmt --check --check-format --check-domain *.po` | merge-blocking (Python) |
 | G8 | XLIFF schema validity [I18N-10] | 0 invalid files | Apache Okapi / OASIS 2.2 schema validation on any committed `.xlf` | merge-blocking (if XLIFF present) |
-| G9 | Pseudolocale overflow [I18N-11] | 0 clipped/overlapping nodes under ~40% expansion | `formatjs` pseudo-locale (`en-XA` analogue) + Playwright DOM-overflow assertion on key views | merge-blocking (frontends) |
+| G9 | Pseudolocale overflow [I18N-11] | 0 clipped/overlapping nodes under ~40% expansion | `formatjs` pseudo-locale (`en-XA` analog) + Playwright DOM-overflow assertion on key views | merge-blocking (frontends) |
 | G10 | RTL: no physical-direction CSS [I18N-12] | 0 `margin-left/right`, `padding-left/right`, `left/right` in layout components | stylelint `csstools/use-logical` (require `margin-inline-*`, `padding-inline-*`); `ar`/`he` `dir=rtl` Playwright mirror smoke | merge-blocking (frontends) |
 | G11 | `Vary: Accept-Language` [I18N-13] | 100% localized endpoints set it | curl/Playwright header assertion in integration test; also assert `Content-Language` present on negotiated responses | merge-blocking (servers/Lambdas) |
 | G12 | CLDR/tzdata freshness [I18N-14] | CLDR lag ≤ 1 major, tzdata ≥ 2026a | Assert pinned version in `pyproject.toml`/`package.json` ≥ 48.2 | merge-blocking |
@@ -227,7 +227,7 @@ dependencies = ["babel>=2.16", "pyicu>=2.13"]   # CLDR via ICU >= 78.3 / CLDR >=
 ```json
 // package.json (TS frontends)
 "dependencies": {
-  "@messageformat/core": "^3",        // LDML 48.2 level
+  "messageformat": "^4",              // MF2 at the LDML 48 level
   "@formatjs/intl": "^3", "react-intl": "^7"
 }
 ```
@@ -244,8 +244,8 @@ dependencies = ["babel>=2.16", "pyicu>=2.13"]   # CLDR via ICU >= 78.3 / CLDR >=
 | Bespoke dictionaries or regex translation | Migrate to gettext or MF2 catalogs; add extraction and parity checks | G1, G2, G6 |
 | Server or Lambda choosing a response language | Implement RFC 4647 negotiation and response headers | G11, then R5 |
 | Multilingual AI/RAG output | Add native-language fixtures and disaggregated quality evaluation | §7 |
-| Existing ICU MF1 resources | Commit the MF2 migration plan and block new MF1-only syntax | G9 |
-| Web UI without directionality coverage | Add pseudolocale and RTL browser gates | G5, G10 |
+| Existing ICU MF1 resources | Commit the MF2 migration plan and block new MF1-only syntax | §9 [I18N-25], [I18N-26] |
+| Web UI without directionality coverage | Add pseudolocale and RTL browser gates | G9, G10 |
 | Valid N/A candidate | Commit `docs/I18N.md` with the exact reason and re-entry point | N/A-declaration gate |
 
 Which repositories occupy these rows, and their current gaps, are maintained in

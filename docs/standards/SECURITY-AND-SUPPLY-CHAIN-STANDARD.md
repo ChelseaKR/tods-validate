@@ -14,8 +14,8 @@ Target framework is **OWASP ASVS 5.0.0** (May 2025). Every repo declares its lev
 
 | Repo class | ASVS target | Rationale | Examples |
 |---|---|---|---|
-| Default floor | **L1** | ASVS 5.0 states L1 is achievable with automated tooling alone; that maps exactly to our AUTO-GATE set. | every repo, minimum |
-| Touches PII / identity / location | **L2** | Field-level authz (BOPLA V8.2.1), cross-tenant isolation, breached-password checks, OIDC `acr`/`amr` validation. | public-service applications, privacy-sensitive tools, identity-aware frontends, or local data stores |
+| Default floor | **L1** | ASVS 5.0 states L1 is the minimum, first-layer-of-defense set (about 20% of its requirements). It does not say automated tooling alone achieves L1; this portfolio maps L1 to its AUTO-GATE set. | every repo, minimum |
+| Touches PII / identity / location | **L2** | Field-level authz (BOPLA V8.2.3), cross-tenant isolation, breached-password checks, OIDC `acr`/`amr` validation. | public-service applications, privacy-sensitive tools, identity-aware frontends, or local data stores |
 | Catastrophic-breach surface | **L3** | Hardware phishing-resistant factor, adaptive authz, annual threat-model + leadership justification. Any repository at this blast radius declares L3 and adopts the V6/V8/V10 L3 review-gates. | high-impact identity or authorization systems |
 
 L1 is satisfied entirely by §3–§4 AUTO-GATEs (parameterized queries, output encoding, TLS 1.2+, server-side function- and object-level authz). L2 adds the authz integration tests in §5 and the OAuth/OIDC review-gate. No-outing sentinel tests and AST-level no-identity-inference checks are reference ASVS-V8 abuse-case controls; repositories keep equivalent project-specific guarantees.
@@ -103,13 +103,15 @@ remediation registry.
 
 ### Secret scanning — gitleaks (Gate 1+2) + TruffleHog (Gate 3)
 
-Two-gate gitleaks: **pre-commit** (Gate 1) and **CI diff** (Gate 2). TruffleHog runs a scheduled full-history scan (Gate 3) with live-credential verification.
+Two-gate gitleaks: **pre-commit** (Gate 1) and **CI diff** (Gate 2). TruffleHog runs a scheduled full-history scan (Gate 3).
+
+Gate 3 must report **all three** TruffleHog result tiers. `verified` means the credential authenticated against the live service; `unverified` means TruffleHog asked and the service said **no**; `unknown` means it could not ask. A credential that was committed and later **revoked** comes back `unverified` — the revocation is what makes the provider say no — and a cleaned-up leak is the case a full-history scan exists for. `--only-verified` and `--results=verified,unknown` exclude that tier under two different names, and both produce a scheduled scan that cannot fail on a real incident. Measured 2026-09-06 on a throwaway clone with a real-shaped AWS key planted in one commit and deleted in the next: `--results=verified` and `--results=verified,unknown` each exited 0 reporting nothing; `--results=verified,unknown,unverified` exited 183 with `unverified_secrets: 1`. If a placeholder fixture fires, exclude that **detector** by name (`--exclude-detectors=<Name>`); never narrow the tier.
 
 | Gate | Tool | Target | Gate |
 |---|---|---|---|
 | 1 pre-commit [SEC-17] | gitleaks `v8.30.1` | zero unredacted matches | AUTO-GATE |
 | 2 CI diff [SEC-18] | gitleaks `--exit-code 1 --redact` (no `\|\| true`) | zero matches | AUTO-GATE |
-| 3 scheduled [SEC-19] | `trufflehog git --object-discovery --results=verified,unknown --fail` | zero verified live creds | AUTO-GATE (page on hit) |
+| 3 scheduled [SEC-19] | `trufflehog git --results=verified,unknown,unverified --fail` | zero findings in any reported tier | AUTO-GATE (page on hit) |
 
 ```yaml
 # .pre-commit-config.yaml — Gate 1
@@ -125,7 +127,7 @@ This pre-commit configuration is **mandatory** in every repository; the gitleaks
 
 ## 5. Input validation & authz testing (ASVS V8 / L2)
 
-L1 floor (AUTO-GATE, all repos with ingress): parameterized queries only (no string-built SQL — Semgrep rule), output encoding on all user-controlled HTML sinks (XSS), TLS 1.2+ asserted, server-side function-level authz (V8.1.1) and object-level authz (V8.1.2).
+L1 floor (AUTO-GATE, all repos with ingress): parameterized queries only (no string-built SQL — Semgrep rule), output encoding on all user-controlled HTML sinks (XSS), TLS 1.2+ asserted, server-side function-level authz (V8.2.1) and object-level authz (V8.2.2).
 
 L2 (AUTO-GATE, PII repos): an integration suite asserting **every protected endpoint returns 403 to an unauthorized principal** and that object-level (BOLA/IDOR) and field-level (BOPLA) access is denied cross-tenant. Block deploy if any protected route lacks a negative-path test.
 
@@ -175,7 +177,7 @@ Renovate keeps SHAs current and survivable:
 }
 ```
 
-Migration: run StepSecurity Action-Advisor (app.stepsecurity.io) or `pin-github-action` over each workflow to auto-generate SHA-pinned stubs.
+Migration: run StepSecurity Secure-Repo (`step-security/secure-repo`) or `pin-github-action` over each workflow to auto-generate SHA-pinned stubs.
 
 ```bash
 npx pin-github-action .github/workflows/*.yml   # rewrites tags -> SHA + comment
@@ -220,7 +222,7 @@ steps:
   - uses: sigstore/cosign-installer@<40-char-sha> # v3.x
   - run: cosign sign --yes $IMAGE
   - run: cosign attest --yes --predicate sbom.cdx.json --type cyclonedx $IMAGE
-  - uses: actions/attest-build-provenance@<40-char-sha> # v2.x  (SLSA L2 + Source Track)
+  - uses: actions/attest-build-provenance@<40-char-sha> # v2.x  (SLSA build provenance; no Source level, see CI-CD §5)
     with: { subject-path: 'dist/*' }
 ```
 
@@ -231,7 +233,8 @@ Deployment-side: consumers verify before install.
 ```bash
 cosign verify --certificate-oidc-issuer=https://token.actions.githubusercontent.com \
   --certificate-identity-regexp='^https://github.com/<org>/<repo>/' $IMAGE
-slsa-verifier verify-artifact --source-uri github.com/<org>/<repo> dist/<artifact>
+slsa-verifier verify-artifact --provenance-path dist/<artifact>.intoto.jsonl \
+  --source-uri github.com/<org>/<repo> dist/<artifact>
 ```
 
 ### 6.5 OpenSSF Scorecard — required check
@@ -249,6 +252,49 @@ slsa-verifier verify-artifact --source-uri github.com/<org>/<repo> dist/<artifac
 | Aggregate [SEC-37] | ≥ 8/10 | AUTO-GATE |
 | Monthly Scorecard report committed [SEC-38] | present, dated | REVIEW-GATE |
 
+### 6.6 Third-party scripts on public sites: an allowlist held by a test — AUTO-GATE
+
+A script that a public page loads from a third party is a dependency that ships to every visitor, runs with the page's full authority, and is invisible to every scanner above, because they read the repository and not the page. It is also the whole of a site's privacy claim: "no tracking", or "Google Analytics 4 and nothing else", is exactly as true as the pages are. A claim that no test holds can go false in one commit without turning anything red.
+
+**Why this is a rule.** On 2026-09-17/18, Google Analytics 4 was added to 26 portfolio sites in one wave. Several of those sites said "no tracking", "no analytics" or "no third-party requests" in their pages, READMEs and threat models, and the change would have made each statement false without failing a build. One site did not change silently: `id-churn-sentinel`'s merge-blocking gate held its pages to zero third-party requests and stopped the first attempt. Its ADR 0004 then changed the gate instead of disabling it: exactly one loader allowed, matched by its whole text and by a SHA-256 digest pinned outside the module that renders it, only inside `<head>`; every other script, font, pixel, beacon and third-party host still failing; and negative controls that sabotage the page and assert that the gate goes red. That gate is the model for this section.
+
+| Metric | Target | Measured by | Gate |
+|---|---|---|---|
+| Third-party scripts are an allowlist held by a test [SEC-43] | the site commits `third-party-scripts.json`; a test in the suite CI runs reads it and fails on any script, tracker, pixel or third-party host that is not on it, and on a privacy page whose stated analytics differ from it | the repository's own test and its negative controls; `automation/published_output_controls.py` checks the wiring (conformance key `third_party_script_allowlist`) | AUTO-GATE (report-only through 2026-10-18) |
+
+**The allowlist** is `third-party-scripts.json` at the repository root:
+
+```json
+{
+  "privacy_page": "site/privacy.html",
+  "first_party_hosts": ["example.org"],
+  "scripts": [
+    {
+      "vendor": "Google Analytics 4",
+      "src": "https://www.googletagmanager.com/gtag/js?id=G-XXXXXXXXXX",
+      "sha256": "<SHA-256 of the exact loader text the page carries>",
+      "position": "head"
+    }
+  ]
+}
+```
+
+Each entry names its `vendor`, is pinned by its full `text` or by its `sha256` (when both are given, the digest must be the digest of the text), and states its `position`: `head` or `body`. `src` names the external address the entry loads, and `first_party_hosts` lists the hosts that are the site itself. A site that loads no third-party script commits `"scripts": []`. The empty list is the claim, and the test holds it like any other.
+
+**The test** runs in the suite CI runs, and:
+
+1. matches every allowlisted script to its pinned text or digest, at its position. One changed character makes it a different script, which fails as a stray;
+2. fails on everything else: any other `<script>`, inline or external; a tracking pixel, beacon or iframe; and any request to a host that is neither first-party nor on the list. It checks every published page and artifact, not only the front page;
+3. checks that the privacy page names each allowlisted vendor and what that vendor receives, and states no analytics that the list does not contain. With an empty list, the page claims none;
+4. carries negative controls: it sabotages a page (a second script, a changed loader, a pixel, the loader in the body), asserts that each sabotage landed, and asserts that each one fails;
+5. pins the digest of a script that code renders outside the module that renders it, so changing the loader takes two deliberate edits, not one.
+
+Changing what a site loads, or what a vendor receives, is a decision record (ADR), not just a new digest.
+
+**Applicability.** Every repository whose `applicability.yml` entry has `hosted: true` and `html: true`.
+
+**Conformance control.** `third_party_script_allowlist` passes when the allowlist parses as above, the privacy page exists and names every allowlisted vendor, a test file reads `third-party-scripts.json`, a workflow runs the test suite, and no committed HTML page outside test fixtures has a `<script src>` on a host that is neither allowlisted nor first-party. It proves the wiring; the repository's own test proves the pages. It is report-only through 2026-10-18 and scored from 2026-10-19 (`automation/report_only.py`).
+
 ---
 
 ## 7. Least-privilege tokens, OIDC, branch protection, workflow SAST
@@ -261,22 +307,41 @@ Owned in detail by `CI-CD-STANDARD.md`; the supply-chain-load-bearing minimums r
 | Cloud creds [CICD-05, CICD-06, CICD-07] | OIDC only, no long-lived secrets, sub scoped to `repo:…:environment:…` | audit-log alert on new long-lived secret | AUTO-GATE |
 | Workflow SAST [CICD-19] | `zizmor` required check on any PR touching `.github/workflows/` | merge-blocked on high/critical | AUTO-GATE |
 | `persist-credentials: false` [SEC-39] | on every `actions/checkout` | zizmor / grep | AUTO-GATE |
-| No direct push to `main` [CQ-37, CICD-15] | branch ruleset blocks direct admin pushes; designated maintainer bypass is PR-only and break-glass; normal/solo review disposition follows CQ §7.1 | committed ruleset export + bypassed PR attestation | AUTO+REVIEW-GATE |
+| No unrecorded push to `main` [CQ-37, CICD-15] | branch ruleset blocks every push but the accountable maintainer's standing admin bypass, which is break-glass and recorded per use; normal/solo review disposition follows CQ §7.1. Tag rulesets keep an empty bypass list; branch rulesets never do (CICD §5) | committed ruleset export + bypassed-merge attestation | AUTO+REVIEW-GATE |
 | CODEOWNERS routes `.github/workflows/` + security-critical files [CICD-17] | routing present in both profiles; approval mechanics are owned by CICD-18 / CQ §7.1 | committed `CODEOWNERS` | AUTO-GATE |
 | Branch ruleset + CODEOWNERS as committed artifacts [CICD-12] | present | repo files | REVIEW-GATE |
 
 ```yaml
-# zizmor as a required check
-permissions: { contents: read }
+# zizmor as a required check (same trigger as CI-CD §7)
+on:
+  pull_request: { paths: ['.github/workflows/**', '.github/actions/**'] }
+permissions:
+  contents: read
+  security-events: write   # SARIF upload only
 jobs:
   zizmor:
-    if: contains(toJSON(github.event.pull_request.changed_files), '.github/workflows/')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@<40-char-sha> # v4.2.2
         with: { persist-credentials: false }
       - uses: zizmorcore/zizmor-action@<40-char-sha> # v0.x
 ```
+
+### 7.1 Infrastructure as code: what is committed is what is live — AUTO-GATE
+
+A security header, a Content Security Policy, a bucket policy or an IAM grant that lives in committed infrastructure-as-code is reviewed, merged, and then **in force only if something applies it**. On 2026-09-18, three sites (`afterward`, `transit-delivery-atlas`, and one private site) had merged CSP and security-header changes in CloudFormation templates or edge configuration that no pipeline applied: their CI deployed site content (`aws s3 sync`) and never touched the stack, and the private site's edge reconciliation is a `workflow_dispatch`-only workflow. The committed configuration allowed GA4 and the live configuration blocked it, silently, until someone applied the templates by hand. Every check was green, because every check read the repository and none read the account.
+
+| Metric | Requirement | Measured by | Gate |
+|---|---|---|---|
+| Committed IaC is applied by CI or checked for drift [SEC-44] | A repository that commits IaC (CloudFormation/SAM templates, Terraform, CDK, Pulumi, Serverless) either **applies it from CI on an automatic trigger** (push, tag push, schedule, `workflow_run`; declared as `iac: applied-by-ci` in `applicability.yml`), or **runs a scheduled drift check** that fails when the live stack differs from the committed definition | `conformance_check.py` `iac_drift_check` | AUTO-GATE (report-only through 2026-10-18) |
+
+**A drift check is one that can fail.** Accepted shapes, run from a `schedule:`-triggered workflow: `aws cloudformation detect-stack-drift` (then `describe-stack-resource-drifts`), plus a template diff against the deployed stack (`aws cloudformation get-template`) for properties drift detection does not cover; `terraform plan -detailed-exitcode` (exit 2 means changes are pending); `cdk diff --fail`; `driftctl`; or a repository command named for what it compares (`deploy-drift`, `stack-drift`, `iac-drift`). A bare `cdk diff` or `terraform plan` exits 0 on drift and is not a check. A comparison that runs only on `workflow_dispatch` asks only when someone remembers to ask, which is the failure this control exists for. A failing scheduled run is the alert; route it wherever the repository's scheduled failures already go.
+
+**"Applied by CI" is a declaration, and it is checked.** `iac: applied-by-ci` in `applicability.yml` passes only when some workflow with an automatic trigger actually runs an apply (`terraform apply`, `cdk deploy`, `cloudformation deploy`, `sam deploy`, `pulumi up`, …). A `workflow_dispatch`-only apply is applied by whoever remembers, so it does not count. A repository that applies automatically but has not declared it fails with a hint to declare it: the manifest stays the source of truth for scope, and an undeclared deploy is exactly the thing a reader of the manifest cannot see.
+
+**Prior art in this portfolio.** A private monitoring service's `deploy-drift.yml` compares its synthesized CDK template with the live stack daily; it was written after a five-day outage in which CloudFormation read `UPDATE_COMPLETE` while the function AWS ran was still the old configuration. `family-greenhouse` commits its live `protect-main` ruleset as `.github/rulesets/main.json`, with the regeneration command beside it and a recorded committed-versus-live reconciliation, and `automation/check_ruleset_profile.py --hosted` checks the same parity for this repository. SEC-44 asks the same question of the rest of the account.
+
+A template that is committed but deliberately not deployed (a planned or decommissioned stack) still needs one of the two: a drift check that asserts the stack is **absent** (as that monitoring service does for its decommissioned stacks), or a waiver in `waivers.yml` with its reason and expiry.
 
 ---
 

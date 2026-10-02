@@ -7,7 +7,7 @@ judge calibration against human labels, code-enforced citation coverage, and
 tests that prohibit sensitive-attribute inference. Project-specific adoption
 evidence and gaps live in the private remediation registry.
 
-**Regulatory frame (de-facto enforceable as of 2026-06-21):** NIST AI RMF 1.0 + the Generative AI Profile (NIST AI 600-1) supply the risk taxonomy; ISO/IEC 42001:2023 supplies the management-system artifacts (risk register, Statement of Applicability, impact assessment); the EU AI Act is in **full force since 2026-08-02** for high-risk systems (Annex III deadline 2027-12-02), with GPAI obligations live since 2025-08. Every AI repository must **declare** its classification rather than assume it (see §6); project classifications stay in the private registry.
+**Regulatory frame (de-facto enforceable as of 2026-06-21):** NIST AI RMF 1.0 + the Generative AI Profile (NIST AI 600-1) supply the risk taxonomy; ISO/IEC 42001:2023 supplies the management-system artifacts (risk register, Statement of Applicability, impact assessment); the EU AI Act (Reg. (EU) 2024/1689, as amended by Reg. (EU) 2026/1744, the Digital Omnibus on AI) has applied generally since 2026-08-02, with GPAI obligations live since 2025-08; its high-risk obligations (Chapter III §§1–3) are deferred to **2027-12-02 (Annex III)** and **2028-08-02 (Annex I)**, and two added Article 5 prohibitions apply from 2026-12-02. Every AI repository must **declare** its classification rather than assume it (see §6); project classifications stay in the private registry.
 
 ---
 
@@ -96,7 +96,7 @@ verify: lint type test security eval   # eval is part of the blocking chain
 
 ## 2. Red-team / jailbreak suite (AUTO-GATE on critical; REVIEW-GATE for the structured exercise)
 
-Tooling: **Garak** (NVIDIA, 120+ probes — baseline scanner, nightly + PR) and **Promptfoo** (CI-native YAML, GitHub Actions, findings mapped to OWASP-LLM / NIST AI RMF / EU AI Act — the gate). *Rejected as the CI gate:* PyRIT — superb multi-turn (Crescendo, TAP) orchestration but no CI integration or dashboard; it is the tool for the **quarterly structured red-team** (REVIEW-GATE below), not the per-PR gate.
+Tooling: **Garak** (NVIDIA, 120+ probes — baseline scanner, nightly + PR) and **Promptfoo** (CI-native YAML, GitHub Actions, findings mapped to OWASP-LLM / NIST AI RMF / EU AI Act — the gate). *Rejected as the CI gate:* PyRIT — superb multi-turn (Crescendo, TAP) orchestration but no CI integration (its CoPyRIT web GUI is for interactive runs, not a merge gate); it is the tool for the **quarterly structured red-team** (REVIEW-GATE below), not the per-PR gate.
 
 The required checklist is **OWASP Top 10 for LLM Applications v2.0 (LLM01–LLM10)**. Every LLM feature is reviewed against LLM01–LLM10 in full before ship; Promptfoo emits the mapping.
 
@@ -112,7 +112,7 @@ The required checklist is **OWASP Top 10 for LLM Applications v2.0 (LLM01–LLM1
 # promptfooconfig.yaml — redteam gate, OWASP-mapped
 redteam:
   plugins: [owasp:llm]            # LLM01..LLM10
-  strategies: [jailbreak, prompt-injection, base64]
+  strategies: [jailbreak, jailbreak-templates, base64]
   numTests: 25
 targets:
   - id: https://localhost:8000/answer   # the RAG endpoint under test
@@ -198,10 +198,10 @@ These require human judgment, so they are REVIEW-GATEs paired with a committed a
 |----------|-------|-------------------|------|
 | `docs/audits/ai-risk-register.md` [RTF-09] | NIST AI RMF **MAP**: inventory each AI system, its risk tier, which of the 12 AI 600-1 GenAI risks apply (confabulation, bias/homogenization, data privacy, info integrity, etc.) | before any new AI feature ships; review ≥ quarterly | REVIEW-GATE |
 | `docs/audits/ai-impact-assessment-<feature>.md` [RTF-10] | ISO 42001 **Clause 6.1.4** impact assessment: societal + individual consequences | per feature that processes personal data, makes consequential decisions, or faces external users | REVIEW-GATE |
-| `docs/audits/iso42001-soa.md` [RTF-11] | ISO 42001 Statement of Applicability: applicable Annex A controls (of 42) + exclusion rationale | per production AI system; review annually + on architecture change | REVIEW-GATE |
+| `docs/audits/iso42001-soa.md` [RTF-11] | ISO 42001 Statement of Applicability: applicable Annex A controls (of 38) + exclusion rationale | per production AI system; review annually + on architecture change | REVIEW-GATE |
 | EU AI Act classification line [RTF-12] | Annex III high-risk? GPAI? compute near 10²⁵ FLOPs? | per AI feature; recorded in the risk register | REVIEW-GATE — **must be explicit** |
 
-**Classification is mandatory and explicit.** A typical entry: *"Not Annex III high-risk (no recruitment/credit/law-enforcement/education/critical-infra decisioning); not GPAI; API-only, training compute = 0. Reviewed 2026-06-21 by <owner>."* If a feature *does* land in Annex III, the conformity-assessment package (technical docs Art. 18, QMS Art. 17, Declaration of Conformity Art. 47) becomes a hard pre-ship REVIEW-GATE with the 2027-12-02 Annex III deadline. Civic, evaluation, and public-service AI paths receive the highest attention and keep this line current.
+**Classification is mandatory and explicit.** A typical entry: *"Not Annex III high-risk (no recruitment/credit/law-enforcement/education/critical-infra decisioning); not GPAI; API-only, training compute = 0. Reviewed 2026-06-21 by <owner>."* If a feature *does* land in Annex III, the conformity-assessment package (technical documentation Art. 11, kept for 10 years under Art. 18; QMS Art. 17; Declaration of Conformity Art. 47) becomes a hard pre-ship REVIEW-GATE with the 2027-12-02 Annex III deadline. Civic, evaluation, and public-service AI paths receive the highest attention and keep this line current.
 
 **No-inference / no-outing** guarantees are first-class risk-register entries.
 AST-level no-inference checks and isolated sentinel-identity tests are the
@@ -226,8 +226,9 @@ Every item is either an AUTO-GATE (mechanically checked, merge-blocking) or a RE
 
 ## Online / production eval — low-traffic deployment profile (REVIEW-GATE; N/A for local-only repos)
 
-The offline CI gates above are pre-deployment only. Research (EDDOps, 2411.13768:
-93% of agent eval is pre-deployment-only; only ~29% feed results back) names
+The offline CI gates above are pre-deployment only. Research (EDDOps, arXiv 2411.13768: of 134 academic sources reviewed, 93%
+evaluate pre-deployment only and ~29% report changes made in response to
+evaluation; the 27 industry sources are more balanced) names
 **checkpoint-only evaluation** as the core anti-pattern. Deployed AI
 repositories close the loop with a production-eval pass. For a low-traffic
 deployment, use this profile:
