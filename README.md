@@ -16,6 +16,9 @@ validator checks feeds against the current spec, TODS v2.1.0.
 findings in language a scheduler can act on. Each finding says what is wrong,
 where, and what good looks like, and cites the spec section it comes from.
 
+Beyond the sample feed in this repository, it has been tested against a
+pre-production TODS feed from a large U.S. transit agency.
+
 To try the validator without installing anything, use the
 [browser playground](https://chelseakr.github.io/tods-validate/). Validation
 runs locally in your browser; feed files are not uploaded. The website counts
