@@ -14,7 +14,7 @@ The portfolio standardizes rigor in one place and references it everywhere. Repo
 |---|----------|------|--------------------|
 | 0 | `RESPONSIBLE-TECH-FRAMEWORK.md` | Ethics/privacy/bias/transparency audit *methodology*, the audit-as-artifact discipline | The portfolio's signature strength; the *how*, not the per-repo findings |
 | 1 | `CODE-QUALITY-STANDARD.md` | ruff/mypy/pytest floors, coverage thresholds, layout, `make verify`/CI parity | Same logical stack must pin to the same versions and rule sets across repos |
-| 2 | `SECURITY-AND-SUPPLY-CHAIN-STANDARD.md` | SAST/SCA/secret-scan/container-CVE, SHA-pinning, SBOM, signing, provenance | tj-actions/trivy-action 2026 compromises made mutable-tag refs an active threat |
+| 2 | `SECURITY-AND-SUPPLY-CHAIN-STANDARD.md` | SAST/SCA/secret-scan/container-CVE, SHA-pinning, SBOM, signing, provenance | The tj-actions (March 2025) and trivy-action (March 2026) compromises made mutable-tag refs an active threat |
 | 3 | `CI-CD-STANDARD.md` | Token permissions, OIDC, branch protection, CODEOWNERS, workflow SAST, concurrency | Default-write tokens and unscanned workflows are systemic risks |
 | 4 | `RELEASE-AND-VERSIONING-STANDARD.md` | SemVer + public-API contract, signed tags, CHANGELOG, trusted-main signed-tag release pipeline, Trusted Publishing, yank/deprecation/security-release policy | Every consumed artifact needs an explicit version and release contract |
 | 5 | `OBSERVABILITY-STANDARD.md` | Structured logging, OTel, SLOs, health probes — tiered by deployment shape | Telemetry needs one portable schema and enforcement model |
@@ -22,11 +22,12 @@ The portfolio standardizes rigor in one place and references it everywhere. Repo
 | 7 | `ACCESSIBILITY-STANDARD.md` | WCAG 2.2 AA floor, axe/Lighthouse/pa11y gates, SR walkthroughs | Structural and browser-engine checks must both block |
 | 8 | `INTERNATIONALIZATION-STANDARD.md` | Portable catalogs (gettext `.po` / MF2-ICU), key-parity, pseudolocale | Civic multilingual surfaces need portable catalogs and parity gates |
 | 9 | `AI-EVALUATION-STANDARD.md` | RAG faithfulness, red-team, hallucination, judge-calibration, model cards | AI evaluation needs shared thresholds and evidence artifacts |
-| 10 | `DOCUMENTATION-STANDARD.md` (this) | Doc responsibilities, authoring rules, agent consumption, vendoring, declaration | So "production-ready" means one thing everywhere |
+| 10 | `DOCUMENTATION-STANDARD.md` (this) | Doc responsibilities, authoring rules, American English, agent consumption, vendoring, declaration | So "production-ready" means one thing everywhere |
 | 11 | `QUALITY-AND-METRICS-STANDARD.md` | DORA tracking, Definition of Done, the merge-gate manifest | The roll-up that the domain standards' gates report into |
 | 12 | `AI-DEVELOPMENT-MEASUREMENT-STANDARD.md` | Outcome-oriented measurement for AI-assisted development, with quality-debt counterweights and prohibited uses | Development telemetry must inform process without becoming an individual-performance gate |
 | 13 | `INCIDENT-RESPONSE-STANDARD.md` | Severity ladder, `incident`/`sevN` label convention feeding DORA, committed postmortem artifact, secret-leak runbook | Incidents need durable, consistently classified evidence |
 | 14 | `DATA-GOVERNANCE-STANDARD.md` | Data classification, data cards + lineage, retention schedules, backup/DR, license/provenance for ingested civic data | Data rules had four partial owners and no retention/backup floor |
+| 15 | `DISCOVERY-AND-ADOPTION-STANDARD.md` | Open Graph + backlink on published sites, a runnable README first screen, searched-for terms in the About, reserved install names, custom social previews, link-checked money pages, human-approved sends — **advisory** until promoted | Forty green CI runs and zero external referrers: distribution depended on memory, and memory lost; its conformance row is optional until promotion |
 
 **Rejected alternative:** a single monolithic `STANDARDS.md`. Rejected because the doc index is the unit of vendoring and N/A declaration; one file per concern lets a repo mark exactly which concerns are out of scope.
 
@@ -78,6 +79,7 @@ Whichever mechanism is used, the pin is recorded and is itself subject to the su
 | `CITATION.cff` | How to cite the work; author, ORCID, DOI when archived | Licensing (that is `LICENSE`) |
 | `SECURITY.md` | Supported versions, private disclosure channel, response SLA | Scan configuration (that lives in CI + standard 2) |
 | `CONTRIBUTING.md` | How to build, test, run `make verify`, and the DCO/sign-off + review rules | Code of conduct prose if a separate `CODE_OF_CONDUCT.md` exists |
+| `CONTRACTS.md` | Identifiers that must not be renamed without a migration, version or alias, each with its owner and change policy (§4.1) | The schemas themselves (those live beside the code that writes them) |
 | `docs/incidents/YYYY-MM-DD-*.md` | Project-specific, blameless, committed postmortems per closed `incident` issue | The severity ladder, label convention, and secret-leak runbook *methodology* (lives in `STANDARDS/INCIDENT-RESPONSE-STANDARD.md`) |
 | `docs/data/<source>.md` | Project-specific data cards: source, license, fetch cadence, tier, retention line, dataset version per ingested source | The classification tiers, retention floors, and backup/DR requirements *methodology* (lives in `STANDARDS/DATA-GOVERNANCE-STANDARD.md`) |
 | `STANDARDS/*` | Cross-cutting rigor stated once | Anything project-specific |
@@ -114,7 +116,7 @@ These four files have one canonical shape portfolio-wide so a reader (or agent) 
 | File | Required content | Measured by | Gate |
 |------|------------------|-------------|------|
 | `CHANGELOG.md` [DOC-07] | Keep-a-Changelog headings; `Unreleased` section; SemVer; every release tag has a dated entry | `git tag` ⇄ changelog parity check; `Unreleased` non-empty on a tagging PR | AUTO-GATE |
-| `CITATION.cff` [DOC-08] | Valid CFF 1.2.0; `message`, `title`, `authors` (with ORCID where held), and `license`; add `version` + `date-released` for the first and every later tagged release; DOI once Zenodo-archived | `cffconvert --validate` in CI | AUTO-GATE |
+| `CITATION.cff` [DOC-08] | Valid CFF 1.2.0; `message`, `title`, `authors` (with ORCID where held), and `license`; `date-released` exactly when a tag names the declared `version`; DOI once Zenodo-archived | `cffconvert --validate` in CI; `automation/conformance_check.py` (`citation_cff`) | AUTO-GATE |
 | `SECURITY.md` [DOC-09] | Supported-versions table, a private disclosure channel (GitHub private vuln reporting enabled), and a stated triage SLA (≤ 72 h ack) | File presence + repo setting `private-vulnerability-reporting=enabled` via `gh api` | AUTO-GATE (presence); REVIEW-GATE (SLA accuracy) |
 | `CONTRIBUTING.md` [DOC-10] | `make verify` as the single local gate, the PR review/sign-off rule, and a pointer to the README conformance table | Presence + a link-check that `make verify` and `STANDARDS/` are referenced | AUTO-GATE |
 
@@ -135,11 +137,46 @@ license: MIT
 Before the first release tag, omit release-specific `version` and `date-released` rather
 than inventing a release. Both fields are optional in the authoritative
 [CFF 1.2.0 schema guide](https://github.com/citation-file-format/citation-file-format/blob/main/schema-guide.md);
-the portfolio makes them mandatory only when release history exists.
+the portfolio requires them only where a release actually exists.
+
+**`date-released` is a fact about the version this file declares, not about the
+repository.** A repository that released `0.1.0` and is now preparing `0.2.0`
+declares `version: "0.2.0"` and carries **no** `date-released`: there is no date
+to give, because `v0.2.0` has not been cut. The rule is therefore per declared
+version, and it runs in both directions:
+
+| State of the declared `version` | `date-released` |
+|---|---|
+| A tag names it (`v<version>`, or a bare `<version>` where that is the repo's convention) | **Required.** The release happened; the date it happened is part of the citation record, and the record is what downstream indexes keep. |
+| No tag names it | **Must be absent.** A release date on an unreleased version records a release that never happened. Add it in the same PR that cuts the tag (§3.2/REL-25 then checks it against the tag's own date). |
+| The tag list could not be established | **Not measured**, never passed. A shallow or `--no-tags` checkout has no tag list to read, and reading its emptiness as "nothing has been released" would switch the requirement off wherever CI checks out shallowly — an absence rendered as a value, and a control that cannot fail. Check out with `fetch-depth: 0`, or let the checker read `origin`. |
 
 **N/A-with-reason allowances:**
 - `CITATION.cff` may be marked N/A only for repos with no scholarly/civic-reuse intent (a purely personal local-only tool). The README states: `CITATION.cff — N/A: personal local-only utility, no external reuse expected.`
 - No repo may mark `SECURITY.md` or `CHANGELOG.md` N/A. `CONTRIBUTING.md` may be N/A only for single-author `Spec`-status repos, and must flip to required at `Scaffolded`.
+
+### 4.1 `CONTRACTS.md`: identifiers that must not be renamed
+
+Some names outlive the code that writes them. A `localStorage` key is in every visitor's browser; a DynamoDB attribute is in every stored item; a published JSON field, a CLI flag, a package's public function, a URL slug and a StoreKit product ID are in other people's code, bookmarks, search indexes and App Store records. Renaming one in the source is a one-line diff that passes every test in the repository, and it breaks everything outside it. On 2026-09-18 the portfolio-wide American English sweep had to guard these by hand, from memory, repository by repository: a private app's `favourites.v1` storage key, the `gtfs-scorecard` published artifact and schema fields, `afterward`'s dataset fields, public package APIs, and StoreKit IDs. Nothing listed them, so the only protection was an agent remembering to look.
+
+A repository with **published artifacts, persisted storage, or a public package** keeps a short `CONTRACTS.md` at its root (or a `## Contracts` / `## Stable identifiers` section in `README.md`, `ARCHITECTURE.md` or a top-level `docs/*.md`) listing every identifier that must not be renamed without a migration, a version, or an alias:
+
+| Requirement | What passes | Checked by | Gate |
+|---|---|---|---|
+| Persisted and published identifiers are declared [DOC-23] | A register table with an **Identifier** column, an **Owner** column and a **Change policy** column, and at least one row; or an explicit `None.` declaration when the repository has nothing to list. Kinds to cover: storage keys, database attributes, published schema and JSON fields, public API and CLI names, URLs and slugs, product IDs | `conformance_check.py` `identifier_contracts` (shape); PR review (completeness) | AUTO-GATE (report-only through 2026-10-18) + REVIEW-GATE |
+
+```markdown
+# Contracts
+
+| Identifier | Kind | Where | Owner | Change policy |
+|---|---|---|---|---|
+| `favourites.v1` | localStorage key | `src/store.ts` | web app | Never renamed. A successor ships as `favorites.v2`, reads v1 once, then writes v2 only |
+| `score_pct` | published JSON field | `site/data/*.json` | pipeline | Additive changes only; a rename ships the old name as an alias for one major version |
+```
+
+**Scope is read from `applicability.yml`, not judged per repository.** DOC-23 applies when the manifest entry has `distributable: true` (a public package), `hosted: true` (URLs, slugs and client storage), or the `civic-data-tool`, `eval-harness`, `monitoring-service` or `local-first-tool` archetype (published artifacts or persisted state). An unregistered repository is scoped conservatively. A repository in scope that genuinely persists and publishes nothing says so with `None.` and one line of why; that is a declaration, and a missing file is not.
+
+**The AUTO half checks shape, not completeness.** It confirms the register exists and has the three columns; it cannot know that a key is missing. Review owns that, and the cheapest moment to catch an omission is the pull request that introduces the identifier. A rename of a listed identifier without the listed migration, version or alias is a review finding.
 
 ---
 
@@ -193,6 +230,7 @@ Common, **pre-approved** `N/A` patterns (still must be written out):
 5. **Currency stamps.** Any document whose correctness depends on the outside world (laws, broker lists, framework versions, API contracts, scan tool versions) carries a `Last verified: YYYY-MM-DD` line and a `Recheck cadence:` line at the bottom.
 6. **Status is explicit.** Each repo README shows one of: `Spec` · `Scaffolded` · `In build (Mx)` · `Beta` · `Production` · `Maintained` · `Archived`.
 7. **N/A is declared, never silent** (§5). A standard that does not apply is written out with its reason.
+8. **American English** in code and text alike, with three stated exceptions (§11).
 
 ---
 
@@ -264,6 +302,95 @@ proves a claim. The REVIEW half rejects overbroad wording, missing real-world
 limits, and attempts to collapse automated evidence into legal, safety,
 accessibility, or domain validation. External review stays visibly open until a
 dated artifact records it.
+
+## 11. Language: American English (en-US)
+
+Every repository in this portfolio uses American English everywhere, in code and in
+user-facing text (owner decision, 2026-09-18). One spelling per word is what lets a
+search for `color` find every color, and a reader stop wondering whether `normalize()`
+and a British-spelled twin are two functions.
+
+**Scope.** Identifiers, comments and docstrings, UI and other user-facing strings
+(including the English source strings of a translation catalog), documentation,
+commit messages, and pull request titles and descriptions. Text in another language,
+such as a Spanish catalog, is not English and is out of scope.
+
+**Exceptions.** There are three:
+
+- **(a) Proper nouns and quoted or verbatim third-party text.** Organization names
+  ("Centre for …"), license titles ("Open Government Licence"), terms-of-service
+  snapshots, and agency and place names in data keep the spelling their owner gave
+  them. So does a third-party identifier quoted in code, such as the GitHub Actions
+  `cancelled()` status function, or a URL. The prose around a quotation is still
+  American English.
+- **(b) Persisted or published identifiers.** Storage keys, database attributes,
+  published schema fields, API routes and parameters, environment variables, CLI
+  flags, and public package function names change only through a migration, a
+  versioned contract, or a deprecated alias that keeps the old name working, and
+  never by find-and-replace, which breaks every reader of the old name. Until that
+  change ships, the old name is a recorded exception.
+- **(c) Generated output.** It is fixed in its generator, never by hand, and the next
+  run brings it into line. Exclude the output from the check and name its generator.
+
+| Requirement | What passes | Checked by | Gate |
+|---|---|---|---|
+| American English [DOC-22] | Zero findings from codespell's builtin `en-GB_to_en-US` dictionary across the repository's tracked files, after the exceptions the repository records; commit messages and pull request text in American English | `conformance_check.py` `en_us_spelling` (`automation/spelling_controls.py`, tracked files); PR review (commit messages and PR text; published history is never rewritten to fix spelling) | AUTO+REVIEW (the AUTO half report-only through 2026-10-18, scored from 2026-10-19) |
+
+**Rollout.** DOC-22 lands report-only, like every rule added on 2026-09-18. Through
+2026-10-18 a finding appears in the conformance report's report-only table and as an
+annotation in per-repo CI, and it moves no score and fails no build. From 2026-10-19
+it is scored like any other control. The date lives in `automation/report_only.py`,
+and extending it is a CHANGELOG entry with a reason, never a silent edit.
+
+**How the check runs.** `conformance_check.py` lists the repository's tracked files
+(`git ls-files`) and runs codespell `>=2.3` (the first release that honors an inline
+`codespell:ignore`) over them. CI installs the release pinned by hash in
+`automation/requirements-codespell.txt`. The flags:
+
+```bash
+codespell --builtin en-GB_to_en-US \
+  --regex '[A-Z]?[a-z]+|[A-Z]+(?![a-z])' \
+  --uri-ignore-words-list '*' --check-hidden -- <tracked files>
+```
+
+- `--regex` splits identifiers on case and `_`. codespell's default word pattern reads
+  `snake_case_name` as one token and never looks up the words inside it, so without
+  this flag a British spelling in an identifier passes.
+- `--uri-ignore-words-list '*'` reads URLs and email addresses as third-party
+  identifiers (exception a).
+- `--check-hidden` reads files whose name starts with a dot, such as
+  `.pre-commit-config.yaml`, which codespell otherwise skips even when they are named
+  on its command line. A file inside `.github/` named on the command line is read
+  either way; codespell skips that directory only when it walks a directory.
+
+A run that could not have failed is a failure, never a pass: no codespell, no git work
+tree, no tracked files, a codespell exit other than 0 or 65, or a canary file of
+British spellings, passed alongside the repository's files, that codespell did not
+report. The canary catches a stub on `PATH` and an exceptions file that skips
+everything. To reproduce the check locally:
+
+```bash
+git ls-files -z -- . ':!.codespellrc' | xargs -0 codespell --builtin en-GB_to_en-US \
+  --regex '[A-Z]?[a-z]+|[A-Z]+(?![a-z])' --uri-ignore-words-list '*' --check-hidden --
+```
+
+**Recording an exception.** Exceptions live in the repository's `.codespellrc`, which
+codespell reads on its own and the check never scans. The check passes the dictionary
+and the word pattern on its command line, so the file can record exceptions but cannot
+swap either one. Every entry names the exception, (a), (b) or (c), that
+it falls under. Use the narrowest mechanism that fits:
+
+| Mechanism | Use it for | Example |
+|---|---|---|
+| Inline `codespell:ignore <word>` comment | One quoted line or test fixture | `assert parse("colour") == "color"  # codespell:ignore colour` |
+| `ignore-regex` | A proper noun or third-party identifier that recurs. It covers the phrase, so the bare word still fails | `ignore-regex = Open Government Licence` |
+| `skip` (globs over paths as `git ls-files` prints them) | Generated output (name the generator), lockfiles, vendored copies, data files that quote third-party names, catalogs in another language | `skip = data/raw/*,uv.lock` |
+| `ignore-words-list` | Last resort: it exempts the word everywhere in the repository | — |
+
+A `.codespellrc` that sets `write-changes` is refused: the check never rewrites the
+tree. A repository that vendors `STANDARDS/` (§1.1) cannot edit that text (DOC-03), so
+it skips the vendored directory. That text is checked here, where it is written, and a
+re-vendor delivers each fix.
 
 ---
 

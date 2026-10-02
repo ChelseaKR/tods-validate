@@ -44,7 +44,7 @@ Every gate below either blocks the merge or it is not a gate. `make verify` runs
 
 | Metric | Target | Measured by | Gate |
 |---|---|---|---|
-| axe-core violations (WCAG 2.2 AA) [A11Y-01] | **0** of impact `critical`, `serious`, `moderate` | `@axe-core/playwright` (frontends) / `@axe-core/cli` against built HTML (Python report pages); `--tags wcag2a,wcag2aa,wcag22aa` | merge-blocking |
+| axe-core violations (WCAG 2.2 AA) [A11Y-01] | **0** of impact `critical`, `serious`, `moderate` | `@axe-core/playwright` (frontends) / `@axe-core/cli` against built HTML (Python report pages); `--tags wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa` | merge-blocking |
 | Lighthouse CI accessibility score [A11Y-02] | **≥ 0.90**; a repository that declares a higher floor enforces that higher value in LHCI | `@lhci/cli autorun`, assertion budget | merge-blocking |
 | pa11y-ci errors [A11Y-03] | **0** errors; `--standard WCAG2AA`, `--level-cap-when-needs-review=AA`; warnings logged, not blocking | `pa11y-ci` over the route list | merge-blocking |
 | Lint-time a11y (React) [A11Y-04] | **0** `jsx-a11y` errors | `eslint-plugin-jsx-a11y` `recommended` + key rules to `error` | merge-blocking (pre-commit + CI) |
@@ -56,7 +56,7 @@ Every gate below either blocks the merge or it is not a gate. `make verify` runs
 
 ### 1.1 Tool selection (decisions, not a survey)
 
-- **axe-core** is the canonical rule engine — zero-false-positive policy, covers WCAG 2.2 AA, scoped via `--tags wcag22aa`. It powers Lighthouse and pa11y, so the three tools agree on the rule set. *Rejected: HTML_CodeSniffer as the pa11y runner — axe runner has materially better 2.2 coverage and no double-reporting against Lighthouse.*
+- **axe-core** is the canonical rule engine — zero-false-positive policy, covers WCAG 2.2 AA, scoped via `--tags wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa` (axe tags are discrete filters: each WCAG version's rules carry only their own tag, so all five are needed for 2.2 AA). It powers Lighthouse and pa11y, so the three tools agree on the rule set. *Rejected: HTML_CodeSniffer as the pa11y runner — axe runner has materially better 2.2 coverage and no double-reporting against Lighthouse.*
 - **Playwright** drives the dynamic gates (keyboard, reduced-motion, reflow) the static scanners can't see, and is already the cross-browser smoke driver in `QUALITY-AND-METRICS-STANDARD` §3 — no new dependency.
 - **Lighthouse CI** gives the page-level score budget and a trend artifact. Its score is weighted and a pass does **not** prove AA conformance — it is a floor, never the proof. axe + pa11y + Playwright + the §2 review gates are the proof.
 - **eslint-plugin-jsx-a11y** shifts the cheap violations (missing `alt`, unlabeled inputs, bad ARIA) to authoring time so they never reach CI.
@@ -90,7 +90,7 @@ for (const route of ["/", "/about", "/projects"]) {       // repo records its ro
   test(`axe AA: ${route}`, async ({ page }) => {
     await page.goto(route);
     const r = await new AxeBuilder({ page })
-      .withTags(["wcag2a", "wcag2aa", "wcag22aa"])
+      .withTags(["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa"])
       .analyze();
     const blocking = r.violations.filter(v =>
       ["critical", "serious", "moderate"].includes(v.impact ?? ""));
@@ -142,7 +142,7 @@ The HTML is a build artifact, so the a11y check is part of the build: render it,
 ```makefile
 # Makefile — runs in `make verify` for any repo emitting HTML
 a11y: build-html            ## scan generated HTML for WCAG 2.2 AA violations
-	npx --yes @axe-core/cli --tags wcag2a,wcag2aa,wcag22aa --exit \
+	npx --yes @axe-core/cli --tags wcag2a,wcag2aa,wcag21a,wcag21aa,wcag22aa --exit \
 	  $(shell find dist/reports -name '*.html')
 	npx --yes pa11y-ci --config .pa11yci.json
 ```

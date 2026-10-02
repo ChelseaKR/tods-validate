@@ -15,7 +15,7 @@ projection.
 
 Every control in every standard is exactly one of two kinds. There is no third "aspirational" category.
 
-- **AUTO-GATE** — mechanically checkable and **merge-blocking** in CI. No `|| true`, no `continue-on-error`, and no direct admin bypass on `main`; the sole break-glass path is the audited, PR-only CICD-15 procedure.
+- **AUTO-GATE** — mechanically checkable and **merge-blocking** in CI. No `|| true`, no `continue-on-error`, and no unrecorded bypass on `main`; the sole break-glass path is the audited CICD-15 procedure, whose recorded attestation — not an unusable actor list — is what makes it accountable.
 - **REVIEW-GATE** — requires an accountable human decision; paired with a checklist line and a
   dated, durable artifact that is regenerated on release. The default artifact is committed; an
   owning standard may instead require an authenticated current-head PR/release record where committing
@@ -50,6 +50,7 @@ restore the normal human-review requirement.
 | [`RESPONSIBLE-TECH-FRAMEWORK.md`](./RESPONSIBLE-TECH-FRAMEWORK.md) | The audit *methodology* (Ethics, Bias, Privacy/DPIA, Transparency, Accessibility, Security) each repo instantiates as committed findings. | All repos |
 | [`INCIDENT-RESPONSE-STANDARD.md`](./INCIDENT-RESPONSE-STANDARD.md) | The severity ladder, the `incident`/`sevN` label convention feeding DORA, the committed postmortem artifact, and the secret-leak runbook (rotate → revoke → history-scrub decision → postmortem). | All repos |
 | [`DATA-GOVERNANCE-STANDARD.md`](./DATA-GOVERNANCE-STANDARD.md) | Data classification, data cards + lineage, retention schedules, backup/DR expectations for local-first repos, license/provenance for ingested civic data, and the policy layer over dataset versioning and PII-in-logs. | All repos that hold data beyond their own source |
+| [`DISCOVERY-AND-ADOPTION-STANDARD.md`](./DISCOVERY-AND-ADOPTION-STANDARD.md) | Whether a finished project can be found and installed by a stranger: Open Graph + backlink on the published site, a runnable command in the README's first screen, searched-for terms in the About, a reserved install name, a custom social preview, a link-checked money page, and the one send that is never automated. **Advisory**: reported, not scored, until each control is promoted (§8). | All public repos (advisory) |
 
 ## Living deliverables
 
@@ -80,18 +81,29 @@ of the public standards archive.
 
 ## Publishing cadence
 
-This repo dogfoods [`RELEASE-AND-VERSIONING-STANDARD.md`](./RELEASE-AND-VERSIONING-STANDARD.md): SemVer 2.0.0, annotated signed `vX.Y.Z` tags cut only on `main`, and a Keep-a-Changelog entry per release (`CHANGELOG.md`). The cadence:
+This repo dogfoods [`RELEASE-AND-VERSIONING-STANDARD.md`](./RELEASE-AND-VERSIONING-STANDARD.md): SemVer 2.0.0, annotated signed `vX.Y.Z` tags cut only on `main`, and a Keep-a-Changelog entry per release (`CHANGELOG.md`).
+
+Release cadence: MINOR monthly whenever `main` carries unreleased changes; PATCH ad hoc; MAJOR on any gate tightening, with a migration note.
+
+In detail:
 
 - **MINOR — monthly, if there are changes.** At most one scheduled minor per month, cut only when `main` carries unreleased backward-compatible changes (new standards or sections, new automation, relaxed or clarified guidance). No empty releases.
 - **PATCH — ad hoc.** Typo, link, and tooling fixes that change no requirement ship whenever they are ready.
 - **MAJOR — any gate-tightening change, with a migration note.** **Tightening any gate is a breaking change for consumers**: adding an AUTO-GATE, raising a threshold (coverage floor, severity cutoff), converting a REVIEW-GATE to an AUTO-GATE, or narrowing an N/A carve-out can turn a consuming repo's green CI red on its next bump. Every MAJOR ships a CHANGELOG migration note naming the tightened gates and what a consumer must do before bumping. Loosening a gate, or adding guidance that gates nothing, is MINOR.
 
 Releasing: `sh automation/release.sh vX.Y.Z` verifies every gate and the live branch/tag protections,
-then creates an SSH-signed tag whose message binds the immutable hosted tag ruleset. The trusted-main
-workflow builds and signs the manifest-defined public document archive, creates a draft release,
-byte-verifies every draft asset and attestation, and only then promotes it. Consumers pin a tag
-(CI-fetch `ref:` or vendored `.standards-version`); the private release
-automation opens a version-bump change in each configured consumer.
+the matching reviewed `release-notes/vX.Y.Z.md`, then creates an SSH-signed tag whose message binds
+the immutable hosted tag ruleset. The trusted-main workflow builds and signs the manifest-defined
+public document archive, binds the exact public-notes digest to provenance, creates a draft release,
+and byte-verifies every draft asset, note, and attestation without publishing it. The checksummed
+`release-body.md` asset is the immutable canonical copy because GitHub permits later edits to displayed
+release notes. Consumers pin a tag (CI-fetch `ref:` or vendored `.standards-version`); the release
+workflow reports required bumps, while reviewed version-bump changes are opened owner-locally.
+`automation/dispatch_release.sh` verifies the immutable-hosting prerequisite and starts owner-only
+draft staging. After that run succeeds, `automation/promote_release.sh` independently binds the draft
+to the successful trusted-main run, reverifies its bytes and signatures, checks the administration-only
+immutable-release setting immediately before publication, and requires GitHub to return an immutable
+release state. No administration credential is stored in Actions.
 
 The prescribed controls are established, testable engineering patterns. Each
 repository records its own implementation evidence and remaining gaps in the

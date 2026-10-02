@@ -12,7 +12,7 @@ This document is the index. Each row below is enforced **in** the named standard
 
 | Domain | Owning standard | Interface this spine depends on |
 |--------|-----------------|---------------------------------|
-| Code quality / toolchain | `CODE-QUALITY-STANDARD.md` | ruff ≥0.15.x, mypy `--strict`, branch coverage ≥85% (libs ≥90%), single `pyproject.toml`, `uv sync --frozen`, `make verify` byte-equal to CI |
+| Code quality / toolchain | `CODE-QUALITY-STANDARD.md` | ruff ≥0.15.x, mypy `--strict`, branch coverage ≥85% (libs ≥90%), single `pyproject.toml`, `uv lock --check` then `uv sync --frozen`, `make verify` byte-equal to CI |
 | CI/CD hardening | `CI-CD-STANDARD.md` | top-level `permissions: contents: read`, OIDC-only cloud creds, `zizmor` on workflow PRs, concurrency groups, committed CODEOWNERS + branch ruleset |
 | Security & supply chain | `SECURITY-AND-SUPPLY-CHAIN-STANDARD.md` | ASVS 5.0 L2; SHA-pinned actions; Semgrep/CodeQL/gitleaks/pip-audit/Trivy blocking on HIGH+CRITICAL; SBOM + cosign + SLSA L2 |
 | Release & versioning | `RELEASE-AND-VERSIONING-STANDARD.md` | SemVer 2.0.0; signed tags; CHANGELOG entry per release; trusted-main dispatch re-runs verification at the selected tag; Trusted Publishing (OIDC, no stored tokens); version-consistency gate |
@@ -39,11 +39,195 @@ A control that is "run but `|| true`," "advisory," or "on the roadmap" is a **de
 
 ---
 
+## Falsifiability: observed failing, or it is not a gate
+
+**A claim that cannot come out differently is not a measurement.** A gate nobody has
+ever seen fail is indistinguishable from a gate that *cannot* fail, and its green tick
+proves nothing about either. Every one of the following was green, in this portfolio,
+on a real merge:
+
+- a check named for full-history scanning that read exactly one commit;
+- a consent evaluation whose oracle was the component under test;
+- an alarm whose threshold comparison could never be true, because the value arrived
+  from the datastore as a `Decimal` and was compared against a `float`;
+- four security checks that matched the words `semgrep`, `gitleaks` and `pip-audit`
+  inside a `# TODO:` comment;
+- a confidence interval labeled 95% that every one of its 31 tests still passed at
+  *z* = 1.0, because every test asserted a property and no test pinned the width;
+- a report whose `ok` field was `all(...)` over zero results;
+- two mutation-control harnesses that reported *caught*: one had read only the
+  last three lines of the test run's output, the other had read pytest's exit
+  status 4 — a usage error, in which no test ran — as *caught*;
+- a permission-denied write that an automated agent retried until it went
+  through: a boundary that held only for as long as the actor chose to respect it.
+
+These are not eight bugs. They are one defect wearing eight costumes, and "absence rendered
+as a value" is only its most common costume. The others are a constant no test pins, a
+verdict computed over an empty set, a check that matched a comment, and a comparison
+between two types that never compare equal.
+
+**What counts as a gate here.** Anything that emits a pass/fail verdict, an exit code a
+caller branches on, or a published figure: a CI job, a `make verify` stage, a pre-push
+hook, a checker under `automation/`, an evaluation harness, a scorer, a badge, and a
+number in a README.
+
+| Metric | Target | Measured by | Gate |
+|---|---|---|---|
+| Executed falsifiability evidence, per gate [QM-19] | Every gate ships a committed, byte-reproducible execution record showing it **was observed failing** on (a) a planted defect it exists to catch, (b) an input of which it examined nothing, and (c) a mutation of a decisive literal in its own source | `automation/check_falsifiability.py` validates the record; `--execute` re-runs every case against the real gate and requires the committed record back, byte for byte | AUTO-GATE (advisory until promoted, §Promotion below) |
+| The covered gate set is derived, not declared [QM-20] | The gates the record covers are enumerated **from the repository tree**. A gate that exists and appears in no case is reported `not measured` — never counted among the passes, never silently outside the scope | the same checker expands the record's declared globs against the tree and diffs the two sets | AUTO-GATE (advisory until promoted, §Promotion below) |
+| Negative-control discipline [QM-21] | Any claim — in a pull request, an ADR, a report, or a commit message — that a gate "was verified to fail" carries the four artifacts named below, or it is not made | reviewer checks the four artifacts are in the diff or linked from it | REVIEW-GATE |
+
+### What evidence satisfies QM-19
+
+Four artifacts per case. Three of them exist because each has already been produced
+wrongly and believed.
+
+1. **A baseline identified by content hash, not by a scratch copy.** Record the
+   SHA-256 of the file about to be sabotaged, and the SHA-256 of the gate program
+   itself. A baseline kept as `foo.py.bak` is a file anything can overwrite; a hash is
+   a claim that can be checked later by someone who was not there.
+2. **Proof that the sabotage landed.** Record the SHA-256 *after* the edit, and require
+   it to differ from the baseline. A sabotage that silently no-ops — a `find` string
+   that was not present, a constant that was imported from elsewhere, a patched file
+   the gate never reads — produces a green run that reads exactly like a passing
+   negative control. **The most common way to fake this evidence is to fake it by
+   accident.**
+3. **The red, observed — not the exit code alone.** Record the command, its exit code,
+   *and* the line of output that changed. An exit code is not a verdict on a runner
+   that has been seen printing `gate FAILED` and exiting 0. Where a gate's exit code is
+   genuinely not its verdict, the case says so in a field of its own and names what was
+   read instead; it does not quietly treat 0 as red.
+
+   **The observation is the gate's own words, quoted.** For a checker, the finding line
+   it printed; for a test suite, the assertion message — `AssertionError: 0 != 1`, not
+   `FAILED (failures=2)`. A harness's summary label (`FAIL`, `FAILED`, `caught`,
+   `killed`, `red`, `blocked`) is a claim *about* the run made by a second program,
+   and that second program is exactly what has been seen reading a truncated tail, or
+   mistaking "nothing ran" for "something failed". Quote the line that proves the
+   gate examined the defect and objected to it, from the complete output.
+4. **The tree restored, byte-identical.** Record the SHA-256 after restoration and
+   require it to equal the baseline. Cases run against a copy of the tree satisfy this
+   by construction, and must still record the source tree's digest before and after, so
+   "the generator did not touch the working tree" is a checked fact rather than a
+   design intention.
+
+And one assertion per case that is about the *other* gates:
+
+5. **Collateral is declared, not tolerated.** Record the outcome of every other gate
+   the case ran. A gate that fails on a defect it was not written to catch is a
+   coupling, and an undeclared coupling **fails the case**. This is the assertion that
+   makes trivial sabotage useless: planting a syntax error trips everything, so every
+   row it appears in fails on undeclared collateral. It is also the assertion that
+   turns this record into a map of which gates measure distinct things — a finding to
+   report, not a number to tune.
+
+### What does not satisfy it
+
+- A test *named* `test_gate_rejects_empty_input` that calls the gate and asserts
+  nothing. The name is not the execution.
+- A checked box, a screenshot, or a sentence in a pull-request body.
+- An argument that the gate *would* fail. Every gate in the list at the top of this
+  section would have survived that argument.
+- A case whose planted defect is a syntax error, a deleted file, or anything else that
+  makes the gate program fail to start. That demonstrates the interpreter works.
+- A harness's label for the run — `FAILED`, `caught`, `killed`, `red`, a non-zero
+  count — in place of the quoted assertion message or finding line.
+- An exit status that means the suite did not run. pytest's 4 (usage error) and 5
+  (no tests collected), and unittest's `NO TESTS RAN`, are non-zero and are not
+  failures: a mutant that nothing tested was not caught.
+- A verdict read from part of the output: a `tail`, a first page, a grep for the
+  word `FAIL`.
+- A case that regenerates differently on a second run. Evidence that is not
+  reproducible is an anecdote; no network, no clock, no randomness, no ordering that
+  depends on a hash seed.
+
+### The third state is mandatory
+
+A gate with no falsifiability evidence is reported `not measured`. It is **not** a
+pass, **not** a failure, and — unlike `n/a` — it **stays in the denominator**, because
+`not measured` is a statement about this portfolio's knowledge and `n/a` is a statement
+about the repository. A headline that improves when evidence goes missing is the same
+defect this section exists to name.
+
+### Negative-control discipline (QM-21)
+
+Written down here once, rather than rediscovered by whoever runs the next one:
+
+- Identify the baseline by git object hash or content hash. Never by a scratch copy.
+- Assert the sabotage landed before trusting anything the run printed.
+- Sabotage a **literal**, not a named constant: a named constant may be re-exported,
+  defaulted, or shadowed, and the edit then changes nothing the gate reads.
+- Clear `__pycache__` between runs. A stale bytecode file makes a landed edit invisible.
+- If the control does not fire, widen the fixture before doubting the sabotage. A
+  fixture too small to exhibit the defect is the usual cause, and "the gate must be
+  fine" is the usual wrong conclusion.
+- A denial is an observation, not an obstacle. When a permission system, a hook, a
+  ruleset or a guard refuses an action, stop and report the exact command that was
+  refused. Never retry it and never route around it: a retry that succeeds is
+  evidence that the boundary cannot fail, which is the finding — not a path to the goal.
+- Read the full output when judging a control. A run that printed a failure and exited
+  0 has been observed here; so has a rising pass count inside a run that ultimately
+  failed.
+- A determinism claim is tested **across processes**, with `PYTHONHASHSEED` varied, over
+  a fixture large enough that ordering is observable.
+
+### Cost, and where each half runs
+
+The cheap half — validating the committed record, and diffing the covered gate set
+against the tree — is offline, deterministic and belongs in `make verify` and on every
+pull request. The expensive half — re-executing every case against the real gate
+(`--execute`) — belongs on a schedule and on any pull request that touches gate code.
+A portfolio that already measured `make verify` roughly doubling when a mutation gate
+was added to it should not put that cost on every push.
+
+### Promotion
+
+QM-19 and QM-20 land **advisory**, on the same terms as
+`DISCOVERY-AND-ADOPTION-STANDARD.md` §8: the checker runs, reports each gate as `pass`,
+`fail`, `n/a` or `not measured`, and is excluded from the score and from the weekly
+sweep's red/green. A repository's number cannot move because this section was written.
+
+Advisory is not "`|| true`". **A record that lies fails now, in the advisory phase and
+on every push:** a case whose sabotage did not land, whose restoration digest does not
+match its baseline, whose gate program has changed since the case was recorded, whose
+outcome was a pass, or whose collateral was undeclared, is a hard failure at every
+posture. Only the *absence* of evidence is advisory, and absence is what `not measured`
+reports.
+
+They are promoted to scored — and the three decisions below are made at the same time,
+because promotion is where they start to cost something — when, and only when:
+
+1. four consecutive weekly sweeps show QM-19 passing on at least 80% of the gates it
+   applies to (`n/a` and `not measured` excluded from that pass rate but printed
+   beside it), and
+2. every remaining gate without evidence carries a waiver in `waivers.yml` or an open
+   issue, and
+3. the promotion is recorded in `CHANGELOG.md` with the four sweep dates and the rate
+   on each.
+
+Three decisions are deferred to promotion and are the owner's, not an implementer's:
+whether a survivor allowlist exists at all (an existing mutation-gate ADR says no, in terms,
+and a portfolio-wide allowlist reopens it); whether the posture at promotion is
+*refuse* or *disclose* (an existing evaluation-harness ADR chose disclose, on the
+grounds that refusing a partial configuration also refuses the legitimate case of
+phasing coverage in); and whether exit codes are ever unified across gates — four
+deliberate and incompatible schemes are in use, the record carries each gate's own
+non-passing outcome, and nothing here requires changing that.
+
+### What this control does not do
+
+Scope is where it is soft. The covered set is derived from the tree, but the *globs*
+that say which programs are gates are still a judgment, and a thin declaration is not
+detectable from inside. This control raises the cost of a fake pass from zero to real.
+It does not make one impossible, and it should not be described as though it did.
+
+---
+
 ## Quality-attribute taxonomy — ISO/IEC 25010:2023
 
 **Updated to the 2023 second edition** (replaces 2011). Nine top-level product-quality characteristics; the deltas from 2011 are load-bearing and called out. Each feature/story **must** map to ≥1 measurable acceptance criterion under ≥1 characteristic; an untested characteristic is an **out-of-scope violation** and must be declared N/A-with-reason (see *Scoping*). **Recheck the standard version at build time.**
 
-> 2023 deltas you must use the new vocabulary for: *Usability* → **Interaction Capability** (adds inclusivity, self-descriptiveness, user-engagement); *Portability* → **Flexibility** (adds **scalability**); Security adds **resistance**; and **Safety** is a brand-new ninth characteristic. ISO 25010:2023 also defines a *Quality-in-Use* model (Effectiveness, Efficiency, Satisfaction, Freedom-from-Risk, Context-Coverage) — used in REVIEW-GATE acceptance criteria for civic/public-facing repos.
+> 2023 deltas you must use the new vocabulary for: *Usability* → **Interaction Capability** (adds inclusivity, self-descriptiveness, user-engagement); *Portability* → **Flexibility** (adds **scalability**); Security adds **resistance**; and **Safety** is a brand-new ninth characteristic. ISO/IEC 25010:2023 covers only the product-quality model; the *Quality-in-Use* model moved to the companion **ISO/IEC 25019:2023** (Beneficialness, Freedom from Risk, Acceptability) — used in REVIEW-GATE acceptance criteria for civic/public-facing repos.
 
 ### 1. Functional Suitability *(completeness, correctness, appropriateness)*
 - **Targets:** all acceptance criteria pass; no `P0`/`P1` open at release; acceptance tests mapped 1:1 to roadmap features.
@@ -78,7 +262,7 @@ A control that is "run but `|| true`," "advisory," or "on the roadmap" is a **de
 - **Gate (AUTO):** CI builds container + runs from-scratch bring-up; IaC `plan` validates.
 
 ### 9. Safety — **NEW in 2023** *(operational constraint, risk identification, fail-safe, hazard warning, safe integration)*
-- **Definition:** "acceptable levels of risk to human life, health, property, or environment." For **non-safety-critical but high-stakes** surfaces such as civic benefits, transit, identity, or public-data tools, Safety applies via **fail-safe** and **safe-integration** sub-characteristics.
+- **Definition (ISO/IEC 25010:2023):** "capability of a product under defined conditions to avoid a state in which human life, health, property, or the environment is endangered." For **non-safety-critical but high-stakes** surfaces such as civic benefits, transit, identity, or public-data tools, Safety applies via **fail-safe** and **safe-integration** sub-characteristics.
 - **Targets / measured-by per repo (illustrative, values live in-repo):**
   - no-outing guarantee — injected sentinel identities never surface (isolated CI job). **AUTO.**
   - "no identity inference ever" via AST-level static test. **AUTO.**
@@ -108,7 +292,7 @@ ISO 25010 says *what* quality is; DORA says *how fast and safely* it ships. This
 | Deployment Rework Rate *(new 2024)* | < 10%; alert if > 5% (30-d) | low | unplanned-fix deploy ratio | health signal |
 
 **Implementation contract:** a `gh api`-based collector reads deploy, release,
-and publish workflow runs plus `incident`-labelled issues, then writes a
+and publish workflow runs plus `incident`-labeled issues, then writes a
 committed quarterly `DORA-<year>-Q<n>.md` report and JSON snapshot. Hosted
 repositories and Lambdas feed deploy events; library/CLI repositories report
 DF/LT only. Failed-Deployment Recovery Time reads N/A until the repository has
@@ -116,7 +300,7 @@ adopted the incident-label convention; the collector never fabricates a zero.
 
 **2024/2025 findings we act on (not survey trivia):**
 - AI adoption is **positively** associated with throughput but **negatively** with stability — so automated safety nets (coverage gate, SAST, merge queue, red-team) are **prerequisite infrastructure**, not optional hygiene. This directly justifies the AUTO-GATE-everything stance.
-- **DORA 2025 AI Capabilities Model** is a REVIEW-GATE governance checklist before expanding AI tooling scope in any AI/RAG repo: (1) written AI policy acknowledged, (2) AI grounded in internal context, (3) foundational CI/CD at elite tier, (4) safety nets operational, (5) internal-platform health scored, (6) user-centric metrics defined, (7) **AI-generated code segmented in DORA metrics**. Do not expand scope until all seven hold.
+- **DORA 2025 AI Capabilities Model** is a REVIEW-GATE governance checklist before expanding AI tooling scope in any AI/RAG repo: (1) clear and communicated AI stance, (2) healthy data ecosystems, (3) AI-accessible internal data, (4) strong version control practices, (5) working in small batches, (6) user-centric focus, (7) quality internal platforms. Do not expand scope until all seven hold. Portfolio requirement in addition (not one of DORA's seven): **AI-generated code is segmented in DORA metrics**.
 - High-performance tier shrank (31%→22%) and AI amplifies existing gaps → the standard sets **minimum floors**, not just elite targets (above).
 
 ---
@@ -147,6 +331,9 @@ Every repo ships a checked-in `DEFINITION_OF_DONE.md` at root, CODEOWNER-protect
 10. performance             → k6/Lighthouse budgets, ≤10% regress  [PERFORMANCE]
                               vs committed perf/baseline.json
 11. build + container + IaC plan
+12. falsifiability evidence → every gate observed failing on a planted   [QUALITY-AND-METRICS]
+                              defect, an empty input and a mutated
+                              literal; advisory until promoted
 ```
 
 `make verify` runs stages 1–4 (and 6–9 where applicable) locally, **byte-for-byte identical to CI** — the portfolio's drift-killing discipline; propagate it to every Python repo.
@@ -159,7 +346,7 @@ Every repo ships a checked-in `DEFINITION_OF_DONE.md` at root, CODEOWNER-protect
 
 **RELEASE-GATE:** performance baseline regression passed; runbook updated; ACR (or the accessibility §2.0 provisional status record) + SBOM + provenance regenerated ("audit-as-artifact"); rollback documented. A domain-authorized provisional release must carry the synthetic-evidence record and maintainer residual-risk acceptance while keeping the human gate visibly open; it is not a conformance result.
 
-**Branch protection (per `CI-CD-STANDARD.md`, org rulesets preferred):** PR required (≥1 independent approval, ≥2 for Safety/Security-critical paths), stale reviews dismissed, CODEOWNERS routing `.github/workflows/` + Safety-critical files to a required reviewer, required status checks in **strict** mode, **signed commits**, **linear history**, and **blocked force-pushes/direct admin pushes**. A designated maintainer may bypass only through a PR under the documented CICD-15 emergency procedure. An eligible exactly-one-maintainer project uses CQ §7.1/CICD §5.1: platform approval count 0 plus an authenticated current-head owner decision and all checks green; it never labels self/synthetic review as independent approval. Accessibility §2.0 preserves linear history by merging the product change first, testing that protected-main commit, and merging the record through a separate evidence-only PR. Merge queue on high-velocity branches.
+**Branch protection (per `CI-CD-STANDARD.md`, org rulesets preferred):** PR required (≥1 independent approval, ≥2 for Safety/Security-critical paths), stale reviews dismissed, CODEOWNERS routing `.github/workflows/` + Safety-critical files to a required reviewer, required status checks in **strict** mode, **signed commits**, **linear history**, and **blocked force-pushes**. The accountable maintainer keeps a standing repository-admin bypass and may use it only under the documented CICD-15 emergency procedure, which records every bypassed merge; an empty bypass list is a locked-out repository, not a stricter gate. An eligible exactly-one-maintainer project uses CQ §7.1/CICD §5.1: platform approval count 0 plus an authenticated current-head owner decision and all checks green; it never labels self/synthetic review as independent approval. Accessibility §2.0 preserves linear history by merging the product change first, testing that protected-main commit, and merging the record through a separate evidence-only PR. Merge queue on high-velocity branches.
 
 ---
 
@@ -198,17 +385,19 @@ must be reconciled or documented before conformance is counted.
 
 ## DORA implementation — no longer aspirational
 
-The DORA section mandated automated measurement but named only the `fourkeys`
-reference. The portfolio implementation is **`automation/delivery_metrics.py`**
+The portfolio implementation of the DORA section is **`automation/delivery_metrics.py`**
 (git + `gh` mining, no LLM), emitting `metrics/PORTFOLIO-METRICS.md` on the weekly
-launchd cadence: the DORA five plus the AI-quality-debt counterweights (churn,
-short-term-churn-14d, unreviewed-merge rate, revert rate). It **segments AI-authored
+launchd cadence: deployment frequency, lead time and a change-fail proxy, plus the
+AI-quality-debt counterweights (churn, short-term-churn-14d, unreviewed-merge rate,
+revert rate). Failed-deployment recovery time and deployment rework rate come from
+the quarterly **`automation/dora_collector.py`** report
+(`automation/dora/DORA-<year>-Q<n>.md`). `delivery_metrics.py` **segments AI-authored
 vs human-authored** work via the `Co-Authored-By: Claude …` commit trailer, which
-closes the DORA-2025 AI-capabilities checklist item "AI-generated code segmented in
-DORA metrics." The full Track A methodology — the BASELINE/graduation gate state,
+satisfies the portfolio's AI-segmentation requirement (a portfolio addition beside the
+DORA 2025 AI Capabilities Model, not one of its seven capabilities). The full Track A methodology — the BASELINE/graduation gate state,
 the never-gate list, telemetry privacy, and the quarterly DORA AI-Capabilities
 self-assessment — lives in **`AI-DEVELOPMENT-MEASUREMENT-STANDARD.md`**.
 
 ---
 
-Last verified: 2026-06-21 · Recheck cadence: quarterly, or on any new revision of ISO/IEC 25010, the DORA annual report, WCAG, OWASP ASVS, or OpenSSF Baseline — whichever is sooner.
+Last verified: 2026-10-01 · Recheck cadence: quarterly, or on any new revision of ISO/IEC 25010, the DORA annual report, WCAG, OWASP ASVS, or OpenSSF Baseline — whichever is sooner.

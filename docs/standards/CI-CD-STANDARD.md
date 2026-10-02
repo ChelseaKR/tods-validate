@@ -51,7 +51,7 @@ silently skipping a stage is a defect.
 
 ## 2. Least-privilege `GITHUB_TOKEN`
 
-**Default is write; this is wrong.** Org-level default is set to read-only (Settings → Actions → General → "Read repository contents and packages permissions"), and **every** workflow declares a top-level `permissions` block. Write is granted **per-job, never top-level**.
+**The default may be write; that is wrong.** GitHub made read-only the default only for enterprises, organizations and personal-account repositories created on or after 2023-02-02; older ones keep the read/write default. The account- or org-level default is set to read-only (Settings → Actions → General → "Read repository contents and packages permissions"), and **every** workflow declares a top-level `permissions` block. Write is granted **per-job, never top-level**.
 
 | Metric | Target | Measured by | Gate |
 |---|---|---|---|
@@ -125,7 +125,7 @@ The full pinning/SBOM/signing posture lives in `SECURITY-AND-SUPPLY-CHAIN-STANDA
 
 Every action reference, including preview and deployment workflows, must be
 pinned. One straggler tag fails the gate. Migrate with `pin-github-action` or
-StepSecurity Action-Advisor:
+StepSecurity Secure-Repo (`step-security/secure-repo`):
 
 ```bash
 # pins every uses: to its current SHA + version comment, repo-wide
@@ -150,7 +150,7 @@ profile that the read-only validator resolves.
 | Required reviewers on `main` [CICD-12] | ≥ 1 (≥ 2 for civic/PII repos); exactly 0 only while the bounded solo-maintainer mode below is current | ruleset artifact `.github/rulesets/main.json` + `check_solo_governance.py --hosted` | AUTO+REVIEW |
 | Required status checks [CICD-13] | `format,lint,type,test,security` + `zizmor` + `codeql-actions` + applicable a11y/perf/responsible | ruleset `required_status_checks` | AUTO-GATE |
 | Dismiss stale reviews on push [CICD-14] | on | ruleset | AUTO-GATE |
-| Emergency bypass on `main` [CICD-15] | one designated maintainer, **PR-only** (`bypass_mode: pull_request`); direct admin pushes remain blocked | committed ruleset actor + bypassed PR attestation | AUTO+REVIEW-GATE |
+| Emergency bypass on `main` [CICD-15] | exactly one actor, the repository-admin role held by the accountable maintainer, with `bypass_mode: always` so a wedged required check can still be cleared; no team, app, user, or second role. An **empty** `bypass_actors` list fails the gate — it is the lockout, not a stricter setting. Every bypassed merge is recorded | `check_ruleset_profile.py` bypass assertion (owner role present; no other actor; empty list fails) + the bypass record below | AUTO+REVIEW-GATE |
 | Force-push to `main` [CICD-16] | blocked | ruleset | AUTO-GATE |
 
 Repositories that actually maintain `release/*` branches create a second committed `protect-release`
@@ -158,17 +158,46 @@ profile with the same deletion, non-fast-forward, signature, linear-history, sta
 floors. The canonical `protect-main` profile intentionally matches only `refs/heads/main`, so its live
 parity check is unambiguous.
 
-The committed ruleset doubles as evidence and feeds SLSA Source Track L2 (`attest-build-provenance` populates `sourceLevels` only when branch protection with required reviews is active — see SECURITY std).
+The committed ruleset doubles as evidence for the branch-protection and review controls that the SLSA v1.2 Source track asks of the source control system. `attest-build-provenance` does not carry it: its predicate is SLSA build provenance (`https://slsa.dev/provenance/v1`), which records the workflow, ref and commit but no source level. A Source level is asserted only in a source verification summary attestation (`verifiedLevels: SLSA_SOURCE_LEVEL_n`) issued by the source control system — see SECURITY std.
 
 The bypass is a break-glass path, not a second merge policy. It may be used only
 when an authorized human explicitly directs the merge and a required external
 gate cannot produce a result (for example, hosted CI cannot allocate a runner).
-The change must still be carried by a pull request; direct pushes, force-pushes,
-and branch deletion remain blocked. Before bypassing, run every available local
-equivalent, record the blocked check and the explicit authorization in the PR,
-and merge with the platform's PR bypass so the PR timeline and merge commit
-remain the audit trail. Never disable or delete the ruleset to force a merge.
-Routine red tests, missing review, or convenience are not bypass conditions.
+Before bypassing, run every available local equivalent, then record in the pull
+request the blocked check, the explicit authorization, and why no ordinary path
+existed. Prefer the pull-request path, so the PR timeline and the merge commit
+are the audit trail. A direct push to `main` is the last resort, reserved for a
+branch so wedged that no pull request can merge at all; it carries the same
+record, opened as a follow-up pull request or issue naming the pushed SHA, since
+an *unrecorded* bypass is the thing this control exists to prevent. Force-push
+and branch deletion stay blocked in every case. Never disable or delete the
+ruleset to force a merge. Routine red tests, missing review, or convenience are
+not bypass conditions.
+
+**Why `bypass_mode: always`, and why the actor list is never empty.** Through
+2026-08 this control specified `bypass_mode: pull_request` and treated an empty
+`bypass_actors` list as the stricter, safer configuration. Both are wrong, and
+the second one has already cost real remediation. `pull_request` does not cover
+a direct push, so a repository whose *required check itself* is wedged has no
+way through and no work can land. And an empty list is not a tighter gate but an
+unattended lockout: automation once applied a ruleset with an empty bypass list,
+locked the repository owner out of her own `main`, and restoring access took a
+sweep across eighteen repositories. The accountable maintainer's standing
+repository-admin bypass is therefore a deliberate, permanent part of the
+`protect-main` profile, and `automation/check_ruleset_profile.py` asserts it
+three ways: the owner's bypass must be present, no other actor may appear, and an
+empty list fails. What CICD-15 protects is that a bypass is *auditable*, never
+that it is unusable — so tighten the record, not the actor list.
+
+**A branch ruleset and a tag ruleset are different controls; do not harmonize
+them.** `protect-main` governs where all work lands, so when one of its required
+checks cannot report, every merge stops and the maintainer must retain a way in.
+`protect-release-tags` (`RELEASE-AND-VERSIONING-STANDARD.md` §3.1) governs
+artifacts that have already shipped, where there is no equivalent emergency: a
+bad release is corrected by cutting a new tag, never by moving an old one. Its
+`bypass_actors` is exactly `[]`, and `automation/check_release_ruleset.py`
+asserts that emptiness on purpose. Making either list resemble the other is a
+defect, in whichever direction it is done.
 
 ```jsonc
 // .github/rulesets/main.json (committed; mirrors repository-owned protect-main)
@@ -179,7 +208,8 @@ Routine red tests, missing review, or convenience are not bypass conditions.
   "conditions": { "ref_name": { "include": ["refs/heads/main"], "exclude": [] } },
   "rules": [
     { "type": "pull_request", "parameters": { "required_approving_review_count": 1,
-      "dismiss_stale_reviews_on_push": true, "require_code_owner_review": true } },
+      "dismiss_stale_reviews_on_push": true, "require_code_owner_review": true,
+      "require_last_push_approval": false, "required_review_thread_resolution": false } },
     { "type": "required_status_checks", "parameters": {
       "strict_required_status_checks_policy": true, "required_status_checks": [
       {"context": "format"}, {"context": "lint"}, {"context": "type"},
@@ -191,8 +221,10 @@ Routine red tests, missing review, or convenience are not bypass conditions.
     { "type": "deletion" }
   ],
   "bypass_actors": [
-    { "actor_id": 3114598, "actor_type": "User", "bypass_mode": "pull_request" }
-  ]                                           // designated maintainer; PR path only
+    // The accountable maintainer's repository-admin role. Exactly this actor,
+    // and never an empty list: see "Why `bypass_mode: always`" above.
+    { "actor_id": 5, "actor_type": "RepositoryRole", "bypass_mode": "always" }
+  ]
 }
 ```
 
@@ -202,7 +234,8 @@ Routine red tests, missing review, or convenience are not bypass conditions.
 GitHub cannot count self-approval. An eligible project following `CODE-QUALITY-STANDARD.md` §7.1 may
 set that count to `0` and `require_code_owner_review` to `false`, while retaining the PR requirement,
 strict required checks, stale-head invalidation, signed commits, deletion/force-push protection, and
-empty bypass actors. Its current solo-maintainer declaration names the owner, declaration/expiry
+the owner-only bypass list of §5 — the solo profile relaxes review mechanics, never the bypass
+actors. Its current solo-maintainer declaration names the owner, declaration/expiry
 dates, reporting channel, and the automatic return-to-independent-review triggers. The PR carries the
 authenticated current-head decision required by CQ-37/CQ-43.
 
@@ -214,8 +247,9 @@ exactly that login. It also uses the ordinary read-only workflow token (Metadata
 active hosted `protect-main` rules against the committed profile. GitHub withholds
 `bypass_actors` from callers lacking ruleset write access; PR code is never given such a credential.
 The authenticated current-head owner comment therefore binds the fetched ruleset ID and
-`updated_at` and explicitly declares the hosted bypass list empty. Omitted bypass data is accepted
-only after that exact comment passes; a visible non-empty list always fails. Token, API, permission,
+`updated_at` and explicitly declares the hosted bypass list to be the owner's repository-role bypass
+and nothing else. Omitted bypass data is accepted only after that exact comment passes; a visible
+list that is missing that actor, or that carries any other one, always fails. Token, API, permission,
 ruleset, event/head, comment, or collaborator ambiguity fails closed. Post the final-head comment,
 then rerun the same head's failed required check; do not push a record containing a comment URL or
 SHA to make it pass.
@@ -228,7 +262,7 @@ branching on the proposed approval count alone is forbidden. The only valid stat
 | normal | normal | API-visible fields must match; platform independent approval remains authoritative |
 | normal | solo | **fail** — hosted count zero must never enter a no-attestation CI branch |
 | solo | normal | serialized activation only: exact current-head solo attestation plus equality of every visible field except the still-stricter hosted approval count/code-owner requirement |
-| solo | solo | exact visible parity plus the current-head attestation bound to hosted ruleset ID/`updated_at` and an owner declaration that redacted bypass actors are empty |
+| solo | solo | exact visible parity plus the current-head attestation bound to hosted ruleset ID/`updated_at` and an owner declaration that the redacted bypass list is the owner repository-role bypass only |
 
 Activate solo mode in that order: land the declaration and proposed solo profile in one PR; while the
 hosted profile is still normal, post the generated current-head comment and let CI validate the
@@ -239,13 +273,16 @@ the brief hosted-solo interval, any concurrent PR whose committed profile is sti
 matrix above. Serialize the transition; do not have another mergeable PR in flight.
 
 GitHub's read-only response may omit `bypass_actors`. In normal/normal mode CI can prove only visible
-parity and must say exactly that; omission is never reported as proof of an empty list. Before solo
-activation and before a solo deployment, the accountable owner inspects the live settings and makes
-the exact ruleset-ID/`updated_at`-bound empty-bypass declaration. A visible non-empty bypass list
-fails in every mode. No ruleset-write credential is exposed to pull-request code.
+parity and must say exactly that; omission is never reported as proof of what the list contains.
+Before solo activation and before a solo deployment, the accountable owner inspects the live settings
+and makes the exact ruleset-ID/`updated_at`-bound declaration that the list holds her repository-role
+bypass and nothing else. A visible list that lacks that actor — an empty list included — or that
+carries any additional actor fails in every mode. No ruleset-write credential is exposed to
+pull-request code.
 
 This profile changes only unavailable human-approval mechanics. It never turns a synthetic review
-into an approval, never permits direct push, and never relaxes an AUTO-GATE. The normal profile is
+into an approval, never opens a push path beyond the CICD-15 bypass in §5, and never relaxes an
+AUTO-GATE. The normal profile is
 restored before merging work outside the eligibility boundaries in CQ §7.1 or as soon as a second
 maintainer joins.
 
@@ -378,7 +415,10 @@ called reusable workflows declare their **own** group independent of the caller.
 concurrency:
   group: deploy-${{ github.ref }}            # deploy/release: serialize
   cancel-in-progress: false                  # never cancel an in-flight deploy
-# CI/lint jobs may use cancel-in-progress: true
+# CI/lint jobs use the per-commit group key in §11c, NOT this ref-only one:
+# a ref-only key lets a third push evict a pending run before it starts, and
+# the commit it belonged to then carries no verdict at all. That is acceptable
+# here — a deploy converges on its newest run — and never for a required check.
 ```
 
 | Metric | Target | Measured by | Gate |
@@ -391,6 +431,86 @@ Cache (`actions/cache`, `cache: true` on `setup-*`) is **prohibited** in any job
 | Metric | Target | Measured by | Gate |
 |---|---|---|---|
 | No caching in release/publish/provenance/`id-token` jobs [CICD-24] | enforced | zizmor cache-poisoning rule + workflow-lint | AUTO-GATE |
+
+### 8d. Unattended deploys and publishes alert on failure
+A deploy or publish that runs with nobody watching (on a `schedule`, or on a
+push to the default branch) **tells the owner when it fails**. A red run in the
+Actions tab is not an alert. It reaches nobody who is not already looking, and
+for a scheduled run nobody is. In one week, nexthomegame.com's nightly Pages
+deploy failed silently from 2026-09-18 08:29Z, and the fare-policy assistant's
+nightly evidence-hub publish failed 20 nights running before anyone looked.
+
+Any one of these is a failure-notification path:
+
+- **A step or job gated on `failure()`** (or on `always()` together with a
+  check of the result) **that notifies**: `gh issue create` or `comment`, a
+  webhook, SNS, or SES. A job-level gate needs `needs:`, because without it the
+  job runs first and never sees a failure. family-greenhouse's Alert relay,
+  which reports into one reused GitHub issue, is the portfolio's reference
+  shape for the destination.
+- **A heartbeat ping to an external monitor** (a dead man's switch, such as
+  healthchecks.io). It also fires when the run never starts, which no
+  in-workflow step can do.
+- **A relay workflow** started by `schedule` or `workflow_run` that names this
+  workflow (in `workflow_run.workflows`, `gh run list --workflow`, or by file
+  name), reads its outcome or the freshness of what it publishes, and notifies.
+
+Deploys triggered by a tag push or by `workflow_dispatch` have a person at the
+keyboard and are outside the control's scope; they should reuse the same path.
+**Applies to** every repository whose `applicability.yml` entry marks `CICD`
+as `applies` and that has such a workflow. In practice that means
+`static-site`, `monitoring-service`, `civic-bilingual-app`, and `civic-data-tool`
+entries (tiers A and B), plus a tier-C library that publishes docs or a
+package on a push to `main`.
+
+| Metric | Target | Measured by | Gate |
+|---|---|---|---|
+| Unattended deploy/publish alerts on failure [CICD-31] | every workflow that deploys or publishes on `schedule` or on a push to the default branch has one of the three paths above | `conformance_check.py` → `deploy_failure_alert` (`automation/ops_controls.py`): finds deploys by what a workflow executes (`actions/deploy-pages`, `terraform apply`, `aws s3 sync … s3://`, `npm publish`, a `git push` to `main`, and similar), then looks for a path that notifies | AUTO-GATE (report-only through 2026-10-18, scored from 2026-10-19) |
+
+### 8e. A new scheduled function starts disabled
+Terraform creates a function and the schedule that triggers it in one apply.
+In a pipeline that uploads function code *after* `terraform apply`, the
+schedule is live before the code is. family-greenhouse v0.35.0 created the
+`checkoutRecovery` Lambda and its EventBridge rule in Terraform Apply before
+the code upload. The first scheduled run failed with
+`Cannot find module 'handler'`, landed in the dead-letter queue, and set off
+an alarm.
+
+A schedule that targets a function **created in the same change** is created
+**disabled** (`state = "DISABLED"` on `aws_cloudwatch_event_rule` or
+`aws_scheduler_schedule`, or the older `is_enabled = false`) and is enabled in
+a later change, after the code has shipped. A `state` expression driven by a
+variable is accepted and reported. When the deploy order already guarantees
+that real code comes first (the same apply packages the code through
+`filename` and `source_code_hash`, or the pipeline uploads code before it
+applies triggers), record that in a `# deploy-order: <reason>` comment on the
+schedule resource.
+
+```hcl
+resource "aws_cloudwatch_event_rule" "checkout_recovery" {
+  name                = "${var.project_name}-checkout-recovery-${var.environment}"
+  schedule_expression = "rate(15 minutes)"
+  state               = "DISABLED" # enable once a deploy has shipped checkoutRecovery's code
+}
+```
+
+"The same change" is measured against the pull request's base branch in CI
+(`GITHUB_BASE_REF`), a branch's merge-base with the default branch locally,
+and, on the default branch itself, the newest `v*` release tag: what the next
+release will apply. **Applies to** every repository with Terraform under
+`CICD: applies`, which today means tier-A entries with `flags.hosted` whose
+infrastructure is Terraform.
+
+| Metric | Target | Measured by | Gate |
+|---|---|---|---|
+| A schedule on a newly created function starts disabled [CICD-32] | no enabled schedule targets a function that the same change creates, unless the resource carries a `# deploy-order:` reason | `conformance_check.py` → `new_schedule_starts_disabled` (`automation/ops_controls.py`): a static read of `*.tf` against the change's base, following `aws_cloudwatch_event_target` and inline `target` blocks to `aws_lambda_function` (including a new `for_each` key), `aws_lambda_alias`, and function-named module outputs | AUTO-GATE (report-only through 2026-10-18, scored from 2026-10-19) |
+
+**Rollout.** CICD-31 and CICD-32 land report-only. Through 2026-10-18 a failure
+appears in the conformance report's report-only table and as an annotation in
+per-repo CI that counts down the days, and it moves no score and fails no
+build. From 2026-10-19 it is scored like any other control. The date lives in
+`automation/report_only.py`, and extending it is a CHANGELOG entry with a
+reason, never a silent edit.
 
 ---
 
@@ -477,13 +597,66 @@ fund the required private checks instead.
 
 **11b. Runners.** `ubuntu-latest` is the default. `macos-*` (**10× minutes**) and `windows-*` (**2×**) are **forbidden on per-push/PR CI**; if a platform genuinely needs coverage it runs on a **nightly `schedule` matrix only**, with the reason in a comment. CI does not exercise OS-specific device I/O (e.g. live audio), so OS-matrixing the unit suite is pure cost.
 
-**11c. Cancel superseded runs.** Every CI/lint workflow sets, at the top level:
+**11c. Cancel superseded runs — but never two commits into one group.** Every
+CI/lint workflow sets, at the top level:
 ```yaml
 concurrency:
-  group: ci-${{ github.ref }}
+  # One group per commit on a push; one per branch on a pull request, so a new
+  # push to a PR still supersedes the run it replaces. See "Why the key carries
+  # the SHA" below — a ref-only key silently loses verdicts.
+  group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name == 'pull_request' && 'pr' || github.sha }}
   cancel-in-progress: true
 ```
 (Release/publish/deploy jobs keep `cancel-in-progress: false` per §8b.)
+
+**Why the key carries the SHA.** By default (`queue: single`), GitHub holds
+**exactly one pending run per concurrency group**; the optional `queue: max`
+(2026-05-07) keeps up to 100, and this section does not rely on it. With a
+ref-only key every push to `main` shares one group,
+so a third arriving run *evicts the pending one with zero jobs dispatched*. The
+commit that run belonged to then sits on the default branch with **no CI verdict
+at all** — not a failure anyone can see, an absence. `cancel-in-progress`
+neither causes this nor prevents it; it only changes where the loss shows up:
+
+| `cancel-in-progress` | where the verdict is lost | how it looks |
+|---|---|---|
+| `false` | the invisible pending slot | a canceled run with **zero jobs** |
+| `true` | the running slot, killed part-way | a canceled run **with** jobs |
+| **any expression** — `${{ … == 'pull_request' }}`, `${{ github.ref != 'refs/heads/main' }}`, and every variant of "cancel on branches, not on `main`" | the pending slot, always, on the branch you were protecting | the worst of the three: it protects the running slot and pushes every loss into the slot nobody inspects |
+
+**Fix the group key, not the flag.** The third row is the tempting one, and it
+has now been reached independently by more than one repository, in more than one
+spelling, on the correct observation that canceling a `main` run mid-flight is
+bad. It does not work: eviction of the *pending* run happens no matter what
+`cancel-in-progress` says, so making it `false` on `main` protects the run that
+is already going and does nothing for the one waiting behind it. A repository
+that ships only that change has moved its losses from visible (canceled with
+jobs) to invisible (canceled with zero jobs) and will report itself fixed.
+`cancel-in-progress` decides what happens to a run that has *started*; the group
+key decides whether two commits compete for one slot at all. Only the second
+question is the one this section is about.
+
+Measured across this portfolio in 2026-09: roughly twenty repositories carried a
+ref-only key, and on the worst of them **32 of the last 100 default-branch
+commits had no successful run** — every one of those a cancellation, not a
+genuine failure. So the metric that matters is *commits on the default branch
+with no successful run*, never the zero-job cancellation count, which is exactly
+the number a ref-only key makes invisible.
+
+Appending the commit SHA on `push` gives each commit its own group, so nothing
+can be evicted before it starts. PR supersession is unchanged, and that was
+verified by experiment rather than by reasoning: a force-push over an in-flight
+run produced an ordinary canceled-with-jobs supersede, and the replacement run
+proceeded normally.
+
+**Deliberate exception.** Workflows whose *newest* run is the only one that
+matters keep a ref-only or constant group and keep eviction: Pages deploys
+(`group: pages`), other deployment and release workflows (§8b), scheduled
+scorecard/report refreshes, and dependabot auto-update. There the pending slot
+always holds the newest run, so the site or the score converges, and
+interrupting a mid-flight deploy is strictly worse than dropping a superseded
+one. None of these is a required status check, which is the test: **if a
+workflow produces a required check, it must not share a group across commits.**
 
 **11d. Gate heavy & advisory jobs.** Browser E2E, fuzz, load, and other multi-minute jobs: a **blocking** E2E may run on PRs into `main`; any **non-blocking/advisory** variant (`continue-on-error: true`) runs on `schedule` (nightly) or behind a label, never on every push. An advisory job that cannot fail the merge has no business spending minutes on every commit.
 
@@ -502,8 +675,8 @@ publication-boundary guard on **every branch push** as defense in depth; the
 local pre-push guard and hosting policy remain responsible for preventing an
 unsafe push before server-side CI can react.
 
-Measured by a `ci-minutes` review-gate row in the ledger; the merge-blocking floor is: **no `macos`/`windows` on PR CI · concurrency-cancel present · advisory jobs scheduled, not per-push**.
+Measured by a `ci-minutes` review-gate row in the ledger; the merge-blocking floor is: **no `macos`/`windows` on PR CI · concurrency-cancel present, with a group key that is per-commit on pushes (§11c) · advisory jobs scheduled, not per-push**. A ledger row that reports only canceled-run counts does not satisfy the first half of that: report **default-branch commits with no successful run**, because that is the number the defect §11c describes makes invisible.
 
 ---
 
-Last verified: 2026-07-16 · Recheck cadence: per GitHub Actions security-feature release, OpenSSF Scorecard minor (currently v5.5), SLSA spec revision (currently v1.2), and OWASP Top-10 CI/CD update — review at least quarterly given the active supply-chain threat environment. Confirm current action SHAs, Scorecard check weights, and GitHub ruleset schema at build time.
+Last verified: 2026-10-02 · Recheck cadence: per GitHub Actions security-feature release, OpenSSF Scorecard minor (currently v5.5), SLSA spec revision (currently v1.2), and OWASP Top-10 CI/CD update — review at least quarterly given the active supply-chain threat environment. Confirm current action SHAs, Scorecard check weights, and GitHub ruleset schema at build time.

@@ -23,7 +23,7 @@ The canonical incident-response rigor for every repo in this portfolio: the seve
 
 ## 1. Severity ladder
 
-Every incident gets exactly one severity at open, re-assessed as facts emerge. There is no unnumbered "just a bug" escape hatch once the `incident` label is applied — see §2 for what triggers labelling in the first place.
+Every incident gets exactly one severity at open, re-assessed as facts emerge. There is no unnumbered "just a bug" escape hatch once the `incident` label is applied — see §2 for what triggers labeling in the first place.
 
 | Sev | Definition | Illustrative examples | Ack target (owner) | Resolve target |
 |---|---|---|---|---|
@@ -38,12 +38,12 @@ Every incident gets exactly one severity at open, re-assessed as facts emerge. T
 
 ## 2. The `incident` label convention — the DORA feed
 
-`QUALITY-AND-METRICS-STANDARD.md`'s DORA table measures **Change Fail Rate** and **Failed-Deployment Recovery Time** from "incident events" and states plainly that "incidents get labelled and tracked" — this section is the process that makes that true instead of aspirational.
+`QUALITY-AND-METRICS-STANDARD.md`'s DORA table measures **Change Fail Rate** and **Failed-Deployment Recovery Time** from "incident events", and its collector reads `incident`-labeled issues — this section is the process that makes that feed true instead of aspirational.
 
 | Rule | Requirement | Gate |
 |---|---|---|
 | Every incident is a GitHub issue [IR-01] | Opened in the affected repo (or `STANDARDS/` for cross-portfolio process incidents) the moment an event meets the SEV1–4 bar in §1 | REVIEW-GATE (judgment call: does this meet the bar) |
-| Labelled `incident` + `sev1`…`sev4` [IR-02] | Both labels applied at open; severity label updated on re-assessment, never silently deleted (a label change is itself part of the postmortem timeline) | AUTO-GATE — CI/scheduled check on `automation/`-side tooling asserts every open issue with `incident` also carries exactly one `sevN` label |
+| Labeled `incident` + `sev1`…`sev4` [IR-02] | Both labels applied at open; severity label updated on re-assessment, never silently deleted (a label change is itself part of the postmortem timeline) | AUTO-GATE — CI/scheduled check on `automation/`-side tooling asserts every open issue with `incident` also carries exactly one `sevN` label |
 | Open→close timestamps are the recovery-time signal [IR-03] | Issue `created_at` → `closed_at` feeds `QUALITY-AND-METRICS-STANDARD.md`'s Failed-Deployment Recovery Time row; an incident is not closed until its postmortem (§3) is committed | AUTO-GATE — the postmortem-presence check (§3) blocks closing the loop, not the issue itself (GitHub doesn't gate issue-close; the weekly conformance run **flags** any closed `incident` issue with no matching `docs/incidents/*.md` file as a regression) |
 | Deploy-triggered incidents count toward Change Fail Rate [IR-04] | An incident opened within 24h of a deploy/release event in the same repo is tagged `deploy-caused` (or `deploy-caused: no` once ruled out) | REVIEW-GATE |
 
@@ -159,7 +159,67 @@ portfolio-wide AUTO-GATE:
 | Postmortem committed within cadence [IR-06] | SEV1/2 ≤ 7 days, SEV3 ≤ 14 days | issue-close-to-commit date diff | REVIEW-GATE |
 | No wildcard `git add` in automation [IR-15] | zero matches | §4 lint | AUTO-GATE |
 | DORA Failed-Deployment Recovery Time / Change Fail Rate populated [IR-18] | non-null for any repo with ≥1 closed incident | `QUALITY-AND-METRICS-STANDARD.md` DORA table sourced from `incident` issue timestamps | health signal (REVIEW quarterly) |
+| Critical data pipeline has an out-of-band freshness check [IR-19] | documented and verified for every repo declaring `critical_data_pipeline` | §6 | AUTO+REVIEW-GATE |
 
 ---
 
-Last verified: 2026-07-08 · Recheck cadence: after any SEV1/SEV2 incident (the postmortem's action items feed back into this standard), or quarterly, whichever is first.
+## 6. A pipeline that cannot catch up is watched from outside its platform
+
+Some scheduled pipelines can never make up a missed run. Trout Truck keeps a
+weekly history of CDFW's fish-planting table, and CDFW keeps only a rolling
+window of past weeks (the page states six months; on 2026-10-02 it listed
+plants back to 2025-10-05), so an outage longer than that window loses
+history that no rerun can recover. On 2026-09-18 a GitHub Actions billing
+block stopped every scheduled workflow on the account: the pipeline, and every
+Actions-based monitor with it. A freshness check written as a workflow goes
+quiet at the same moment as the thing it watches, and silence is also what a
+healthy check looks like. For these pipelines detection runs somewhere else.
+
+`CI-CD-STANDARD.md` §8d (CICD-31) covers a deploy or publish that fails. This
+section covers the case where the platform that would report the failure is
+itself down. `OBSERVABILITY-STANDARD.md` owns alert mechanics; this section
+owns the one detection decision that determines whether the incident is
+recoverable at all.
+
+**Declaring one.** A repository declares such a pipeline in `applicability.yml`
+with `critical_data_pipeline: true` in its `flags:` map. The declaration is
+the owner's call, and it says "a missed run loses data we cannot get back",
+not "this pipeline matters". It binds this section only where `IR` is
+`applies`. In practice that means `monitoring-service` and `civic-data-tool`
+entries (tier A or B) whose source publishes a rolling window.
+
+**Out of band** means one of these, watching the pipeline's *output* (the age
+of the published file, a fetched-at timestamp) rather than the workflow's
+status, and alerting somewhere the owner reads:
+
+- an AWS CloudWatch Synthetics canary, or a Lambda on an EventBridge schedule;
+- an external uptime or heartbeat monitor;
+- a `launchd` job on the owner's machine, committed to the repository.
+
+**Documenting it.** The check is described in
+`docs/operations/freshness-check.md` with these five fields:
+
+```markdown
+- Mechanism: launchd          <!-- launchd | cloudwatch-synthetics | lambda | external-monitor -->
+- Definition: ops/launchd/app.trouttruck.freshness.plist
+- Watches: https://example.org/data/history.json
+- Max age: 8 days
+- Alerts: push notification to the owner's phone
+```
+
+`Definition` is a pointer the checker can verify. It is a path to the
+committed definition of the check, which is never a GitHub Actions workflow,
+and it (or a file beside it, such as the script a plist runs) names what
+`Watches` says.
+
+| Metric | Target | Measured by | Gate |
+|---|---|---|---|
+| Critical data pipeline has an out-of-band freshness check [IR-19] | every repo declaring `critical_data_pipeline` has the document, and its `Definition` resolves to a committed check of the declared kind that names its target | `conformance_check.py` → `critical_pipeline_freshness` (`automation/ops_controls.py`): the five fields are present; `Mechanism` is one of the four; `Definition` exists, is not under `.github/` and has no `runs-on:`, and is the declared kind (a plist with `StartCalendarInterval` or `StartInterval`, an `aws_synthetics_canary`, or a Lambda schedule); `Watches` appears in it or beside it; `Max age` is a duration. That the check is loaded and has alerted at least once (a test alert counts) is confirmed in the §5 quarterly review | AUTO+REVIEW-GATE (automated half report-only through 2026-10-18, scored from 2026-10-19) |
+
+What the checker cannot see, it does not claim: a committed plist proves that
+a check is defined, not that `launchctl` has loaded it. That half stays a
+review.
+
+---
+
+Last verified: 2026-10-02 · Recheck cadence: after any SEV1/SEV2 incident (the postmortem's action items feed back into this standard), or quarterly, whichever is first.

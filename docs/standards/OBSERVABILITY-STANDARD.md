@@ -32,7 +32,7 @@ A repository with both a service and a CLI applies Tier A to the service surface
 
 ## 1. Traces (Tier A; Tier B for browser spans)
 
-**Tool:** `opentelemetry-distro` zero-code auto-instrumentation (Python) / `@opentelemetry/sdk-web` (TS). *Rejected:* manual span wiring as the baseline — auto-instrumentation covers Flask/FastAPI/httpx/requests/SQLAlchemy/Redis for free; reserve manual spans for business operations the auto-instrumentor can't see (a retrieval step, a judge call).
+**Tool:** `opentelemetry-distro` zero-code auto-instrumentation (Python) / `@opentelemetry/sdk-trace-web` (TS). *Rejected:* manual span wiring as the baseline — auto-instrumentation covers Flask/FastAPI/httpx/requests/SQLAlchemy/Redis for free; reserve manual spans for business operations the auto-instrumentor can't see (a retrieval step, a judge call).
 
 Run Python services under `opentelemetry-instrument python app.py`. Export via OTLP — gRPC `:4317` or HTTP `:4318` — to an OTel Collector, never directly to a backend. Use `BatchSpanProcessor` in production.
 
@@ -52,7 +52,7 @@ OTEL_PYTHON_LOG_CORRELATION=true          # injects trace_id/span_id into logs
 |-----------|---------------------|
 | HTTP **server** | `http.request.method`, `url.path`, `url.scheme`, `http.route`, `http.response.status_code`, `error.type` (on error) |
 | HTTP **client** | `http.request.method`, `server.address`, `server.port`, `url.full`, `http.response.status_code`, `error.type` (on error) |
-| **All spans** (resource) | `service.name`, `service.version`, `deployment.environment` |
+| **All spans** (resource) | `service.name`, `service.version`, `deployment.environment.name` |
 
 W3C `traceparent` (`00-<32hex>-<16hex>-<2hex>`) and `tracestate` propagate on every inbound/outbound HTTP call. All-zero trace-id or parent-id is forbidden; generate a fresh trace-id when no incoming header exists. For Tier-B frontends, the `fetch`/`axios` layer **must** inject `traceparent` on API requests so browser traces chain to backend traces.
 
@@ -85,7 +85,7 @@ W3C `traceparent` (`00-<32hex>-<16hex>-<2hex>`) and `tracestate` propagate on ev
 
 | Metric | Target | Measured by | Gate |
 |--------|--------|-------------|------|
-| Metric naming [OBS-06] | base units only; `_total` on every monotonic counter; no `_ms`/`_mb`/`_gb` suffix | `promtool lint` + custom linter in CI | AUTO-GATE |
+| Metric naming [OBS-06] | base units only; `_total` on every monotonic counter; no `_ms`/`_mb`/`_gb` suffix | `promtool check metrics` + custom linter in CI | AUTO-GATE |
 | Label cardinality [OBS-07] | no `user_id`/`email`/`request_id`/unbounded labels | custom linter scans metric definitions | AUTO-GATE |
 | RED present per endpoint [OBS-08] | requests_total + duration_seconds + errors_total exist for every public route | metrics-registry test | AUTO-GATE |
 
@@ -205,7 +205,7 @@ groups:
 | Alert rules valid [OBS-16] | zero errors | `promtool check rules alerts/*.yml` in CI | AUTO-GATE |
 | Burn-rate tiers complete [OBS-17] | critical (14.4×, 1h+5m) **and** high (6×, 6h+30m) defined per SLO | rule-presence linter | AUTO-GATE |
 
-**A `page`-severity alert that confirms real user impact opens an `incident` issue.** This standard owns detection and routing; what happens once a page is confirmed real (severity assignment, labelling, the postmortem clock) is owned by `INCIDENT-RESPONSE-STANDARD.md` §1–3 — a fired alert is not itself an incident record.
+**A `page`-severity alert that confirms real user impact opens an `incident` issue.** This standard owns detection and routing; what happens once a page is confirmed real (severity assignment, labeling, the postmortem clock) is owned by `INCIDENT-RESPONSE-STANDARD.md` §1–3 — a fired alert is not itself an incident record.
 
 ---
 
@@ -242,7 +242,7 @@ Ship a `docker-compose.observability.yml` bringing up an OTel Collector + Grafan
 ```yaml
 receivers:  [otlp, filelog]            # otlp: grpc 4317 + http 4318; filelog: stdout JSON
 processors: [memory_limiter, batch, resource]   # memory_limiter FIRST
-exporters:  [otlphttp/tempo, prometheusremotewrite/mimir, loki, otlphttp/pyroscope]
+exporters:  [otlphttp/tempo, prometheusremotewrite/mimir, otlphttp/loki, otlphttp/pyroscope]
 # TLS on all exporter connections in prod.
 ```
 
@@ -255,7 +255,7 @@ exporters:  [otlphttp/tempo, prometheusremotewrite/mimir, loki, otlphttp/pyrosco
 
 ## 8. Frontends / PWAs — Core Web Vitals (Tier B)
 
-Instrument with `@opentelemetry/sdk-web` (stable spans for interactions + API calls) plus `@opentelemetry/browser-instrumentation` (experimental: navigation/resource timing). Emit Core Web Vitals via the `web-vitals` library as OTel metric events with `trace_id` for correlation. Every Tier-B frontend implements this RUM beacon path.
+Instrument with `@opentelemetry/sdk-trace-web` (stable spans for interactions + API calls) plus `@opentelemetry/browser-instrumentation` (experimental: navigation/resource timing). Emit Core Web Vitals via the `web-vitals` library as OTel metric events with `trace_id` for correlation. Every Tier-B frontend implements this RUM beacon path.
 
 **Field SLI (p75 of real-user sessions) and the Lighthouse-CI lab gate share thresholds:**
 
