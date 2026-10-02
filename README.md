@@ -372,7 +372,9 @@ skipped; `--require-complete-run` adds the same opt-in gate it provides on
 - `tods-validate anonymize feed/ -o feed-anon/` writes a copy with
   person-identifying fields (employee IDs, license plates, vehicle IDs)
   pseudonymized before sharing. This is pseudonymization, not guaranteed
-  anonymity; see [SECURITY.md](SECURITY.md).
+  anonymity; see [SECURITY.md](SECURITY.md). The output must be outside the
+  input: `anonymize` and `fix` refuse to write over or into the package they
+  read.
 
 To fail CI only on findings introduced since a known-good run, capture a
 baseline (`--format json > baseline.json`) and pass `--baseline baseline.json`.

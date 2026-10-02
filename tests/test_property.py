@@ -110,7 +110,7 @@ def test_round_trip_via_zip_package(
     data = _pkgio.serialize_feed(headers, rows)
     out_dir = tmp_path_factory.mktemp("roundtrip")
     zip_path = out_dir / "pkg.zip"
-    _pkgio.write_package({"feed.txt": data}, zip_path)
+    _pkgio.write_package({"feed.txt": data}, zip_path, source=None)
 
     package = load_package(zip_path)
 
@@ -135,7 +135,7 @@ def test_fix_is_idempotent(
     headers, rows = feed
     base = tmp_path_factory.mktemp("fixidem")
     src = base / "src"
-    _pkgio.write_package({"feed.txt": _pkgio.serialize_feed(headers, rows)}, src)
+    _pkgio.write_package({"feed.txt": _pkgio.serialize_feed(headers, rows)}, src, source=None)
 
     once = base / "once"
     twice = base / "twice"
@@ -175,7 +175,7 @@ def test_merge_feeds_is_deterministic_and_round_trips(
             ["service_id", "monday", "TODS_delete"], supplement_rows
         ),
     }
-    _pkgio.write_package(entries, src)
+    _pkgio.write_package(entries, src, source=None)
 
     out1, out2 = base / "out1", base / "out2"
     merge_feeds(src, None, out1)

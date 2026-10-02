@@ -186,7 +186,7 @@ def anonymize_package(  # noqa: C901 - the pseudonymization pass tracks several 
             result.replacements[f"{name}:{col}"] = count
         entries[name] = serialize_feed(feed.headers, rows)
 
-    write_package(entries, output)
+    write_package(entries, output, source=path, command="anonymize")
     result.written = sorted(entries)
     result.carried_through.sort()
     return result
