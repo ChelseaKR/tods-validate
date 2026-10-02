@@ -70,8 +70,65 @@ def serialize_feed(headers: Sequence[str], rows: list[dict[str, str]]) -> bytes:
     return buffer.getvalue().encode("utf-8")
 
 
-def write_package(entries: dict[str, bytes], output: Path) -> None:
-    """Write ``{filename: bytes}`` to a .zip file or a directory."""
+class OutputOverlapsInputError(Exception):
+    """A package write was pointed at the package it was read from.
+
+    ``anonymize`` and ``fix`` hold the whole input in memory and then write a
+    transformed copy, so an output path that is the input (or lies inside an
+    input directory) silently replaces the operator's feed. For ``anonymize``
+    that loss cannot be undone: the default salt is random and single-use, so
+    the original identifiers have no inverse. The tool reads a feed and writes
+    nothing back to it (docs/data/README.md); this is what makes that true.
+    """
+
+
+def output_overlaps_input(source: str | Path, output: Path) -> bool:
+    """True if writing to ``output`` would write over or into ``source``.
+
+    That is: ``output`` is the input file or directory, or is inside the input
+    directory. Paths are compared by file identity after resolving, so
+    ``./feed``, ``feed/`` and a symlink to ``feed`` all count as the same
+    package, as do two spellings that differ only in case on a
+    case-insensitive filesystem. The output need not exist yet: its nearest
+    existing ancestor is what decides "inside".
+    """
+    src = Path(source)
+    if not src.exists():
+        return False
+    target = output.resolve()
+    for candidate in (target, *target.parents):
+        if candidate.exists() and candidate.samefile(src):
+            return True
+    return False
+
+
+def reject_output_over_input(source: str | Path | None, output: Path, command: str) -> None:
+    """Raise :class:`OutputOverlapsInputError` if ``output`` overlaps ``source``."""
+    if source is None or not output_overlaps_input(source, output):
+        return
+    raise OutputOverlapsInputError(
+        f"{command} will not write to {output}: it is the input package {source} or inside "
+        "it, and writing there would replace the feed you read from. Choose an output path "
+        "outside the input."
+    )
+
+
+def write_package(
+    entries: dict[str, bytes],
+    output: Path,
+    *,
+    source: str | Path | None,
+    command: str = "tods-validate",
+) -> None:
+    """Write ``{filename: bytes}`` to a .zip file or a directory.
+
+    ``source`` is the package the entries were read from, or ``None`` when they
+    were built from scratch. It is keyword-only and required so that every
+    writer has to say which input it must not overwrite: an ``output`` that is
+    ``source`` or inside it raises :class:`OutputOverlapsInputError` before
+    anything is written. ``command`` names the caller in that error.
+    """
+    reject_output_over_input(source, output, command)
     if output.suffix.lower() == ".zip":
         output.parent.mkdir(parents=True, exist_ok=True)
         with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as zf:

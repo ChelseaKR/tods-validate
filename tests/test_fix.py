@@ -1,11 +1,17 @@
 """The fix command: safe, deterministic whitespace trimming (unit + e2e)."""
 
+import zipfile
 from pathlib import Path
 
 import pytest
 from click.testing import CliRunner
 
-from tods_validate._pkgio import UnreadableFileError
+from tods_validate._pkgio import (
+    OutputOverlapsInputError,
+    UnreadableFileError,
+    output_overlaps_input,
+    write_package,
+)
 from tods_validate.anonymize import anonymize_package
 from tods_validate.cli import main
 from tods_validate.fix import fix_package
@@ -212,3 +218,108 @@ def test_readable_package_is_unaffected(tmp_path: Path) -> None:
     result = fix_package(src, output=out)
     assert result.unreadable == []
     assert "run_events.txt" in result.written
+
+
+# --- An output path that is the input, or inside it, is refused (#220) -------
+#
+# anonymize and fix load the whole package and then write a transformed copy,
+# so `--output <input>` used to replace the operator's feed. For anonymize that
+# is unrecoverable: the default salt is random and single-use, so the original
+# employee_id values have no inverse.
+
+_EMPLOYEES = "date,service_id,run_id,employee_id\n20260106,weekday,10000,emp-100\n"
+
+
+def _operator_feed(tmp_path: Path) -> Path:
+    src = _src(tmp_path)
+    (src / "employee_run_dates.txt").write_text(_EMPLOYEES)
+    return src
+
+
+def _zip_of(src: Path) -> Path:
+    archive = src.with_suffix(".zip")
+    with zipfile.ZipFile(archive, "w") as zf:
+        for entry in sorted(src.iterdir()):
+            zf.writestr(entry.name, entry.read_bytes())
+    return archive
+
+
+def _snapshot(root: Path) -> dict[str, bytes]:
+    if root.is_file():
+        return {root.name: root.read_bytes()}
+    return {str(p.relative_to(root)): p.read_bytes() for p in sorted(root.rglob("*"))}
+
+
+# (input, output) as command-line spellings relative to tmp_path, which the
+# tests chdir into, so "./src/" and "src" really are two spellings of one path.
+_OVERLAPS = {
+    "same directory": ("src", "src"),
+    "same directory, other spelling": ("src", "./src/"),
+    "same directory, via ..": ("src", "src/../src"),
+    "directory inside the input": ("src", "src/anon"),
+    "zip inside the input directory": ("src", "src/out.zip"),
+    "same zip": ("src.zip", "src.zip"),
+    "same zip, other spelling": ("src.zip", "./src.zip"),
+    "symlink to the input": ("src", "link"),
+}
+
+
+def _invocation(command: str, src: str, out: str) -> list[str]:
+    if command == "anonymize":
+        return ["anonymize", src, "--output", out, "--salt", "t"]
+    return ["fix", src, "-o", out]
+
+
+@pytest.mark.parametrize("command", ["anonymize", "fix"])
+@pytest.mark.parametrize("case", list(_OVERLAPS), ids=list(_OVERLAPS))
+def test_cli_refuses_to_write_over_or_into_the_input(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: str, case: str
+) -> None:
+    feed = _operator_feed(tmp_path)
+    _zip_of(feed)
+    (tmp_path / "link").symlink_to(feed, target_is_directory=True)
+    src, out = _OVERLAPS[case]
+    monkeypatch.chdir(tmp_path)
+    before = _snapshot(tmp_path / src)
+
+    result = CliRunner().invoke(main, _invocation(command, src, out))
+
+    assert result.exit_code == 2, result.output  # EXIT_USAGE
+    assert f"{command} will not write to" in result.output
+    assert "input package" in result.output
+    assert _snapshot(tmp_path / src) == before, "the input must be byte-identical afterwards"
+
+
+@pytest.mark.parametrize("command", ["anonymize", "fix"])
+def test_cli_still_writes_to_a_path_beside_the_input(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, command: str
+) -> None:
+    # Negative control: a sibling whose name starts with the input's is not
+    # "inside" it, and the parent directory of the input is not the input.
+    _operator_feed(tmp_path)
+    monkeypatch.chdir(tmp_path)
+    result = CliRunner().invoke(main, _invocation(command, "src", "src-out"))
+    assert result.exit_code == 0, result.output
+    assert (tmp_path / "src-out" / "employee_run_dates.txt").is_file()
+
+
+def test_api_raises_before_writing_over_the_input(tmp_path: Path) -> None:
+    src = _operator_feed(tmp_path)
+    before = _snapshot(src)
+    with pytest.raises(OutputOverlapsInputError, match="anonymize will not write"):
+        anonymize_package(src, src, salt="t")
+    with pytest.raises(OutputOverlapsInputError, match="fix will not write"):
+        fix_package(src, output=src / "nested")
+    assert _snapshot(src) == before
+    assert not (src / "nested").exists()
+
+
+def test_write_package_without_a_source_writes_anywhere(tmp_path: Path) -> None:
+    out = tmp_path / "built"
+    write_package({"a.txt": b"x\n"}, out, source=None)
+    write_package({"a.txt": b"y\n"}, out, source=None)  # no input to protect
+    assert (out / "a.txt").read_bytes() == b"y\n"
+
+
+def test_output_overlaps_input_ignores_a_missing_source(tmp_path: Path) -> None:
+    assert not output_overlaps_input(tmp_path / "gone", tmp_path / "gone")

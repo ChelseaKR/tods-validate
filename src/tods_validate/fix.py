@@ -106,6 +106,6 @@ def fix_package(  # noqa: C901 -- pragmatic complexity; ratchet tracked in docs/
             result.duplicate_rows_dropped[name] = duplicate_dropped
         entries[name] = serialize_feed(feed.headers, rows)
     if output is not None:
-        write_package(entries, output)
+        write_package(entries, output, source=path, command="fix")
         result.written = sorted(entries)
     return result

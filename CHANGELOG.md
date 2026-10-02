@@ -176,6 +176,18 @@ Added:
 
 Fixed:
 
+- `anonymize --output` and `fix -o` no longer write over the package they
+  read. Both accepted the input path as their destination and replaced the
+  operator's feed in place; for `anonymize` the loss was unrecoverable, because
+  the default salt is random and single-use, so the original `employee_id`,
+  `license_plate` and `vehicle_label` values had no inverse. That contradicted
+  the data cards, which say the tool writes nothing back. The shared writer now
+  refuses, with exit code 2 and both paths named, when the output is the input
+  directory or archive or lies inside the input directory. Paths are compared
+  by file identity after resolving, so `./feed/`, `feed/../feed` and a symlink
+  to `feed` are all caught. The check lives in `write_package`, whose `source`
+  argument is now required, so a future writer inherits it.
+  [#220](https://github.com/ChelseaKR/tods-validate/issues/220)
 - The GitHub Action and pre-commit examples taught a pin one release out of
   date, and nothing could notice. `README.md` and `.pre-commit-hooks.yaml` both
   named `v0.10.0` from the day `v0.11.0` shipped, which is the second time the

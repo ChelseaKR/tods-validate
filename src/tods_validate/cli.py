@@ -17,7 +17,7 @@ from typing import TYPE_CHECKING, NoReturn
 import click
 
 from . import __version__
-from ._pkgio import UnreadableFileError
+from ._pkgio import OutputOverlapsInputError, UnreadableFileError
 from .anonymize import AlreadyProtectedError, anonymize_package
 from .baseline import diff_findings, load_baseline_identities
 from .config import PROFILES, Config, ConfigError, _merge, _profile_config, load_config
@@ -1046,7 +1046,7 @@ def anonymize(
         _fail(str(exc))
     except AlreadyProtectedError as exc:
         _fail(str(exc))
-    except UnreadableFileError as exc:
+    except (UnreadableFileError, OutputOverlapsInputError) as exc:
         _fail(str(exc))
     for target, count in sorted(result.replacements.items()):
         click.echo(f"{target}: {count} value(s) pseudonymized")
@@ -1084,7 +1084,7 @@ def fix(path: str, output_path: str | None, encoding: str | None) -> None:
         result = fix_package(path, Path(output_path) if output_path is not None else None, encoding)
     except PackageNotFoundError as exc:
         _fail(str(exc))
-    except UnreadableFileError as exc:
+    except (UnreadableFileError, OutputOverlapsInputError) as exc:
         _fail(str(exc))
     click.echo(f"tods-validate fix: {result.source}")
     for name in result.unreadable:
