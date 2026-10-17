@@ -176,6 +176,12 @@ Added:
 
 Fixed:
 
+- The VS Code extension's VSIX now includes `vscode-languageclient`, which the
+  client requires at activation. `editor/vscode/.vscodeignore` excluded all of
+  `node_modules/`, so an installed copy could not start. The packaging workflow
+  now fails if the archive lacks it. The extension also gains its own
+  `CHANGELOG.md` and a `repository.directory` field. It is still not published;
+  `docs/runbooks/publish-vscode-extension.md` has the steps.
 - `anonymize --output` and `fix -o` no longer write over the package they
   read. Both accepted the input path as their destination and replaced the
   operator's feed in place; for `anonymize` the loss was unrecoverable, because
