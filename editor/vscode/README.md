@@ -51,7 +51,8 @@ code --install-extension tods-validate-*.vsix
 ```
 
 The repository's **VS Code extension** workflow performs the same locked install,
-type-check, package, and vulnerability-audit steps and uploads the VSIX as a
-workflow artifact. The extension has not been published to the Marketplace or
+type-check and package steps, checks the archive's contents, and uploads the
+VSIX as a workflow artifact. Dependency advisories are checked by `make
+npm-audit` in the main CI run. The extension has not been published to the Marketplace or
 Open VSX; publisher-account setup and terms acceptance remain maintainer-only
 steps. Verify the VSIX in a real editor before relying on it.

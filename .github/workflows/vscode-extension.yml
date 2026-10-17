@@ -68,6 +68,10 @@ jobs:
           test -n "$vsix"
           unzip -Z1 "$vsix" | grep -Fx 'extension/LICENSE.txt'
           unzip -Z1 "$vsix" | grep -Fx 'extension/out/extension.js'
+          # The client requires this at activation. .vscodeignore once excluded
+          # all of node_modules, and the VSIX shipped without it.
+          unzip -Z1 "$vsix" | grep -Fx 'extension/node_modules/vscode-languageclient/package.json'
+          unzip -Z1 "$vsix" | grep -Fx 'extension/readme.md'
       - name: Upload VSIX
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
