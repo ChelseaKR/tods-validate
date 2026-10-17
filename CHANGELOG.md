@@ -176,6 +176,17 @@ Added:
 
 Fixed:
 
+- `make npm-audit` failed on GHSA-VFJ7-8CJW-P6XM (`braces`, high) in
+  `editor/vscode`, reached through `@vscode/vsce` -> `secretlint` -> `globby`
+  -> `fast-glob` -> `micromatch`. No patched `braces` exists, but
+  `@vscode/vsce` 4.0.0 no longer depends on `secretlint` or `globby`, so the
+  extension's packaging tool moves to `^4.0.0` and the chain is gone, along
+  with the two moderate advisories (`fast-uri`, `markdown-it`) that came in
+  with it. No waiver was needed. `npm run package` still produces a VSIX with
+  the same required entries, and the VSIX carries none of the packaging
+  toolchain. `@vscode/vsce` 4 needs Node 22 or later; every workflow here uses
+  Node 24. [#267](https://github.com/ChelseaKR/tods-validate/issues/267)
+
 - The VS Code extension's VSIX now includes `vscode-languageclient`, which the
   client requires at activation. `editor/vscode/.vscodeignore` excluded all of
   `node_modules/`, so an installed copy could not start. The packaging workflow
