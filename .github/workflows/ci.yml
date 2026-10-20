@@ -65,6 +65,23 @@ jobs:
       - name: Check that docs/rules.md matches the rule registry
         run: make docs-check
 
+  # Reads origin's tag list and fails if a major- or minor-only ref is published.
+  # Its own job rather than a step in docs-drift: a failure here is a statement
+  # about the remote, not about this checkout, and burying it under a docs gate
+  # would read as a documentation problem.
+  published-refs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7
+        with:
+          python-version: "3.12"
+      - name: No moving ref is published (SECURITY.md, supply chain)
+        run: make published-refs-check
+
   # Compares docs/v1-contract-candidate.json against the implementation on every
   # pull request. It is a `make verify` gate, but until now it reached CI only
   # through the release workflows, which are `on: release` -- so the public

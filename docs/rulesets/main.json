@@ -80,6 +80,9 @@
             "context": "perf"
           },
           {
+            "context": "published-refs"
+          },
+          {
             "context": "secrets"
           },
           {
