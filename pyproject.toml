@@ -20,7 +20,7 @@ license = "Apache-2.0"
 license-files = ["LICENSE"]
 requires-python = ">=3.12"
 authors = [{ name = "Chelsea Kelly-Reif" }]
-keywords = ["transit", "gtfs", "tods", "ods", "validation", "cal-itp"]
+keywords = ["transit", "gtfs", "tods", "ods", "transit-operational-data-standard", "operational-data-standard", "crew-runs", "deadheads", "mobilitydata", "cal-itp", "validation", "validator", "linter", "sarif", "github-action", "open-data"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Environment :: Console",
@@ -29,6 +29,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
     "Topic :: Scientific/Engineering :: GIS",
+    "Topic :: Software Development :: Quality Assurance",
 ]
 dependencies = ["click>=8.1"]
 
