@@ -1,5 +1,9 @@
 # tods-validate
 
+[![CI](https://github.com/ChelseaKR/tods-validate/actions/workflows/ci.yml/badge.svg)](https://github.com/ChelseaKR/tods-validate/actions/workflows/ci.yml)
+[![PyPI](https://img.shields.io/pypi/v/tods-validate.svg)](https://pypi.org/project/tods-validate/)
+[![License: Apache 2.0](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
+
 A validator for [Transit Operational Data Standard (TODS)](https://tods-transit.org/)
 feeds, with a CLI and a GitHub Action.
 
