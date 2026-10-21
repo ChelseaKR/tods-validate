@@ -363,8 +363,8 @@ VEHICLE_ASSIGNMENTS = TableSpec(
     primary_key=("date", "block_id", "service_id"),
     fields=(
         FieldSpec("date", FieldType.DATE, Presence.REQUIRED),
-        # Spec: "Required if block_ids are repeated between different
-        # service_ids." Checked by rule TODS-E205.
+        # Spec: "Required when this row's block_id is used by trips with
+        # more than one service_id." Checked by rule TODS-E205.
         FieldSpec(
             "service_id",
             FieldType.ID,

@@ -220,10 +220,11 @@ def _normalize_presence(cell: str, description: str = "") -> Presence:
     """Map the spec's Required cell and conditional prose to ``Presence``.
 
     The ``vehicle_assignments.service_id`` row is labeled ``Optional`` in the
-    table, then narrowed by its description: "Required if ``block_id``s are
-    repeated between different ``service_id``s."  Preserve that semantic
-    condition so the parsed spec can be compared with ``schema.py`` without
-    weakening the dedicated TODS-E205 check.
+    table, then narrowed by its description: "Required when this row's ``block_id``
+    is used by trips with more than one ``service_id``" (previously phrased
+    "Required if ``block_id``s are repeated between different ``service_id``s").
+    Preserve that semantic condition so the parsed spec can be compared with
+    ``schema.py`` without weakening the dedicated TODS-E205 check.
     """
     low = re.sub(r"[`*]", "", cell).strip().lower()
     if "conditional" in low:
@@ -231,7 +232,7 @@ def _normalize_presence(cell: str, description: str = "") -> Presence:
     if low.startswith("required"):
         return Presence.REQUIRED
     if low.startswith("optional"):
-        if re.search(r"\brequired\s+if\b", description, re.IGNORECASE):
+        if re.search(r"\brequired\s+(?:if|when)\b", description, re.IGNORECASE):
             return Presence.CONDITIONAL
         return Presence.OPTIONAL
     raise SpecParseError(f"unrecognized presence {cell!r}")
