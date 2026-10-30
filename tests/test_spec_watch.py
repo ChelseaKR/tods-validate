@@ -189,6 +189,13 @@ def test_normalize_presence(spec_watch) -> None:
         )
         is Presence.CONDITIONAL
     )
+    assert (
+        spec_watch._normalize_presence(
+            "Optional",
+            "Required when this row's `block_id` is used by trips with more than one `service_id`.",
+        )
+        is Presence.CONDITIONAL
+    )
     assert spec_watch._normalize_presence("Conditionally required") is Presence.CONDITIONAL
     with pytest.raises(spec_watch.SpecParseError):
         spec_watch._normalize_presence("Sometimes")
