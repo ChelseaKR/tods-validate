@@ -9,6 +9,6 @@
   },
   "overrides": {
     "pa11y": "10.0.0",
-    "puppeteer": "25.10.0"
+    "puppeteer": "25.13.0"
   }
 }
