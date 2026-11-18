@@ -131,8 +131,8 @@ ceilings, recorded in `perf/bundle-baseline.json`.
 
 | Surface | Measured | Budget |
 | --- | --- | --- |
-| `web/index.html` | 14,678 | 14,976 |
-| Whole published `web/` tree | 254,360 | 262,144 |
+| `web/index.html` | 14,724 | 14,976 |
+| Whole published `web/` tree | 254,406 | 262,144 |
 | Published page count | 49 | 60 |
 | HTML report at 10,000 findings | 2,348,762 | 3,145,728 |
 
@@ -157,7 +157,8 @@ browser: the report frame was a fixed 24rem window, so a long report scrolled
 inside a box that itself scrolls with the page, and an empty frame was a Tab
 stop that showed no focus ring. The script that fits the frame to its report
 costs 1,104 bytes with the placeholder's language and color-scheme
-declarations, leaving 298 bytes -- 2.0%. What was measured is in
+declarations, and a rule that keeps the file input inside its panel
+took 46 more, leaving 252 bytes -- 1.7%. What was measured is in
 `web/README.md`. The 1200x630 PNG is a static asset and does not enter either
 byte figure.
 

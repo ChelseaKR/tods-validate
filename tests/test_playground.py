@@ -544,3 +544,13 @@ def test_the_placeholder_report_declares_its_language() -> None:
     srcdoc = re.search(r'srcdoc="([^"]*)"', _HTML.read_text())
     assert srcdoc
     assert "<html lang='en'>" in srcdoc.group(1)
+
+
+def test_the_file_input_cannot_be_wider_than_its_panel() -> None:
+    # With text spacing raised (WCAG 1.4.12) the browser's "No file chosen"
+    # text grows, and at 320px the control pushed the page 20px past the screen.
+    style = re.search(r"<style>(.*?)</style>", _HTML.read_text(), flags=re.S)
+    assert style
+    rule = re.search(r'input\[type="file"\]\s*\{([^}]*)\}', style.group(1))
+    assert rule, "no rule for the file input"
+    assert re.search(r"max-width:\s*100%", rule.group(1))
