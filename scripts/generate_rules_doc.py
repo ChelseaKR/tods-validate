@@ -357,11 +357,13 @@ def _rule_page_html(r: Rule) -> str:
 {_ANALYTICS_SCRIPT}  </head>
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
+    <main>
     <p class="id">{esc(r.id)}</p>
     <h1>{esc(r.title)}</h1>
     <p class="meta"><span class="badge">{esc(severity)}</span></p>
     {notes_html}<p>{esc(r.description)}</p>
 {interpretation_html}    <p>{esc(_citation_label(r))} <a href="{spec_href}">{spec_text}</a></p>
+    </main>
 {_ANALYTICS_FOOTER}  </body>
 </html>
 """
@@ -409,6 +411,7 @@ def _index_page_html(rules: list[Rule]) -> str:
 {_PAGE_STYLE}    </style>
 {_ANALYTICS_SCRIPT}  </head>
   <body>
+    <main>
     <h1>tods-validate rule catalog</h1>
     <p class="lede">
       Every rule tods-validate checks against TODS v{esc(SPEC_VERSION)}, one
@@ -416,7 +419,8 @@ def _index_page_html(rules: list[Rule]) -> str:
       editor hovers, and CI annotations link back to; rule IDs are never
       renumbered once released, so a link made today keeps working.
     </p>
-{body}{_ANALYTICS_FOOTER}  </body>
+{body}    </main>
+{_ANALYTICS_FOOTER}  </body>
 </html>
 """
 

@@ -76,11 +76,13 @@
   </head>
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
+    <main>
     <p class="id">TODS-E304</p>
     <h1>Supplement both deletes and redefines the same row</h1>
     <p class="meta"><span class="badge">ERROR</span></p>
     <p>A supplement file contains a delete (TODS_delete=1) and another row with the same primary key. The spec prohibits this because supplement rows are not processed in order, so the result is undefined.</p>
     <p>Spec reference: <a href="https://tods-transit.org/spec/#supplement-files">https://tods-transit.org/spec/#supplement-files</a></p>
+    </main>
     <footer><p><a href="../privacy.html">Privacy and analytics</a></p><p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p></footer>
   </body>
 </html>

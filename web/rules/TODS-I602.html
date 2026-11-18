@@ -76,6 +76,7 @@
   </head>
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
+    <main>
     <p class="id">TODS-I602</p>
     <h1>One value is spelled more than one way</h1>
     <p class="meta"><span class="badge">INFO</span></p>
@@ -83,6 +84,7 @@
     <p>run_events.txt writes the same event_type or job_type two or more ways, differing only in capitalization or in the separator between words. The spec lets a producer use any values but asks for them to be consistent, and a consumer that matches on the literal value reads the spellings as unrelated types. Advisory only: two spellings can be two genuinely different values.</p>
     <p><strong>Interpretation:</strong> advisory: two values count as one value spelled differently when they match after case-folding and removing spaces, hyphens, and underscores</p>
     <p>Spec reference: <a href="https://tods-transit.org/spec/#run_eventstxt">https://tods-transit.org/spec/#run_eventstxt</a></p>
+    </main>
     <footer><p><a href="../privacy.html">Privacy and analytics</a></p><p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p></footer>
   </body>
 </html>
