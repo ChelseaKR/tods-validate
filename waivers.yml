@@ -11,9 +11,9 @@
 # The npm project is the optional `tree:` field, a repository-relative path
 # defaulting to `.` (the root). It exists because the gate audits every
 # `package-lock.json` in the repository, and the prose in a waiver is an
-# argument about one dependency tree: WVR-001 below reasons about a package
-# five levels down from pa11y-ci in the accessibility toolchain, which says
-# nothing about the same advisory arriving under `editor/vscode/`. A `tree:`
+# argument about one dependency tree: WVR-003 below reasons about the VS Code
+# extension's packaging tool, which says nothing about the same advisory
+# arriving in the accessibility toolchain at the root. A `tree:`
 # naming a directory that holds no lockfile is a gate failure, so a waiver
 # cannot outlive the project it describes. `kind: playground-version-pin`
 # waivers are matched by
@@ -23,34 +23,40 @@
 version: 1
 
 waivers:
-  - id: WVR-001
+  - id: WVR-003
     control: SEC-11
     repo: tods-validate
     kind: npm-audit
-    advisory: GHSA-jmr9-qjv8-65gv
-    package: extract-zip
-    version: 2.0.1
+    tree: editor/vscode
+    advisory: GHSA-fc5q-39xc-vjpf
+    package: picomatch
+    version: 4.0.7
     severity: high
     dependency_path: >-
-      pa11y-ci@4.1.1 -> pa11y@9.1.1 -> puppeteer@24.43.1 ->
-      @puppeteer/browsers@2.13.2 -> extract-zip@2.0.1
+      @vscode/vsce@4.0.0 -> tinyglobby@0.2.17 -> picomatch@4.0.7, and
+      @vscode/vsce@4.0.0 -> tinyglobby@0.2.17 -> fdir@6.5.0 -> picomatch@4.0.7
     reason: >-
-      extract-zip 2.0.1 does not validate symlink targets when unpacking an
-      archive, so a crafted archive can write outside the extraction directory
-      (CWE-22, CVSS 8.1). It reaches this repository only as a transitive
-      development dependency of the accessibility toolchain, five levels down
-      from pa11y-ci, where its sole job is unpacking the Chrome build that
-      @puppeteer/browsers downloads from Google's own storage host. It is in
-      the npm devDependencies set, is never installed by the published Python
-      package or the browser playground, and no code path in the shipped
-      artifact reaches it. No patched release of extract-zip exists as of
-      2026-08-15; the only remedy npm offers is `npm audit fix --force`, which
-      downgrades pa11y-ci from 4.1.1 to 3.1.0, a breaking major that would take
-      the WCAG 2.1 AA gate backwards to accept a fix for a package the shipped
-      artifact never loads. Accepted on that basis, to be re-reviewed on or
-      before the expiry date below and released the moment extract-zip ships a
-      fixed version or pa11y-ci moves off it.
+      picomatch through 4.0.7 backtracks exponentially on a single-branch
+      repeated extglob such as +(*) or +(*a), so whoever supplies the glob
+      pattern can block the Node.js event loop (CWE-1333, CVSS 7.5). It
+      reaches this repository only in the VS Code extension's development
+      tree, under @vscode/vsce, the packaging tool that `npm run package`
+      runs to build the VSIX. @vscode/vsce is a devDependency. It hands
+      tinyglobby the fixed pattern `**` and the ignore patterns in this
+      repository's own .vscodeignore, so no pattern comes from a user or a
+      feed. Nothing in the built extension loads it: the extension's one
+      runtime dependency, vscode-languageclient, does not depend on
+      picomatch, and the extension is not published to the Marketplace or
+      Open VSX. No patched release of picomatch exists as of 2026-11-17: the
+      latest is 4.0.7 and the advisory lists no fixed version. The newest
+      @vscode/vsce, 4.1.1, still depends on tinyglobby, whose newest release
+      still depends on picomatch 4. The only remedy npm offers is moving
+      @vscode/vsce back to 3.9.1, the major line that #268 left to clear the
+      braces advisory GHSA-vfj7-8cjw-p6xm. Accepted on that basis for 30
+      days, to be re-reviewed on or before the expiry date below and
+      released the moment picomatch ships a fixed version or @vscode/vsce
+      moves off it.
     owner: chelseakr
-    granted: 2026-08-15
-    expires: 2026-11-15
-    link: https://github.com/advisories/GHSA-jmr9-qjv8-65gv
+    granted: 2026-11-17
+    expires: 2026-12-17
+    link: https://github.com/advisories/GHSA-fc5q-39xc-vjpf

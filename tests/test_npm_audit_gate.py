@@ -1,11 +1,18 @@
-"""The npm-audit waiver is bounded to one advisory, and provably so.
+"""An npm-audit waiver is bounded to one advisory, and provably so.
 
-waivers.yml accepts GHSA-jmr9-qjv8-65gv, an unpatched symlink path-traversal
-issue in extract-zip that reaches this repository only through the pa11y-ci
-development toolchain. An exception mechanism nobody has tested is worse than
-no exception at all, so these pin what it will *not* accept: a different
-advisory, the same advisory on a different package, the same advisory at a
-higher severity, and an expired or malformed waiver all still fail the gate.
+An exception mechanism nobody has tested is worse than no exception at all,
+so these pin what a waiver will *not* accept: a different advisory, the same
+advisory on a different package, the same advisory at a higher severity, and
+an expired or malformed waiver all still fail the gate.
+
+The waiver those tests push against is a fixture, `_FIXTURE_WAIVER`, with
+dates that move with the calendar. It used to be the committed registry's
+own entry, WVR-001, which meant nine tests about the mechanism failed on the
+day that entry expired, for a reason that had nothing to do with the
+mechanism. WVR-001 covered GHSA-jmr9-qjv8-65gv in extract-zip; the root tree
+moved off extract-zip on 2026-09-08 and the waiver was retired on 2026-11-17.
+The fixture keeps its shape. What the committed registry holds today is
+checked separately, against the real file, further down.
 
 The second half of the module pins *what the gate looks at*, which is a
 separate question from what it accepts. `npm audit` reads the lockfile in its
@@ -38,6 +45,37 @@ WAIVERS = ROOT / "waivers.yml"
 
 WAIVED_ADVISORY = "GHSA-jmr9-qjv8-65gv"
 WAIVED_PACKAGE = "extract-zip"
+
+# What waivers.yml accepts today: one advisory, in the VS Code extension's tree.
+COMMITTED_ADVISORY = "GHSA-fc5q-39xc-vjpf"
+COMMITTED_PACKAGE = "picomatch"
+
+# A root-scoped waiver for the tests of the mechanism. Granted yesterday and
+# expiring in a month, whenever the tests run, so the only thing that can
+# expire it is a test that sets out to.
+_FIXTURE_GRANTED = (date.today() - timedelta(days=1)).isoformat()
+_FIXTURE_EXPIRES = (date.today() + timedelta(days=30)).isoformat()
+_FIXTURE_WAIVER = f"""version: 1
+
+waivers:
+  - id: WVR-TEST
+    control: SEC-11
+    repo: tods-validate
+    kind: npm-audit
+    advisory: {WAIVED_ADVISORY}
+    package: {WAIVED_PACKAGE}
+    version: 2.0.1
+    severity: high
+    dependency_path: >-
+      pa11y-ci -> pa11y -> puppeteer -> @puppeteer/browsers -> extract-zip
+    reason: >-
+      A fixture for tests/test_npm_audit_gate.py: a root-scoped waiver for
+      one high advisory, in the shape the committed registry uses.
+    owner: chelseakr
+    granted: {_FIXTURE_GRANTED}
+    expires: {_FIXTURE_EXPIRES}
+    link: https://github.com/advisories/{WAIVED_ADVISORY}
+"""
 
 # The two npm projects this repository commits today. Named rather than
 # derived, because the failure this module exists to prevent is the walk
@@ -113,9 +151,17 @@ def _report(*advisories: dict[str, Any]) -> dict[str, Any]:
     }
 
 
-def _run(tmp_path: Path, report: dict[str, Any], waivers: Path = WAIVERS) -> int:
+def _fixture_registry(tmp_path: Path, text: str = _FIXTURE_WAIVER) -> Path:
+    path = tmp_path / "fixture-waivers.yml"
+    path.write_text(text, encoding="utf-8")
+    return path
+
+
+def _run(tmp_path: Path, report: dict[str, Any], waivers: Path | None = None) -> int:
     path = tmp_path / "audit.json"
     path.write_text(json.dumps(report), encoding="utf-8")
+    if waivers is None:
+        waivers = _fixture_registry(tmp_path)
     return int(
         _gate().main(
             ["--audit-json", str(path), "--waivers", str(waivers), "--repo", "tods-validate"]
@@ -123,9 +169,35 @@ def _run(tmp_path: Path, report: dict[str, Any], waivers: Path = WAIVERS) -> int
     )
 
 
-def test_the_committed_waiver_accepts_the_advisory_it_names(tmp_path: Path) -> None:
+def test_a_waiver_accepts_the_advisory_it_names(tmp_path: Path) -> None:
     report = _report(_advisory(WAIVED_ADVISORY, WAIVED_PACKAGE))
     assert _run(tmp_path, report) == 0
+
+
+def test_the_committed_waiver_accepts_the_advisory_it_names_where_it_names_it() -> None:
+    """The real registry, against the advisory it was written for.
+
+    It accepts that advisory in the extension's tree and nowhere else: the
+    same finding at the repository root is still an unreviewed one.
+    """
+
+    gate = _gate()
+    waivers, problems = gate.npm_audit_waivers(
+        WAIVERS.read_text(encoding="utf-8"),
+        "tods-validate",
+        date.today(),
+        gate.npm_projects(ROOT),
+    )
+    assert problems == []
+    report = _report(_advisory(COMMITTED_ADVISORY, COMMITTED_PACKAGE))
+
+    in_extension = gate.adjudicate(report, waivers, EXTENSION_PROJECT)
+    assert in_extension[0] == []
+    assert in_extension[1], "the committed waiver accepts the advisory in the tree it names"
+
+    at_root = gate.adjudicate(report, waivers, ROOT_PROJECT)
+    assert at_root[1] == []
+    assert any("no waiver" in failure for failure in at_root[0])
 
 
 def test_a_different_high_advisory_still_fails(
@@ -170,17 +242,19 @@ def test_a_moderate_advisory_does_not_fail_the_high_floor(tmp_path: Path) -> Non
 
 def test_an_expired_waiver_accepts_nothing(tmp_path: Path) -> None:
     stale = tmp_path / "waivers.yml"
-    text = WAIVERS.read_text(encoding="utf-8")
     yesterday = (date.today() - timedelta(days=1)).isoformat()
-    stale.write_text(text.replace("expires: 2026-11-15", f"expires: {yesterday}"), encoding="utf-8")
+    text = _FIXTURE_WAIVER.replace(f"expires: {_FIXTURE_EXPIRES}", f"expires: {yesterday}")
+    assert text != _FIXTURE_WAIVER
+    stale.write_text(text, encoding="utf-8")
     report = _report(_advisory(WAIVED_ADVISORY, WAIVED_PACKAGE))
     assert _run(tmp_path, report, waivers=stale) == 1
 
 
 def test_a_waiver_missing_a_required_field_accepts_nothing(tmp_path: Path) -> None:
     broken = tmp_path / "waivers.yml"
-    text = WAIVERS.read_text(encoding="utf-8")
-    broken.write_text(text.replace("    owner: chelseakr\n", ""), encoding="utf-8")
+    text = _FIXTURE_WAIVER.replace("    owner: chelseakr\n", "")
+    assert text != _FIXTURE_WAIVER
+    broken.write_text(text, encoding="utf-8")
     report = _report(_advisory(WAIVED_ADVISORY, WAIVED_PACKAGE))
     assert _run(tmp_path, report, waivers=broken) == 1
 
@@ -201,12 +275,12 @@ def test_the_committed_registry_is_well_formed() -> None:
     assert problems == []
     # Keyed by (npm project, advisory): the same advisory in two dependency
     # trees is two decisions, and one waiver must not answer for both.
-    assert set(waivers) == {(ROOT_PROJECT, WAIVED_ADVISORY.upper())}
-    waiver = waivers[(ROOT_PROJECT, WAIVED_ADVISORY.upper())]
-    assert waiver["package"] == WAIVED_PACKAGE
+    assert set(waivers) == {(EXTENSION_PROJECT, COMMITTED_ADVISORY.upper())}
+    waiver = waivers[(EXTENSION_PROJECT, COMMITTED_ADVISORY.upper())]
+    assert waiver["package"] == COMMITTED_PACKAGE
     assert waiver["severity"] == "high"
     # The record has to carry the facts the acceptance rests on, not just an id.
-    for claim in ("2.0.1", "pa11y-ci", "2026-08-15"):
+    for claim in ("4.0.7", "@vscode/vsce", "2026-11-17"):
         assert claim in waiver["reason"] + waiver["version"] + waiver["dependency_path"]
 
 
@@ -410,9 +484,9 @@ def test_the_run_says_how_many_projects_it_adjudicated(
 
 
 def _scoped_registry(tmp_path: Path, tree: str | None) -> Path:
-    """The committed registry with WVR-001 re-scoped to `tree` (or left at root)."""
+    """The fixture registry with its waiver re-scoped to `tree` (or left at root)."""
 
-    text = WAIVERS.read_text(encoding="utf-8")
+    text = _FIXTURE_WAIVER
     if tree is not None:
         text = text.replace("    kind: npm-audit\n", f"    kind: npm-audit\n    tree: {tree}\n", 1)
     path = tmp_path / "waivers.yml"
@@ -425,16 +499,16 @@ def test_a_root_waiver_does_not_accept_the_same_advisory_in_another_project(
 ) -> None:
     """The reason `tree` exists.
 
-    WVR-001's justification is entirely about the accessibility toolchain --
-    "five levels down from pa11y-ci", "the npm devDependencies set". None of
-    that is a statement about the VS Code extension's dependency tree, so the
-    same advisory arriving there is an unreviewed finding.
+    A waiver's justification is an argument about one dependency tree. The
+    retired WVR-001, whose shape the fixture keeps, argued entirely about the
+    accessibility toolchain: "five levels down from pa11y-ci", "the npm
+    devDependencies set". None of that is a statement about the VS Code
+    extension's dependency tree, so the same advisory arriving there is an
+    unreviewed finding.
     """
 
     gate = _gate()
-    waivers, problems = gate.npm_audit_waivers(
-        WAIVERS.read_text(encoding="utf-8"), "tods-validate", date.today()
-    )
+    waivers, problems = gate.npm_audit_waivers(_FIXTURE_WAIVER, "tods-validate", date.today())
     assert problems == []
     report = _report(_advisory(WAIVED_ADVISORY, WAIVED_PACKAGE))
 
