@@ -13,6 +13,7 @@ import re
 import sys
 import tomllib
 from datetime import date
+from html.parser import HTMLParser
 from pathlib import Path
 from types import ModuleType
 
@@ -510,10 +511,37 @@ def test_the_structured_data_states_no_figure_nothing_re_derives() -> None:
 # it works is a browser's job, and the deployed-page check is where that goes.
 
 
+class _InlineScripts(HTMLParser):
+    """The text of each inline <script> that has no attributes, in page order.
+
+    A parser, not a pattern: it reads the tag the way a browser does, whatever
+    its case or spacing.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.scripts: list[str] = []
+        self._open: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "script" and not attrs:
+            self._open = []
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self._open is not None:
+            self.scripts.append("".join(self._open))
+            self._open = None
+
+    def handle_data(self, data: str) -> None:
+        if self._open is not None:
+            self._open.append(data)
+
+
 def _script() -> str:
-    scripts = re.findall(r"<script>(.*?)</script>", _HTML.read_text(), flags=re.S)
-    assert scripts, "the playground has no inline script"
-    return scripts[-1]
+    parser = _InlineScripts()
+    parser.feed(_HTML.read_text())
+    assert parser.scripts, "the playground has no inline script"
+    return parser.scripts[-1]
 
 
 def test_the_report_frame_is_sized_from_the_report_it_holds() -> None:
