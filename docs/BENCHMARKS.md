@@ -131,12 +131,12 @@ ceilings, recorded in `perf/bundle-baseline.json`.
 
 | Surface | Measured | Budget |
 | --- | --- | --- |
-| `web/index.html` | 13,574 | 13,824 |
-| Whole published `web/` tree | 253,256 | 262,144 |
+| `web/index.html` | 14,678 | 14,976 |
+| Whole published `web/` tree | 254,360 | 262,144 |
 | Published page count | 49 | 60 |
 | HTML report at 10,000 findings | 2,348,762 | 3,145,728 |
 
-The `web/index.html` ceiling has moved twice. The first move was by 1,024
+The `web/index.html` ceiling has moved three times. The first move was by 1,024
 bytes. The share card before it fitted under the old ceiling
 and left 6% headroom, on the stated understanding that the next addition of
 that size would be argued for rather than pre-absorbed. The argument is
@@ -151,8 +151,15 @@ by 512 bytes on 2026-09-17, is for the owner's decision to count visits with
 Google Analytics 4 on every public site (ADR 0010): the minimum GA origins in
 the CSP, one sentence beside the lede saying GA never sees a feed file or the
 report, the `analytics.js` script tag and the footer opt-out cost 573 bytes
-together, leaving 250 bytes -- 1.8% -- tighter again. The 1200x630 PNG is a
-static asset and does not enter either byte figure.
+together, leaving 250 bytes -- 1.8% -- tighter again. The third move, by
+1,152 bytes on 2026-11-17, is for an accessibility defect measured in a
+browser: the report frame was a fixed 24rem window, so a long report scrolled
+inside a box that itself scrolls with the page, and an empty frame was a Tab
+stop that showed no focus ring. The script that fits the frame to its report
+costs 1,104 bytes with the placeholder's language and color-scheme
+declarations, leaving 298 bytes -- 2.0%. What was measured is in
+`web/README.md`. The 1200x630 PNG is a static asset and does not enter either
+byte figure.
 
 The last row is the one that can grow without anyone noticing: about 235 bytes
 per finding, so a template change adding 80 bytes to a row is invisible on a

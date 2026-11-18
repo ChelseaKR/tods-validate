@@ -86,6 +86,36 @@ The reasoning lives here rather than in a comment in the page because
 ceiling in `perf/bundle-baseline.json`; this file is published but never
 fetched by the playground.
 
+## The report frame
+
+The report is shown in an `<iframe>` with `sandbox="allow-same-origin"`. Two
+things about that frame were measured in a browser on 2026-11-17, with the
+Pyodide runtime replaced by a stub that returns what `render_html` produces,
+and both cost a reader who uses a keyboard or zooms:
+
+- The frame was a fixed 24rem window. A 52-finding report is 10,900px tall at
+  1280px wide and 20,000px tall at 320px, so it scrolled inside a 384px box
+  that itself scrolls with the page: two scrollbars for one document, and at
+  400% zoom the box is taller than the screen. `fitReport()` sets the frame's
+  height to its document's, so the report scrolls with the page. A
+  `ResizeObserver` on the frame's root element re-fits it when a rule group
+  opens or closes and when the window narrows.
+- Before any report exists, and for a clean one, the frame holds nothing to
+  operate, yet Tab stopped on it: focus went into the empty document and no
+  focus ring was drawn anywhere. `fitReport()` gives the frame
+  `tabindex="-1"` while its document has no link, field or disclosure, and
+  takes the attribute off again when it does.
+
+The placeholder shown before the first run is a document of its own, so it
+declares `lang` and `color-scheme` itself. Without the second, a reader in
+dark mode got a white 24rem panel in the middle of a dark page.
+
+The sandbox has no `allow-scripts`, so the script inside a report does not
+run here. The parent page can still read and size the frame because the frame
+is same-origin. One consequence is open: the report's own Severity, Rule and
+File filters are drawn in the playground and do nothing, because the script
+that drives them is the one the sandbox blocks.
+
 ## Deployment
 
 The playground is published at

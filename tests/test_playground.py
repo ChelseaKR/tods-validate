@@ -490,3 +490,57 @@ def test_the_structured_data_states_no_figure_nothing_re_derives() -> None:
     assert not re.search(r"\b[0-9]+\b", str(data.get("description", ""))), (
         "the structured data's description states a figure nothing derives"
     )
+
+
+# --- the report frame ------------------------------------------------------
+#
+# The report is shown in an <iframe>. Two things about that frame cost a
+# keyboard or zoom user, and both were measured in a browser on 2026-11-17
+# (web/README.md, "The report frame"):
+#
+#   * It was a fixed 24rem window. A 52-finding report is 10,900px tall at
+#     1280px wide and 20,000px at 320px, so it scrolled inside a 384px box
+#     that itself scrolls with the page: two scrollbars for one document, and
+#     at 400% zoom the box is taller than the screen.
+#   * Before any report exists, and for a clean one, the frame holds nothing
+#     to operate, yet Tab stopped on it. Focus went into the empty document
+#     and no focus ring was drawn anywhere.
+#
+# These read the page's script. They hold that the behavior is wired; whether
+# it works is a browser's job, and the deployed-page check is where that goes.
+
+
+def _script() -> str:
+    scripts = re.findall(r"<script>(.*?)</script>", _HTML.read_text(), flags=re.S)
+    assert scripts, "the playground has no inline script"
+    return scripts[-1]
+
+
+def test_the_report_frame_is_sized_from_the_report_it_holds() -> None:
+    script = _script()
+    fit = re.search(r"const fitReport = \(\) => \{(.*?)\n      \};", script, flags=re.S)
+    assert fit, "nothing sizes the report frame to its content"
+    body = fit.group(1)
+    assert "contentDocument" in body
+    assert re.search(r"report\.style\.height\s*=", body)
+    # Re-fit when the report's own size changes (a rule group opening, the
+    # window narrowing), not only when it first loads.
+    assert "new ResizeObserver(fitReport)" in script
+    assert re.search(r'report\.addEventListener\("load"', script)
+
+
+def test_an_empty_report_frame_is_not_a_tab_stop() -> None:
+    script = _script()
+    fit = re.search(r"const fitReport = \(\) => \{(.*?)\n      \};", script, flags=re.S)
+    assert fit
+    body = fit.group(1)
+    assert "report.tabIndex = -1" in body
+    assert 'report.removeAttribute("tabindex")' in body
+
+
+def test_the_placeholder_report_declares_its_language() -> None:
+    # The frame's placeholder is a document of its own. Without a language a
+    # screen reader has to guess one for it (WCAG 3.1.1).
+    srcdoc = re.search(r'srcdoc="([^"]*)"', _HTML.read_text())
+    assert srcdoc
+    assert "<html lang='en'>" in srcdoc.group(1)
