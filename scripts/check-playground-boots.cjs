@@ -65,13 +65,12 @@ const fs = require("node:fs");
 
 // puppeteer arrives through pa11y-ci -> pa11y, and package-lock.json pins it
 // at the top of node_modules, so `npm ci` resolves this deterministically. It
-// is deliberately not a direct devDependency: WVR-001 waives a transitive
-// extract-zip advisory on the grounds that puppeteer reaches this repository
-// only under the accessibility toolchain, and promoting it would make that
-// waiver's stated reasoning untrue. Declaring it is the right move if pa11y
-// ever drops puppeteer -- but then the waiver text has to be rewritten in the
-// same change, so fail here saying so rather than letting a bare
-// MODULE_NOT_FOUND look like an infrastructure blip.
+// is deliberately not a direct devDependency: it reaches this repository only
+// under the accessibility toolchain, and an advisory in its tree is argued
+// about on those grounds (WVR-001 was, until the tree moved off extract-zip
+// and the waiver was retired on 2026-11-17). Declaring it is the right move
+// if pa11y ever drops puppeteer, so fail here saying so rather than letting a
+// bare MODULE_NOT_FOUND look like an infrastructure blip.
 let puppeteer;
 try {
   puppeteer = require("puppeteer");
@@ -79,8 +78,7 @@ try {
   console.error(
     "::error::puppeteer is not installed. It comes in transitively under " +
       "pa11y-ci; run `npm ci`. If pa11y-ci no longer depends on it, add " +
-      "puppeteer to package.json's devDependencies and update WVR-001 in " +
-      "waivers.yml, which describes it as reachable only through pa11y-ci."
+      "puppeteer to package.json's devDependencies."
   );
   process.exit(1);
 }

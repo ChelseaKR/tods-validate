@@ -176,6 +176,19 @@ Added:
 
 Fixed:
 
+- `make verify` had stopped passing on `main` with no commit to blame: two
+  dependency findings, neither in shipped code. Waiver WVR-001 (extract-zip, GHSA-jmr9-qjv8-65gv)
+  expired on 2026-11-15. It had matched nothing since the root tree moved off
+  extract-zip on 2026-09-08, so it is retired, not renewed. GHSA-fc5q-39xc-vjpf
+  (picomatch, high) was reported in `editor/vscode` with no waiver. No patched
+  picomatch exists and the newest `@vscode/vsce` still depends on it, so it is
+  accepted as WVR-003, scoped to `editor/vscode`, from 2026-11-17 to
+  2026-12-17. picomatch arrives only under `@vscode/vsce`, the extension's
+  packaging tool, which is a devDependency; the extension is unpublished.
+  The tests of the waiver mechanism now use a fixture with dates that move
+  with the calendar. They had borrowed the committed entry, so nine of them
+  failed on the day it expired. The committed registry is still held to being
+  well formed and unexpired, by three tests and by `make npm-audit`.
 - `make npm-audit` failed on GHSA-VFJ7-8CJW-P6XM (`braces`, high) in
   `editor/vscode`, reached through `@vscode/vsce` -> `secretlint` -> `globby`
   -> `fast-glob` -> `micromatch`. No patched `braces` exists, but
