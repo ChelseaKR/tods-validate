@@ -76,6 +76,7 @@
   </head>
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
+    <main>
     <p class="id">TODS-W315</p>
     <h1>Run event location does not match the trip&#x27;s first or last stop</h1>
     <p class="meta"><span class="badge">WARNING</span></p>
@@ -83,6 +84,7 @@
     <p>A run event works a trip end to end (trip_id set, the matching mid_trip flag not 1), but its start_location is not the trip&#x27;s first stop, or its end_location is not the trip&#x27;s last stop, in the supplemented stop_times.txt.</p>
     <p><strong>Interpretation:</strong> the spec says these locations &#x27;should&#x27; be the trip endpoints, so a mismatch is a warning; skipped for mid-trip events and for trips with no stop_times.</p>
     <p>Spec reference: <a href="https://tods-transit.org/spec/#run_eventstxt">https://tods-transit.org/spec/#run_eventstxt</a></p>
+    </main>
     <footer><p><a href="../privacy.html">Privacy and analytics</a></p><p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p></footer>
   </body>
 </html>

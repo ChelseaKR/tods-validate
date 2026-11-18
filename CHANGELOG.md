@@ -176,6 +176,19 @@ Added:
 
 Fixed:
 
+- Three accessibility fixes to the website, from a keyboard and zoom pass in
+  Chromium and WebKit (2026-11-17). The playground's report frame now takes
+  the height of the report it holds, so a long report scrolls with the page
+  instead of inside a 24rem window, and an empty frame is no longer a Tab stop
+  that shows no focus ring; its placeholder declares a language and follows
+  dark mode. The rule catalog's index and its 47 rule pages wrap their content
+  in a `<main>` landmark. The playground's file input stays inside its panel
+  when text spacing is raised. The playground byte ceiling moved from 13,824
+  to 14,976 for the first of these; `perf/bundle-baseline.json` has the
+  reason. The catalog index now links back to the playground and the
+  playground's footer links to the catalog; those two links are the only new
+  visible text. The CLI, Action, hook, Docker image, LSP and editor extension
+  are unchanged.
 - `make verify` had stopped passing on `main` with no commit to blame: two
   dependency findings, neither in shipped code. Waiver WVR-001 (extract-zip, GHSA-jmr9-qjv8-65gv)
   expired on 2026-11-15. It had matched nothing since the root tree moved off

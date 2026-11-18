@@ -76,12 +76,14 @@
   </head>
   <body>
     <nav><a href="index.html">&larr; All rules</a></nav>
+    <main>
     <p class="id">TODS-I501</p>
     <h1>GTFS trips have no run event</h1>
     <p class="meta"><span class="badge">INFO</span></p>
     <p class='meta'>Needs a companion GTFS feed. Opt-in: off by default, enable with --enable coverage or --enable TODS-I501.</p>
     <p>Some trips in the companion GTFS feed are never referenced by a run event, so no crew work is described for them. This is informational: not every trip must appear in run_events.txt, but wide gaps can mean an incomplete export.</p>
     <p>Spec reference: <a href="https://tods-transit.org/spec/#run_eventstxt">https://tods-transit.org/spec/#run_eventstxt</a></p>
+    </main>
     <footer><p><a href="../privacy.html">Privacy and analytics</a></p><p class="analytics-choice" data-analytics-choice hidden><button type="button">Opt out of analytics</button> <span role="status"></span></p></footer>
   </body>
 </html>

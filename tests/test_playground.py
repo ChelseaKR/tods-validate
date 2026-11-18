@@ -13,6 +13,7 @@ import re
 import sys
 import tomllib
 from datetime import date
+from html.parser import HTMLParser
 from pathlib import Path
 from types import ModuleType
 
@@ -490,3 +491,102 @@ def test_the_structured_data_states_no_figure_nothing_re_derives() -> None:
     assert not re.search(r"\b[0-9]+\b", str(data.get("description", ""))), (
         "the structured data's description states a figure nothing derives"
     )
+
+
+# --- the report frame ------------------------------------------------------
+#
+# The report is shown in an <iframe>. Two things about that frame cost a
+# keyboard or zoom user, and both were measured in a browser on 2026-11-17
+# (web/README.md, "The report frame"):
+#
+#   * It was a fixed 24rem window. A 52-finding report is 10,900px tall at
+#     1280px wide and 20,000px at 320px, so it scrolled inside a 384px box
+#     that itself scrolls with the page: two scrollbars for one document, and
+#     at 400% zoom the box is taller than the screen.
+#   * Before any report exists, and for a clean one, the frame holds nothing
+#     to operate, yet Tab stopped on it. Focus went into the empty document
+#     and no focus ring was drawn anywhere.
+#
+# These read the page's script. They hold that the behavior is wired; whether
+# it works is a browser's job, and the deployed-page check is where that goes.
+
+
+class _InlineScripts(HTMLParser):
+    """The text of each inline <script> that has no attributes, in page order.
+
+    A parser, not a pattern: it reads the tag the way a browser does, whatever
+    its case or spacing.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=False)
+        self.scripts: list[str] = []
+        self._open: list[str] | None = None
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        if tag == "script" and not attrs:
+            self._open = []
+
+    def handle_endtag(self, tag: str) -> None:
+        if tag == "script" and self._open is not None:
+            self.scripts.append("".join(self._open))
+            self._open = None
+
+    def handle_data(self, data: str) -> None:
+        if self._open is not None:
+            self._open.append(data)
+
+
+def _script() -> str:
+    parser = _InlineScripts()
+    parser.feed(_HTML.read_text())
+    assert parser.scripts, "the playground has no inline script"
+    return parser.scripts[-1]
+
+
+def test_the_report_frame_is_sized_from_the_report_it_holds() -> None:
+    script = _script()
+    fit = re.search(r"const fitReport = \(\) => \{(.*?)\n      \};", script, flags=re.S)
+    assert fit, "nothing sizes the report frame to its content"
+    body = fit.group(1)
+    assert "contentDocument" in body
+    assert re.search(r"report\.style\.height\s*=", body)
+    # Re-fit when the report's own size changes (a rule group opening, the
+    # window narrowing), not only when it first loads.
+    assert "new ResizeObserver(fitReport)" in script
+    assert re.search(r'report\.addEventListener\("load"', script)
+
+
+def test_an_empty_report_frame_is_not_a_tab_stop() -> None:
+    script = _script()
+    fit = re.search(r"const fitReport = \(\) => \{(.*?)\n      \};", script, flags=re.S)
+    assert fit
+    body = fit.group(1)
+    assert "report.tabIndex = -1" in body
+    assert 'report.removeAttribute("tabindex")' in body
+
+
+def test_the_placeholder_report_declares_its_language() -> None:
+    # The frame's placeholder is a document of its own. Without a language a
+    # screen reader has to guess one for it (WCAG 3.1.1).
+    srcdoc = re.search(r'srcdoc="([^"]*)"', _HTML.read_text())
+    assert srcdoc
+    assert "<html lang='en'>" in srcdoc.group(1)
+
+
+def test_the_file_input_cannot_be_wider_than_its_panel() -> None:
+    # With text spacing raised (WCAG 1.4.12) the browser's "No file chosen"
+    # text grows, and at 320px the control pushed the page 20px past the screen.
+    style = re.search(r"<style>(.*?)</style>", _HTML.read_text(), flags=re.S)
+    assert style
+    rule = re.search(r'input\[type="file"\]\s*\{([^}]*)\}', style.group(1))
+    assert rule, "no rule for the file input"
+    assert re.search(r"max-width:\s*100%", rule.group(1))
+
+
+def test_the_playground_links_to_the_rule_catalog() -> None:
+    # The other half of test_the_catalog_index_links_back_to_the_playground:
+    # the playground named no route to the catalog its reports cite.
+    footer = re.search(r"<footer>(.*?)</footer>", _HTML.read_text(), flags=re.S)
+    assert footer
+    assert '<a href="rules/index.html">Rule catalog</a>' in footer.group(1)

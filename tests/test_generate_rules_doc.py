@@ -126,6 +126,39 @@ def test_every_published_page_carries_the_audited_stylesheet() -> None:
         assert gen._PAGE_STYLE in html, f"{name} does not use the shared stylesheet"
 
 
+def test_every_catalog_page_has_one_main_landmark_around_its_content() -> None:
+    # A screen-reader user jumps to the main landmark to skip what comes before
+    # the content, and on these pages there was none: the catalog index had no
+    # landmark around anything but its footer, and a rule page put its heading
+    # and text outside every landmark (WCAG 1.3.1, 2.4.1). The link back and
+    # the footer stay outside <main>, where a reader expects them.
+    gen = _load_generator()
+    for name, html in gen.generate_rule_pages().items():
+        assert html.count("<main>") == 1, name
+        assert html.count("</main>") == 1, name
+        main = html[html.index("<main>") : html.index("</main>")]
+        assert "<h1>" in main, f"{name}: the page heading is outside <main>"
+        assert "<nav>" not in main, name
+        assert "<footer>" not in main, name
+        before, after = html.split("<main>")[0], html.split("</main>")[1]
+        body_before = before[before.index("<body>") :]
+        # Nothing but the link back comes before the content.
+        text_before = re.sub(r"<nav>.*?</nav>", "", body_before, flags=re.S)
+        assert re.sub(r"<[^>]+>|\s", "", text_before) == "", name
+        assert "<footer>" in after, name
+
+
+def test_the_catalog_index_links_back_to_the_playground() -> None:
+    # The catalog could be reached from the privacy page and from nowhere else
+    # on the site, and its index linked to nothing but its own rule pages: a
+    # reader who arrived from a SARIF helpUri had no route to the tool the
+    # rules belong to (WCAG 2.4.5). The wording is the privacy page's own.
+    gen = _load_generator()
+    index = gen.generate_rule_pages()["index.html"]
+    assert '<nav><a href="../index.html">&larr; Playground</a></nav>' in index
+    assert index.index("<nav>") < index.index("<main>")
+
+
 def test_the_catalog_stylesheet_paints_both_schemes() -> None:
     # The defect the widened audit found: `color-scheme: light dark` with no
     # color or background on `body`, so the user agent painted dark-mode text

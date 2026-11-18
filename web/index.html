@@ -143,6 +143,7 @@
         cursor: pointer;
       }
       button:disabled { opacity: 0.65; cursor: progress; }
+      input[type="file"] { max-width: 100%; }
       :focus-visible { outline: 3px solid currentColor; outline-offset: 3px; }
       #status { color: var(--muted); }
       iframe#report {
@@ -182,7 +183,7 @@
         id="report"
         title="Validation report"
         sandbox="allow-same-origin"
-        srcdoc="<p>Validation results will appear here after you select feed files.</p>"
+        srcdoc="<!doctype html><html lang='en'><meta name='color-scheme' content='light dark'><p>Validation results will appear here after you select feed files.</p>"
       ></iframe>
     </main>
 
@@ -195,6 +196,7 @@
           >github.com/ChelseaKR/tods-validate</a
         >
       </p>
+      <p><a href="rules/index.html">Rule catalog</a></p>
       <p>
         <a href="https://ko-fi.com/T6T6GMYTU" target="_blank" rel="noopener noreferrer"
           >Support this work on Ko-fi</a
@@ -226,6 +228,28 @@
       const footerVersion = document.getElementById("footer-version");
       const selected = new Map(); // filename -> Uint8Array
       let pyodide;
+
+      // The report frame grows to fit its report, so a long one scrolls with
+      // the page, and it is a Tab stop only when it holds something to
+      // operate. The measurements behind both are in web/README.md.
+      const fitReport = () => {
+        const root = report.contentDocument && report.contentDocument.documentElement;
+        if (!root) return;
+        report.style.height = Math.ceil(root.getBoundingClientRect().height) + "px";
+        if (root.querySelector("a[href], input, select, summary, [tabindex]")) {
+          report.removeAttribute("tabindex");
+        } else {
+          report.tabIndex = -1;
+        }
+      };
+      const reportSize = new ResizeObserver(fitReport);
+      const watchReport = () => {
+        reportSize.disconnect();
+        if (report.contentDocument) reportSize.observe(report.contentDocument.documentElement);
+        fitReport();
+      };
+      report.addEventListener("load", watchReport);
+      watchReport(); // the placeholder may have loaded before this script ran
 
       footerVersion.textContent = `tods-validate ${TODS_VALIDATE_VERSION} · Pyodide ${PYODIDE_VERSION}`;
 
