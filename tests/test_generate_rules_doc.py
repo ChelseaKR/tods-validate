@@ -148,6 +148,17 @@ def test_every_catalog_page_has_one_main_landmark_around_its_content() -> None:
         assert "<footer>" in after, name
 
 
+def test_the_catalog_index_links_back_to_the_playground() -> None:
+    # The catalog could be reached from the privacy page and from nowhere else
+    # on the site, and its index linked to nothing but its own rule pages: a
+    # reader who arrived from a SARIF helpUri had no route to the tool the
+    # rules belong to (WCAG 2.4.5). The wording is the privacy page's own.
+    gen = _load_generator()
+    index = gen.generate_rule_pages()["index.html"]
+    assert '<nav><a href="../index.html">&larr; Playground</a></nav>' in index
+    assert index.index("<nav>") < index.index("<main>")
+
+
 def test_the_catalog_stylesheet_paints_both_schemes() -> None:
     # The defect the widened audit found: `color-scheme: light dark` with no
     # color or background on `body`, so the user agent painted dark-mode text

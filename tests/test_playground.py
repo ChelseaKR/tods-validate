@@ -554,3 +554,11 @@ def test_the_file_input_cannot_be_wider_than_its_panel() -> None:
     rule = re.search(r'input\[type="file"\]\s*\{([^}]*)\}', style.group(1))
     assert rule, "no rule for the file input"
     assert re.search(r"max-width:\s*100%", rule.group(1))
+
+
+def test_the_playground_links_to_the_rule_catalog() -> None:
+    # The other half of test_the_catalog_index_links_back_to_the_playground:
+    # the playground named no route to the catalog its reports cite.
+    footer = re.search(r"<footer>(.*?)</footer>", _HTML.read_text(), flags=re.S)
+    assert footer
+    assert '<a href="rules/index.html">Rule catalog</a>' in footer.group(1)

@@ -411,6 +411,7 @@ def _index_page_html(rules: list[Rule]) -> str:
 {_PAGE_STYLE}    </style>
 {_ANALYTICS_SCRIPT}  </head>
   <body>
+    <nav><a href="../index.html">&larr; Playground</a></nav>
     <main>
     <h1>tods-validate rule catalog</h1>
     <p class="lede">
