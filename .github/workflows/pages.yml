@@ -94,7 +94,7 @@ jobs:
       pages: write # publish the built site to GitHub Pages
       id-token: write # OIDC to prove this workflow run produced the artifact
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
       - name: Refuse to publish a page pinned to a wheel PyPI does not have
@@ -139,7 +139,7 @@ jobs:
     # reports the page's last status rather than being killed with the job.
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
           persist-credentials: false
       # Deliberately no actions/setup-node: this workflow deploys as part of
