@@ -5,7 +5,7 @@
     "a11y": "bash scripts/run-a11y.sh"
   },
   "devDependencies": {
-    "pa11y-ci": "4.1.1"
+    "pa11y-ci": "5.0.0"
   },
   "overrides": {
     "pa11y": "10.0.0",
